@@ -1,21 +1,23 @@
 import React from 'react';
-import { Plus, MessageSquare, X } from "lucide-react";
+import { Plus, MessageSquare, X, User } from "lucide-react";
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
+import { userStore } from '../store'
 
 const Sidebar = React.memo(({ isOpen, onClose }) => {
-  const { isDark } = useTheme();
+  const { isDark, border } = useTheme();
   const { t } = useLanguage();
+  const { userProfile } = userStore;
 
   return (
     <div
-      className={`fixed lg:relative top-0 left-0 h-full border-r shadow-md ${isDark
+      className={`fixed lg:relative top-0 left-0 flex flex-col h-full border-r shadow-md ${isDark
           ? "bg-[#171717] text-white border-gray-700"
           : "bg-white text-black border-gray-200"
         } transition-all duration-300 ease-in-out ${isOpen ? "w-64" : "w-0"
         } overflow-hidden z-50`}
     >
-      <div className="w-64">
+      <div className="w-64 flex-1 flex flex-col">
         <div className="px-4 flex justify-between h-[65px] items-center">
           <h2 className="text-xl font-bold">ChatGPT</h2>
           <button
@@ -39,7 +41,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
             {t("newChat")}
           </button>
         </div>
-        <div className="p-4">
+        <div className="p-4 overflow-y-auto flex-1">
           <div
             className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"
               } mb-2`}
@@ -59,6 +61,25 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
             </button>
           ))}
         </div>
+        {userProfile && (
+          <div className="p-4">
+            <div className={`flex items-center rounded-md py-2 px-2 ${isDark ? 'hover:bg-[#212121]' : 'hover:bg-gray-200'
+              } cursor-pointer transition-colors duration-300`}>
+              {userProfile.avatarUrl ? (
+                <img
+                  src={userProfile.avatarUrl}
+                  alt="User Avatar"
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+              ) : (
+                <div className='rounded-full w-8 h-8 bg-gray-300 flex items-center justify-center'>
+                  <User size={20} className={isDark ? 'text-gray-700' : 'text-gray-500'} />
+                </div>
+              )}
+              <div className='ml-2 text-sm truncate'>{userProfile.email}</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

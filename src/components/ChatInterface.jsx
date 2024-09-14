@@ -114,7 +114,7 @@ const ChatInterface = () => {
 
   return (
     <div className={`flex h-screen ${theme.bg} ${theme.text}transition-colors duration-300`}>
-    <Sidebar isOpen={isSidebarOpen} onClose={toggleSidebar} />
+    <Sidebar isOpen={isSidebarOpen} onClose={toggleSidebar}/>
     <div className="flex-1 flex flex-col overflow-hidden">
       <ChatHeader toggleSidebar={toggleSidebar} />
 
