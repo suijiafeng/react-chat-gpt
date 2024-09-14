@@ -1,0 +1,11 @@
+{
+  "welcome": "欢迎使用我的应用",
+  "hello": "你好，{{name}}！",
+  "newChat": "新建聊天",
+  "recentChats": "最近的聊天",
+  "enterMessage": "输入您的消息...",
+  "send": "发送",
+  "chat": "聊天",
+  "darkMode": "深色模式",
+  "lightMode": "浅色模式"
+}

@@ -1,0 +1,11 @@
+{
+  "welcome": "Welcome to my app",
+  "hello": "Hello, {{name}}!",
+  "newChat": "New Chat",
+  "recentChats": "Recent Chats",
+  "enterMessage": "Enter your message...",
+  "send": "Send",
+  "chat": "Chat",
+  "darkMode": "Dark Mode",
+  "lightMode": "Light Mode"
+}
