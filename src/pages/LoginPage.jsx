@@ -1,161 +1,130 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { useTranslation } from 'react-i18next';
 import Spinner from '../components/Spinner';
-import { 
-  WEBUI_BASE_URL, 
-} from '../constants';
-// import { 
-//   useUser, 
-//   useConfig, 
-//   useSocket,
-// } from '../hooks';
-// import { 
-//   getSessionUser, 
-//   userSignIn, 
-//   userSignUp, 
-//   getBackendConfig 
-// } from '../apis';
-// import { generateInitialsImage } from '../utils';
+import NavHeader from '../components/NavHeader';
+import { useLanguage } from '../hooks';
+import { useTheme, withTheme } from '../contexts/ThemeContext';
 
-const Login = () => {
+const LoginSignupForm = ({ config, i18n, WEBUI_NAME, WEBUI_BASE_URL }) => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
-  // const [user, setUser] = useUser();
-  // const [user, setUser] = useState(false);
-  // const [config, setConfig] = useConfig();
-  // const socket = useSocket();
-
-
+  const theme = useTheme();
+  const { t } = useLanguage()
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const setSessionUser = async (sessionUser) => {
-    if (sessionUser) {
-      console.log(sessionUser);
-      toast.success(t("You're now logged in."));
-      if (sessionUser.token) {
-        localStorage.setItem('token', sessionUser.token);
-      }
-
-      // socket.emit('user-join', { auth: { token: sessionUser.token } });
-      // await setUser(sessionUser);
-      // await setConfig(await getBackendConfig());
-      navigate('/');
-    }
-  };
-
-  const signInHandler = async () => {
-    try {
-      // const sessionUser = await userSignIn(email, password);
-      // await setSessionUser(sessionUser);
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
-  const signUpHandler = async () => {
-    try {
-      // const sessionUser = await userSignUp(name, email, password, generateInitialsImage(name));
-      // await setSessionUser(sessionUser);
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
-  const submitHandler = async (e) => {
-    e.preventDefault();
-    if (mode === 'signin') {
-      await signInHandler();
-    } else {
-      await signUpHandler();
-    }
-  };
-
-  const checkOauthCallback = async () => {
-    const hash = window.location.hash.substring(1);
-    if (!hash) return;
-
-    const params = new URLSearchParams(hash);
-    const token = params.get('token');
-    if (!token) return;
-
-    try {
-      // const sessionUser = await getSessionUser(token);
-      // if (sessionUser) {
-      //   localStorage.setItem('token', token);
-      //   await setSessionUser(sessionUser);
-      // }
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
   useEffect(() => {
-    // const init = async () => {
-    //   if (user !== undefined) {
-    //     navigate('/');
-    //     return;
-    //   }
-    //   // await checkOauthCallback();
-    //   setLoaded(true);
-    //   if ((config?.features.auth_trusted_header ?? false) || config?.features.auth === false) {
-    //     await signInHandler();
-    //   }
-    // };
-
-    // init();
+    setLoaded(true);
   }, []);
 
-  if (!loaded) {
-    return null;
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // Implement sign in / sign up logic here
+  };
+
+  if (!loaded) return null;
 
   return (
-    <>
-      <div className="fixed m-10 z-50">
-        <div className="flex space-x-2">
-          <div className="self-center">
-            <img
-              crossOrigin="anonymous"
-              src={`${WEBUI_BASE_URL}/static/favicon.png`}
-              className="w-8 rounded-full"
-              alt="logo"
-            />
-          </div>
-        </div>
+    <div className={`${theme.bg} min-h-screen w-full flex items-center flex-col font-primary`}>
+      <div className='ml-auto'>
+        <NavHeader />
       </div>
+      <div className="w-full flex-1 sm:max-w-md px-10 flex flex-col text-center">
+        <div className="mt-20 pb-10 w-full dark:text-gray-100">
+          <form className="flex flex-col justify-center" onSubmit={handleSubmit}>
+            <div className="mb-1">
+              <div className="text-2xl font-medium">
+                {mode === 'signin' ? t('Sign in') : t('Sign up')}
+                {t('to')}
+                {WEBUI_NAME}
+              </div>
+              {mode === 'signup' && (
+                <div className="mt-1 text-xs font-medium text-gray-500">
+                  ⓘ {WEBUI_NAME}
+                  {t(
+                    'does not make any external connections, and your data stays securely on your locally hosted server.'
+                  )}
+                </div>
+              )}
+            </div>
 
-      <div className="bg-white dark:bg-gray-950 min-h-screen w-full flex justify-center font-primary">
-        <div className="w-full sm:max-w-md px-10 min-h-screen flex flex-col text-center">
-          {((config?.features.auth_trusted_header ?? false) || config?.features.auth === false) ? (
-            <div className="my-auto pb-10 w-full">
-              <div className="flex items-center justify-center gap-3 text-xl sm:text-2xl text-center font-semibold dark:text-gray-200">
-                <div>
-                  {t('Signing in')}
-                  {t('to')}
-                </div>
-                <div>
-                  <Spinner />
-                </div>
+
+            <div className="flex flex-col mt-4">
+              {mode === 'signup' && (
+                <>
+                  <div>
+                    <div className="text-sm font-medium text-left mb-1">{t('Name')}</div>
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      type="text"
+                      className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${theme.input}`}
+                      autoComplete="name"
+                      placeholder={t('Enter Your Full Name')}
+                      required
+                    />
+                  </div>
+                  <hr className={`my-3 ${theme.border}`} />
+                </>
+              )}
+
+              <div className="mb-2">
+                <div className="text-sm font-medium text-left mb-1">{t('Email')}</div>
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${theme.input}`}
+                  autoComplete="email"
+                  placeholder={t('Enter Your Email')}
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="text-sm font-medium text-left mb-1">{t('Password')}</div>
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type="password"
+                  className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${theme.input}`}
+                  placeholder={t('Enter Your Password')}
+                  autoComplete="current-password"
+                  required
+                />
               </div>
             </div>
-          ) : (
-            <div className="my-auto pb-10 w-full dark:text-gray-100">
-              <form className="flex flex-col justify-center" onSubmit={submitHandler}>
-                {/* Form content */}
-              </form>
-              {/* OAuth providers */}
+
+
+
+            <div className="mt-5">
+              <button
+                className="bg-gray-950 hover:bg-gray-900 w-full rounded-2xl text-white font-medium text-sm py-3 transition"
+                type="submit"
+              >
+                {mode === 'signin' ? t('Sign in') : t('Create Account')}
+              </button>
+
+              <div className="mt-4 text-sm text-center">
+                {mode === 'signin'
+                  ? t("Dont have an account?")
+                  : t('Already have an account?')}
+                <button
+                  className="font-medium underline"
+                  type="button"
+                  onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+                >
+                  {mode === 'signin' ? t('Sign up') : t('Sign in')}
+                </button>
+              </div>
             </div>
-          )}
+          </form>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
-export default Login;
+export default withTheme(LoginSignupForm);

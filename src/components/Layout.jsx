@@ -7,7 +7,7 @@ import NotFound from '../pages/NotFound';
 import Login from '../pages/LoginPage';
 
 const Layout = () => {
-  const [isLoggedIn, setIsLoggedIn] = React.useState(true);
+  const [isLoggedIn, setIsLoggedIn] = React.useState(false);
 
   return (
     <ThemeProvider>

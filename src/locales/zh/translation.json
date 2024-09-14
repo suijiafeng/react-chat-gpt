@@ -7,5 +7,16 @@
   "send": "发送",
   "chat": "聊天",
   "darkMode": "深色模式",
-  "lightMode": "浅色模式"
+  "lightMode": "浅色模式",
+  "Name":"用户名",
+  "Email":"电子邮箱",
+  "Password":"密码",
+  "Dont have an account?":"还没有账号?",
+  "Already have an account?":"已经有账号了？",
+  "Enter Your Password":"请输入密码",
+  "Enter Your Email":"请输入电子邮箱",
+  "Enter Your Full Name":"请输入用户名",
+  "Create Account":"创建账号",
+  "Sign in":"登录",
+  "Sign up":"注册"
 }

@@ -7,5 +7,16 @@
   "send": "Send",
   "chat": "Chat",
   "darkMode": "Dark Mode",
-  "lightMode": "Light Mode"
+  "lightMode": "Light Mode",
+  "Name":"Name",
+  "Email":"Email",
+  "Password":"Password",
+  "Dont have an account?":"Don't have an account?",
+  "Already have an account?":"Already have an account?",
+  "Enter Your Password":"Enter Your Password",
+  "Enter Your Email":"Enter Your Email",
+  "Enter Your Full Name":"Enter Your Full Name",
+  "Create Account":"Create Account",
+  "Sign in":"Sign in",
+  "Sign up":"Sign up"
 }
