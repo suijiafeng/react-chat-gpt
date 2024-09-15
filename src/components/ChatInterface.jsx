@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Menu, Sun, Moon, Globe } from "lucide-react";
+import { Send, Menu, Sun, Moon, Globe, Import } from "lucide-react";
+import { v4 as uuidv4 } from 'uuid';
 import Sidebar from '../components/Sidebar';
 import ModelSelector from '../components/ModelSelector';
 import ChatMessage from '../components/ChatMessage';
@@ -7,8 +8,9 @@ import NavHeader from "./NavHeader";
 import { useTheme } from '../contexts/ThemeContext';
 import { useModel } from '../contexts/ModelContext';
 import { useLanguage } from '../hooks';
+import { generateChatCompletion } from '../apis/chat'
 const ChatHeader = ({ toggleSidebar }) => {
-  
+
   const theme = useTheme();
   return (
     <div className={` px-4 flex items-center justify-between h-[65px]`}>
@@ -25,7 +27,7 @@ const ChatHeader = ({ toggleSidebar }) => {
     </div>
   );
 };
-const ChatInput = ({ input, setInput, handleSubmit }) => {  
+const ChatInput = ({ input, setInput, handleSubmit }) => {
   const theme = useTheme();
   const { t } = useLanguage();
   return (
@@ -36,8 +38,7 @@ const ChatInput = ({ input, setInput, handleSubmit }) => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className={`flex-1 border rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:border-gray-700 transition-colors duration-200 ${
-              theme.input}`}
+            className={`flex-1 border rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:border-gray-700 transition-colors duration-200 ${theme.input}`}
             placeholder={t("enterMessage")}
           />
           <button
@@ -80,10 +81,12 @@ const ChatInterface = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
   const handleSubmit = useCallback(
-    (e) => {
+    async (e) => {
       e.preventDefault();
+      generateChatCompletion({ "stream": true, "model": "llama3.1:latest", "messages": [{ "role": "user", "content": input }], "options": {}, "session_id": "peT38VrOnJNooW3BAAAc", "chat_id": "cc4ff7fd-76db-4ac1-9d41-13ba9f8652d5", "id": uuidv4() }, (chuck) => {
+        console.log('chuck', chuck)
+      })
       if (input.trim()) {
         setMessages((prevMessages) => [
           ...prevMessages,
@@ -114,26 +117,26 @@ const ChatInterface = () => {
 
   return (
     <div className={`flex h-screen ${theme.bg} ${theme.text}transition-colors duration-300`}>
-    <Sidebar isOpen={isSidebarOpen} onClose={toggleSidebar}/>
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <ChatHeader toggleSidebar={toggleSidebar} />
+      <Sidebar isOpen={isSidebarOpen} onClose={toggleSidebar} />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatHeader toggleSidebar={toggleSidebar} />
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto p-4 pb-[100px]">
-          {messages.map((message, index) => (
-            <ChatMessage
-              key={index}
-              message={message.text}
-              isUser={message.isUser}
-            />
-          ))}
-          <div ref={messagesEndRef} />
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto p-4 pb-[100px]">
+            {messages.map((message, index) => (
+              <ChatMessage
+                key={index}
+                message={message.text}
+                isUser={message.isUser}
+              />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-      </div>
 
-      <ChatInput input={input} setInput={setInput} handleSubmit={handleSubmit} />
+        <ChatInput input={input} setInput={setInput} handleSubmit={handleSubmit} />
+      </div>
     </div>
-  </div>
   );
 };
 

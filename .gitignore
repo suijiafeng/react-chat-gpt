@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.venv
+__pycache__
+_old
+uploads
+.ipynb_checkpoints
+*.db
+_test
+Pipfile
+!/data
+data/*
+.webui_secret_key

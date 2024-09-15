@@ -7,7 +7,7 @@ const isDev = isBrowser && (window.location.hostname === 'localhost' || window.l
 
 export const APP_NAME = 'Open WebUI';
 
-export const WEBUI_HOSTNAME = isBrowser ? (isDev ? `${window.location.hostname}:8080` : '') : '';
+export const WEBUI_HOSTNAME = isBrowser ? (isDev ? `${window.location.hostname}:3000` : '') : '';
 export const WEBUI_BASE_URL = isBrowser ? (isDev ? `http://${WEBUI_HOSTNAME}` : '') : '';
 export const WEBUI_API_BASE_URL = `${WEBUI_BASE_URL}/api/v1`;
 

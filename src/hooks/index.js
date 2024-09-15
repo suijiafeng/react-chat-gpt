@@ -39,7 +39,6 @@ export const useAuth = () => {
         if(res.statusText === "OK") {
           setIsLoggedIn(true);
           userStore.setUser({
-            avatarUrl: null,
             ...res.data
           });
         }

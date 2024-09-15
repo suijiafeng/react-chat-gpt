@@ -23,7 +23,8 @@
     "react-mobx": "^0.0.4",
     "react-router-dom": "^6.26.2",
     "react-toastify": "^10.0.5",
-    "tailwindcss": "^3.4.11"
+    "tailwindcss": "^3.4.11",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",

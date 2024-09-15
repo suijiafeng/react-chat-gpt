@@ -65,9 +65,9 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
           <div className="p-4">
             <div className={`flex items-center rounded-md py-2 px-2 ${isDark ? 'hover:bg-[#212121]' : 'hover:bg-gray-200'
               } cursor-pointer transition-colors duration-300`}>
-              {userProfile.avatarUrl ? (
+              {userProfile?.profile_image_url ? (
                 <img
-                  src={userProfile.avatarUrl}
+                  src={userProfile.profile_image_url}
                   alt="User Avatar"
                   className="w-8 h-8 rounded-full object-cover"
                 />
