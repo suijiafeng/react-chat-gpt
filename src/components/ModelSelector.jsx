@@ -21,7 +21,7 @@ const ModelSelector = React.memo(() => {
     <div className="relative">
       <button
         onClick={toggleOpen}
-        className={`flex items-center justify-between w-40 px-4 py-2 ${isDark ? "bg-[#212121] text-white" : "bg-white text-black"
+        className={`flex items-center justify-between min-w-40 px-4 py-2 ${isDark ? "bg-[#212121] text-white" : "bg-white text-black"
           } border ${isDark ? "border-gray-700" : "border-gray-300"
           } rounded-md`}
       >
@@ -33,7 +33,7 @@ const ModelSelector = React.memo(() => {
         />
       </button>
       <div
-        className={`absolute mt-1 w-40 ${isDark ? "bg-[#212121] text-white" : "bg-white text-black"
+        className={`absolute mt-1 min-w-40 ${isDark ? "bg-[#212121] text-white" : "bg-white text-black"
           } border ${isDark ? "border-gray-700" : "border-gray-300"
           } rounded-md shadow-lg transition-opacity duration-200 ${isOpen ? "opacity-100 visible" : "opacity-0 invisible"
           }`}

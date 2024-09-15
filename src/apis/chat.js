@@ -1,5 +1,5 @@
 import request from "./config";
-import { WEBUI_API_BASE_URL, OLLAMA_API_BASE_URL } from '../constants'
+import { WEBUI_API_BASE_URL, OLLAMA_API_BASE_URL, WEBUI_BASE_URL } from '../constants'
 export const queryMemory = (params) => {
   const { content, token } = params
   return request.post(`${WEBUI_API_BASE_URL}/memories/query`, { content, token })
@@ -100,4 +100,10 @@ const processChunk = (chunkStr, callback, bufferRef) => {
   } catch (error) {
     console.error('解析数据错误：', error);
   }
+};
+
+
+export const generateTitle = (params) => {
+  const { model, prompt, chat_id } = params
+  return request.post(`${WEBUI_BASE_URL}/api/task/title/completions`, { model, prompt, chat_id })
 };

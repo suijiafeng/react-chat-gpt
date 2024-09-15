@@ -8,10 +8,10 @@ import NavHeader from "./NavHeader";
 import { useTheme } from '../contexts/ThemeContext';
 import { useModel } from '../contexts/ModelContext';
 import { useLanguage } from '../hooks';
-import { generateChatCompletion } from '../apis/chat';
+import { generateChatCompletion, generateTitle } from '../apis/chat';
 
 const ChatHeader = React.memo(({ toggleSidebar }) => {
-  const {classes} = useTheme();
+  const { classes } = useTheme();
   return (
     <div className={`px-4 flex items-center justify-between h-16 ${classes.headerBg}`}>
       <div className="flex items-center">
@@ -29,7 +29,7 @@ const ChatHeader = React.memo(({ toggleSidebar }) => {
 });
 
 const ChatInput = React.memo(({ input, setInput, handleSubmit }) => {
-  const {classes} = useTheme();
+  const { classes } = useTheme();
   const { t } = useLanguage();
   return (
     <div className="py-4">
@@ -59,9 +59,8 @@ const ChatInterface = () => {
   const [input, setInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const {classes} = useTheme();
+  const { classes } = useTheme();
   const { currentModel } = useModel();
-  const { t } = useLanguage();
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -114,6 +113,7 @@ const ChatInterface = () => {
           (chunk) => {
             if (chunk === '[DONE]') {
               setIsStreaming(false);
+              generateChatDone()
               return;
             }
 
@@ -134,9 +134,10 @@ const ChatInterface = () => {
     },
     [input, messages, currentModel]
   );
-
   const toggleSidebar = useCallback(() => setIsSidebarOpen((prev) => !prev), []);
-
+  const generateChatDone = async () => {
+    await generateTitle({model:currentModel, prompt:'聊天如何变美丽', chat_id:''})
+  }
   return (
     <div className={`flex h-screen ${classes.bg} ${classes.text} transition-colors duration-300`}>
       <Sidebar isOpen={isSidebarOpen} onClose={toggleSidebar} />
@@ -146,14 +147,14 @@ const ChatInterface = () => {
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto p-4 pb-24">
             {messages.map((message, index) => (
-             <ChatMessage
-             key={message.id}
-             message={message.text}
-             isUser={message.isUser}
-             isTyping={!message.isUser && index === messages.length - 1 && isStreaming}
-             avatar={message.avatar} // 如果有自定义头像，可以传入
-             username={message.username} // 如果有自定义用户名，可以传入
-           />
+              <ChatMessage
+                key={message.id}
+                message={message.text}
+                isUser={message.isUser}
+                isTyping={!message.isUser && index === messages.length - 1 && isStreaming}
+                avatar={message.avatar} // 如果有自定义头像，可以传入
+                username={message.username} // 如果有自定义用户名，可以传入
+              />
             ))}
             <div ref={messagesEndRef} />
           </div>
