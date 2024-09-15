@@ -15,7 +15,7 @@ const NavHeader = () => {
           className={`${isDark
             ? "text-gray-300 hover:text-white"
             : "text-gray-500 hover:text-gray-700"
-            } mr-4 transition-colors duration-200 flex items-center w-[45px]`}
+            } mr-4 flex items-center w-[45px]`}
         >
           <Globe size={24} />
           {language}
@@ -25,7 +25,7 @@ const NavHeader = () => {
           className={`${isDark
             ? "text-yellow-300 hover:text-yellow-100"
             : "text-gray-500 hover:text-gray-700"
-            } transition-colors duration-200`}
+            }`}
         >
           {isDark ? <Sun size={24} /> : <Moon size={24} />}
         </button>

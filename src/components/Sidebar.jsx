@@ -5,7 +5,7 @@ import { useLanguage } from '../hooks';
 import { userStore } from '../store'
 
 const Sidebar = React.memo(({ isOpen, onClose }) => {
-  const { isDark, border } = useTheme();
+  const { isDark } = useTheme();
   const { t } = useLanguage();
   const { userProfile } = userStore;
 
@@ -25,7 +25,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
             className={`${isDark
                 ? "text-gray-300 hover:text-white"
                 : "text-gray-500 hover:text-gray-700"
-              } mr-4 transition-colors duration-200 lg:hidden`}
+              } mr-4 lg:hidden`}
           >
             <X size={24} />
           </button>
@@ -35,7 +35,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
             className={`flex items-center ${isDark
                 ? "text-white hover:bg-[#212121]"
                 : "text-black hover:bg-gray-200"
-              } w-full p-2 rounded transition-colors duration-200`}
+              } w-full p-2 rounded`}
           >
             <Plus size={18} className="mr-2" />
             {t("newChat")}
@@ -54,7 +54,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
               className={`flex items-center ${isDark
                   ? "text-white hover:bg-[#212121]"
                   : "text-black hover:bg-gray-200"
-                } w-full p-2 rounded transition-colors duration-200`}
+                } w-full p-2 rounded`}
             >
               <MessageSquare size={18} className="mr-2" />
               {t("chat")} {chat}
@@ -64,7 +64,7 @@ const Sidebar = React.memo(({ isOpen, onClose }) => {
         {userProfile && (
           <div className="p-4">
             <div className={`flex items-center rounded-md py-2 px-2 ${isDark ? 'hover:bg-[#212121]' : 'hover:bg-gray-200'
-              } cursor-pointer transition-colors duration-300`}>
+              } cursor-pointer`}>
               {userProfile?.profile_image_url ? (
                 <img
                   src={userProfile.profile_image_url}

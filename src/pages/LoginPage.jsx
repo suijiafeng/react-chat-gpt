@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { message, Spin } from 'antd';
 import NavHeader from '../components/NavHeader';
 import { useLanguage } from '../hooks';
-import { useTheme, withTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { userSignIn, userSignUp,checkAuthStatus } from '../apis/auths';
 
 const LoginSignupForm = ({ WEBUI_NAME }) => {
   const navigate = useNavigate();
-  const theme = useTheme();
+  const {classes} = useTheme();
   const { t } = useLanguage();
   const [mode, setMode] = useState('signin');
   const [name, setName] = useState('');
@@ -63,7 +63,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
     verifyAuthStatus();
   }, []);
   return (
-    <div className={`${theme.bg} min-h-screen w-full flex items-center flex-col font-primary`}>
+    <div className={`${classes.bg} ${classes.text} min-h-screen w-full flex items-center flex-col font-primary`}>
       <div className="ml-auto px-4">
         <NavHeader />
       </div>
@@ -93,13 +93,13 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         type="text"
-                        className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${theme.input}`}
+                        className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${classes.input}`}
                         autoComplete="name"
                         placeholder={t('Enter Your Full Name')}
                         required
                       />
                     </div>
-                    <hr className={`my-3 ${theme.border}`} />
+                    <hr className={`my-3 ${classes.border}`} />
                   </>
                 )}
 
@@ -109,7 +109,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     type="email"
-                    className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${theme.input}`}
+                    className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${classes.input}`}
                     autoComplete="email"
                     placeholder={t('Enter Your Email')}
                     required
@@ -122,7 +122,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     type="password"
-                    className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${theme.input}`}
+                    className={`px-5 py-3 rounded-2xl w-full text-sm outline-none border ${classes.input}`}
                     placeholder={t('Enter Your Password')}
                     autoComplete="current-password"
                     required
@@ -159,4 +159,4 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
   );
 };
 
-export default withTheme(LoginSignupForm);
+export default LoginSignupForm;

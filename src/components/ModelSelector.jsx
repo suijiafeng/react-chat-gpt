@@ -23,7 +23,7 @@ const ModelSelector = React.memo(() => {
         onClick={toggleOpen}
         className={`flex items-center justify-between w-40 px-4 py-2 ${isDark ? "bg-[#212121] text-white" : "bg-white text-black"
           } border ${isDark ? "border-gray-700" : "border-gray-300"
-          } rounded-md transition-colors duration-200`}
+          } rounded-md`}
       >
         {currentModel}
         <ChevronDown
@@ -43,7 +43,7 @@ const ModelSelector = React.memo(() => {
             key={model}
             onClick={() => handleModelSelect(model)}
             className={`block w-full text-left px-4 py-2 ${isDark ? "hover:bg-gray-700" : "hover:bg-gray-100"
-              } ${currentModel === model ? "font-bold" : ""} transition-colors duration-200`}
+              } ${currentModel === model ? "font-bold" : ""}`}
           >
             {model}
           </button>

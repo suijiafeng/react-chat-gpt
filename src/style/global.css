@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.typing-cursor{
+  display: inline-block;
+  width: 1px;
+  height: 1px;
+  background-color: #000;
+  animation: blink 1s steps(1) infinite;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
