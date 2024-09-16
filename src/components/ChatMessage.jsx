@@ -19,7 +19,14 @@ const Avatar = ({ src, alt, isUser }) => (
     className={`w-10 h-10 rounded-full object-cover ${isUser ? 'ml-2' : 'mr-2'}`}
   />
 );
-
+const LoadingIndicator = ({ message,classes }) => {
+  return message ? <span className="typing-cursor animate-pulse">|</span>: (
+    <div className="flex justify-center  text-sm">
+      {/* AI 正在生成响应... */}
+      <Loader size={18} className={`${classes.text} animate-spin-slow`} />
+    </div>
+  );
+};
 const ChatMessage = React.memo(({ message, isTyping, isUser, avatar, username }) => {
   const { isDark, classes } = useTheme();
 
@@ -40,8 +47,7 @@ const ChatMessage = React.memo(({ message, isTyping, isUser, avatar, username })
         <div className={messageClasses}>
           <>
             <span className="message-text break-words">{message}</span>
-            {isTyping && (message ? <span className="typing-cursor animate-pulse">|</span> :
-              <Loader size={24} className={`${classes.text} animate-spin-slow`} />
+            {isTyping && (<LoadingIndicator message={message} classes={classes} />
             )}
           </>
         </div>

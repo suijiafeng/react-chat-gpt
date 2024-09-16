@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo, useLayoutEffect } from "react";
 import { useChat } from '../hooks';
 import Sidebar from '../components/Sidebar';
 import ChatMessage from '../components/ChatMessage';
@@ -14,7 +14,6 @@ const ChatInterface = () => {
     setInput,
     isStreaming,
     handleChatCompletion,
-    updateMessage,
     messagesEndRef,
     cancelChatCompletion
   } = useChat(currentModel);
@@ -26,8 +25,8 @@ const ChatInterface = () => {
     async (e) => {
       e.preventDefault();
       if (isStreaming) {
-        cancelChatCompletion()
-        return
+        cancelChatCompletion();
+        return;
       }
       if (!input.trim()) return;
 
@@ -39,22 +38,32 @@ const ChatInterface = () => {
         { role: 'user', content: input },
       ];
 
-      handleChatCompletion(input, conversation, updateMessage);
+      handleChatCompletion(input, conversation);
     },
-    [input, isStreaming, messages, handleChatCompletion, updateMessage]
+    [input, isStreaming, messages, handleChatCompletion]
   );
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
+  // 初始状态设为 null，避免在界面加载时先展开再收起的问题
+  const [isSidebarOpen, setIsSidebarOpen] = useState(null);
 
   const toggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
-  useEffect(() => {
+
+  useLayoutEffect(() => {
+    // 检查当前窗口宽度并设置侧边栏状态
     const handleResize = () => setIsSidebarOpen(window.innerWidth >= 1024);
+
+    handleResize(); // 在初次加载时立即检测
     window.addEventListener("resize", handleResize);
-    handleResize();
+
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // 如果 isSidebarOpen 仍然为 null，则不渲染 Sidebar，避免闪烁
+  if (isSidebarOpen === null) {
+    return null;
+  }
 
   return (
     <div className={`flex h-screen ${classes.bg} ${classes.text} transition-colors duration-300`}>

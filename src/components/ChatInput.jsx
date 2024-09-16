@@ -1,9 +1,11 @@
 import React from 'react';
 import { Send, CircleStop } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../hooks';
 
 const ChatInput = ({ input, setInput, handleSubmit, isStreaming }) => {
   const { classes, isDark } = useTheme();
+  const { t } = useLanguage()
 
   return (
     <div className="py-4">
@@ -14,7 +16,7 @@ const ChatInput = ({ input, setInput, handleSubmit, isStreaming }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             className={`flex-1 rounded-l-lg px-4 py-2 focus:outline-none border transition-colors duration-300 ${classes.border} ${classes.input}`}
-            placeholder="输入消息"
+            placeholder={t("enterMessage")}
           />
           <button
             type="submit"
