@@ -1,27 +1,28 @@
-import React, { useState,useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message, Spin } from 'antd';
 import NavHeader from '../components/NavHeader';
-import { useLanguage } from '../hooks';
+import { useLanguage, useAuth } from '../hooks';
 import { useTheme } from '../contexts/ThemeContext';
-import { userSignIn, userSignUp,checkAuthStatus } from '../apis/auths';
+import { userSignIn, userSignUp, checkAuthStatus } from '../apis/auths';
+
 
 const LoginSignupForm = ({ WEBUI_NAME }) => {
   const navigate = useNavigate();
-  const {classes} = useTheme();
+  const { classes } = useTheme();
   const { t } = useLanguage();
   const [mode, setMode] = useState('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-
+  const { isLoggedIn } = useAuth();
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   const handleAuth = async (authFunc, successMessage) => {
     setLoading(true);
     try {
-      const res = await authFunc({email, password,...(mode === 'signup' && { name ,profile_image_url:''})  });
+      const res = await authFunc({ email, password, ...(mode === 'signup' && { name, profile_image_url: '' }) });
       if (res.statusText === 'OK') {
         const { token, token_type } = res.data;
         localStorage.setItem('token', `${token_type} ${token}`);
@@ -45,23 +46,12 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
     }
   };
   useEffect(() => {
-    const verifyAuthStatus = async () => {
-      try {
-        const response = await checkAuthStatus();
-        if (response.statusText === "OK") {
-          message.info(t('您已经登录，正在跳转...'));
-          await sleep(2000)
-          navigate('/', { replace: true });
-        }
-      } catch (error) {
-        console.error('Error checking auth status:', error);
-      } finally {
-        setLoading(false);
-      }
+    if (isLoggedIn) {
+      message.info(t('您已经登录，正在跳转...'));
+      sleep(2000)
+      navigate('/', { replace: true });
     };
-  
-    verifyAuthStatus();
-  }, []);
+  }, [isLoggedIn]);
   return (
     <div className={`${classes.bg} ${classes.text} min-h-screen w-full flex items-center flex-col font-primary`}>
       <div className="ml-auto px-4">

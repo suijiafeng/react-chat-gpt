@@ -5,7 +5,16 @@ export const queryMemory = (params) => {
   return request.post(`${WEBUI_API_BASE_URL}/memories/query`, { content, token })
 }
 
-export const generateChatCompletion = async (params, callback) => {
+export const createNewChat =  (params) => {
+	// const {chat} = {params}
+  const chat = {"chat":{"id":"","title":"新对话","models":["llama3.1:latest"],"params":{},"messages":[{"id":"2e5c2c87-c640-4c40-b62d-49f5bd095ec0","parentId":null,"childrenIds":["6cefd5cf-2092-4118-b1e6-5f0acbfed427"],"role":"user","content":"666","timestamp":1726466098,"models":["llama3.1:latest"]},{"parentId":"2e5c2c87-c640-4c40-b62d-49f5bd095ec0","id":"6cefd5cf-2092-4118-b1e6-5f0acbfed427","childrenIds":[],"role":"assistant","content":"","model":"llama3.1:latest","modelName":"llama3.1:latest","modelIdx":0,"userContext":null,"timestamp":1726466098}],"history":{"messages":{"2e5c2c87-c640-4c40-b62d-49f5bd095ec0":{"id":"2e5c2c87-c640-4c40-b62d-49f5bd095ec0","parentId":null,"childrenIds":["6cefd5cf-2092-4118-b1e6-5f0acbfed427"],"role":"user","content":"666","timestamp":1726466098,"models":["llama3.1:latest"]},"6cefd5cf-2092-4118-b1e6-5f0acbfed427":{"parentId":"2e5c2c87-c640-4c40-b62d-49f5bd095ec0","id":"6cefd5cf-2092-4118-b1e6-5f0acbfed427","childrenIds":[],"role":"assistant","content":"","model":"llama3.1:latest","modelName":"llama3.1:latest","modelIdx":0,"userContext":null,"timestamp":1726466098}},"currentId":"6cefd5cf-2092-4118-b1e6-5f0acbfed427"},"tags":[],"timestamp":1726466098996}}
+
+	return request.post(`${WEBUI_API_BASE_URL}/chats/new`,{chat})
+};
+
+
+
+export const generateChatCompletion = async (params, callback,signal) => {
   const { chat_id, id, messages, model, options, session_id, stream } = params;
 
   try {
@@ -17,6 +26,7 @@ export const generateChatCompletion = async (params, callback) => {
         'Authorization': localStorage.getItem('token'),
       },
       body: JSON.stringify({ chat_id, id, messages, model, options, session_id, stream }),
+      signal, // 将 signal 传递给 fetch，以便控制请求的中断
     });
 
     if (!response.ok) {
@@ -37,66 +47,45 @@ export const generateChatCompletion = async (params, callback) => {
       processChunk(chunk, callback, bufferRef);
     }
   } catch (error) {
-    console.error('请求错误：', error);
+    if (error.name === 'AbortError') {
+      console.log('请求被取消');
+    } else {
+      // 更精确的错误处理
+      callback({ error: '请求失败，请检查网络连接或稍后重试。' });
+      console.error('请求错误：', error);
+    }
   }
 };
 
 
+
 const processChunk = (chunkStr, callback, bufferRef) => {
   try {
-    // 在传入的新数据块前，拼接之前的缓冲区内容
+    // 将上次未解析完的部分和新数据拼接在一起
     chunkStr = bufferRef.current + chunkStr;
 
-    let index = 0;
-    const length = chunkStr.length;
+    // 使用正则表达式查找完整的 JSON 对象
+    const jsonMatches = chunkStr.match(/({.*?})(?=\s|$)/g);
 
-    // 用于追踪括号匹配情况
-    let braceCount = 0;
-    let start = null;
+    if (jsonMatches) {
+      jsonMatches.forEach((jsonStr) => {
+        try {
+          const chunk = JSON.parse(jsonStr);
 
-    while (index < length) {
-      const char = chunkStr[index];
-
-      if (char === '{') {
-        if (braceCount === 0) {
-          start = index; // 标记JSON对象的开始位置
-        }
-        braceCount++;
-      } else if (char === '}') {
-        braceCount--;
-        if (braceCount === 0 && start !== null) {
-          // 找到了一个完整的 JSON 对象
-          const jsonStr = chunkStr.slice(start, index + 1);
-
-          try {
-            const chunk = JSON.parse(jsonStr); // 尝试解析 JSON
-
-            if (chunk.done) {
-              callback('[DONE]');
-            } else {
-              const content = chunk.message.content;
-              if (content) {
-                callback(content);
-              }
-            }
-          } catch (jsonError) {
-            console.error('JSON 解析错误：', jsonError);
+          if (chunk.done) {
+            callback('[DONE]');
+          } else if (chunk.message && chunk.message.content) {
+            callback(chunk.message.content);
           }
-
-          // 重置 start
-          start = null;
+        } catch (jsonError) {
+          console.error('JSON 解析错误：', jsonError);
         }
-      }
-
-      index++;
+      });
     }
 
-    // 如果有剩余的未完整的部分，将其存入缓冲区
-    if (braceCount !== 0 && start !== null) {
-      bufferRef.current = chunkStr.slice(start);
-    } else {
-      bufferRef.current = ''; // 否则清空缓冲区
-    }
+    // 缓存未完整的 JSON 字符串
+    const lastIndex = chunkStr.lastIndexOf('}');
+    bufferRef.current = lastIndex === chunkStr.length - 1 ? '' : chunkStr.slice(lastIndex + 1);
   } catch (error) {
     console.error('解析数据错误：', error);
   }
