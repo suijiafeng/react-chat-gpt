@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    "SF Pro Display",
+    "PingFang SC",
+    "Helvetica Neue",
+    sans-serif;
+  /* 背景色由 ThemeContext 通过 JS 动态设置，避免主题切换时残留错误颜色 */
+  transition:
+    background-color 200ms ease-out,
+    color 200ms ease-out;
+}
+
+button,
+input,
+textarea,
+select,
+svg,
+img {
+  transition:
+    background-color 200ms ease-out,
+    border-color 200ms ease-out,
+    color 200ms ease-out,
+    fill 200ms ease-out,
+    stroke 200ms ease-out,
+    box-shadow 200ms ease-out,
+    opacity 200ms ease-out;
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 1px;
+  height: 1.1em;
+  background-color: var(--cursor-color, #1f1f1f);
+  animation: blink 1s steps(1) infinite;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, rgba(0, 0, 0, 0.18));
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes blink {
+  0%   { opacity: 1; }
+  50%  { opacity: 0; }
+  100% { opacity: 1; }
+}
