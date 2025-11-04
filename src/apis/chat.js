@@ -1,28 +1,9 @@
 import request from "./config";
-import { WEBUI_API_BASE_URL, OLLAMA_API_BASE_URL, WEBUI_BASE_URL, USE_LOCAL_DATA } from '../constants';
-import { buildDemoReply } from '../constants/demoReplies';
+import { WEBUI_API_BASE_URL, WEBUI_BASE_URL, USE_LOCAL_DATA, DEFAULT_LLM_PROVIDER } from '../constants';
+import { providerRegistry } from './providers';
 
 const isDemoMode = () => USE_LOCAL_DATA || localStorage.getItem('demo_mode') === 'true';
 
-const streamDemoReply = async (reply, callback, signal) => {
-  // 逐字符发送，标点/换行后加额外停顿，模拟真实打字节奏
-  const PAUSE = { '。': 120, '！': 120, '？': 120, '，': 60, '、': 60, '\n': 80 };
-  const BASE = 22; // 基础每字符延迟 ms
-  const JITTER = 18; // 随机抖动范围
-
-  for (let i = 0; i < reply.length; i++) {
-    if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
-
-    const char = reply[i];
-    callback(char);
-
-    const extra = PAUSE[char] ?? 0;
-    const delay = BASE + extra + Math.random() * JITTER;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-  }
-
-  callback('[DONE]');
-};
 export const queryMemory = (params) => {
   const { content, token } = params;
   if (isDemoMode()) {
@@ -45,93 +26,38 @@ export const createNewChat = (params = {}) => {
   return request.post(`${WEBUI_API_BASE_URL}/chats/new`, { chat });
 };
 
+export const generateChatCompletion = async (params, callback, signal) => {
+  // 用户在「设置」弹窗里保存过的选择始终优先；只有从未设置过（首次使用）时才走自动推断的默认值
+  const storedProvider = localStorage.getItem('llm_provider');
+  let providerName;
 
-
-export const generateChatCompletion = async (params, callback,signal) => {
-  const { chat_id, id, messages, model, options, session_id, stream } = params;
-
-  if (isDemoMode()) {
-    await streamDemoReply(buildDemoReply(messages), callback, signal);
-    return;
+  if (storedProvider === 'custom' || storedProvider === 'demo') {
+    // 显式选择过，原样尊重（即使切换到了真实后端部署，'演示模式' 也应该继续返回 mock 回复）
+    providerName = storedProvider;
+  } else if (isDemoMode()) {
+    // 未设置过偏好：本地数据模式 / 演示账号快捷登录下，默认走演示回复
+    providerName = 'demo';
+  } else {
+    // 未设置过偏好，也不在演示模式：回退到部署时配置的默认 provider（默认 'ollama'）
+    providerName = DEFAULT_LLM_PROVIDER === 'custom' ? 'custom' : (DEFAULT_LLM_PROVIDER === 'demo' ? 'demo' : 'ollama');
   }
 
+  const provider = providerRegistry.getProvider(providerName);
+
   try {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/api/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-vail': 'application/x-ndjson',
-        'Authorization': localStorage.getItem('token'),
-      },
-      body: JSON.stringify({ chat_id, id, messages, model, options, session_id, stream }),
-      signal, // 将 signal 传递给 fetch，以便控制请求的中断
-    });
-
-    if (!response.ok) {
-      throw new Error('网络响应不正确');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    const bufferRef = { current: '' }; // 用于缓存未完成的 JSON 片段
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-
-      // 处理数据块并保存未完成的部分
-      processChunk(chunk, callback, bufferRef);
-    }
+    await provider.complete(params, callback, signal);
   } catch (error) {
     if (error.name === 'AbortError') {
       console.log('请求被取消');
     } else {
-      // 更精确的错误处理
-      callback({ error: '请求失败，请检查网络连接或稍后重试。' });
+      callback('请求失败，请检查您的网络连接或 API 配置。错误信息: ' + error.message);
       console.error('请求错误：', error);
     }
   }
 };
 
-
-
-const processChunk = (chunkStr, callback, bufferRef) => {
-  try {
-    // 将上次未解析完的部分和新数据拼接在一起
-    chunkStr = bufferRef.current + chunkStr;
-
-    // 使用正则表达式查找完整的 JSON 对象
-    const jsonMatches = chunkStr.match(/({.*?})(?=\s|$)/g);
-
-    if (jsonMatches) {
-      jsonMatches.forEach((jsonStr) => {
-        try {
-          const chunk = JSON.parse(jsonStr);
-
-          if (chunk.done) {
-            callback('[DONE]');
-          } else if (chunk.message && chunk.message.content) {
-            callback(chunk.message.content);
-          }
-        } catch (jsonError) {
-          console.error('JSON 解析错误：', jsonError);
-        }
-      });
-    }
-
-    // 缓存未完整的 JSON 字符串
-    const lastIndex = chunkStr.lastIndexOf('}');
-    bufferRef.current = lastIndex === chunkStr.length - 1 ? '' : chunkStr.slice(lastIndex + 1);
-  } catch (error) {
-    console.error('解析数据错误：', error);
-  }
-};
-
-
 export const generateTitle = (params) => {
-  const { model, prompt, chat_id } = params
+  const { model, prompt, chat_id } = params;
   if (isDemoMode()) {
     return Promise.resolve({
       statusText: 'OK',
@@ -142,5 +68,5 @@ export const generateTitle = (params) => {
       },
     });
   }
-  return request.post(`${WEBUI_BASE_URL}/api/task/title/completions`, { model, prompt, chat_id })
+  return request.post(`${WEBUI_BASE_URL}/api/task/title/completions`, { model, prompt, chat_id });
 };
