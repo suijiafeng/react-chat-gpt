@@ -116,13 +116,88 @@ http://localhost:5173
 - 本地模拟回复
 - 本地历史会话存储
 
+## 🔌 大模型公共接口与驱动重构 (LLM Provider & Adapters)
+
+为了提升项目的**开源级别**并方便开发者自由扩展大模型，我们对大模型请求层进行了**策略模式与服务注册**的架构重构。现在所有的请求驱动都统一继承自 `BaseProvider`。
+
+### 1. 架构设计 (Architecture)
+
+- **`BaseProvider`** (`src/apis/providers/base.js`): 核心抽象基类，提供了强健的流式 Server-Sent Events (SSE) 协议解析器，能有效合并由于网络分片/粘包引起的残缺 JSON 分包。
+- **`DemoProvider`** (`src/apis/providers/demo.js`): 本地 Mock 离线演示驱动，负责高逼真度地模拟流式字词打印。
+- **`OpenAIProvider`** (`src/apis/providers/openai.js`): 通用 OpenAI 兼容驱动（支持任意兼容 OpenAI API 协议的三方平台如 DeepSeek, 智谱, Moonshot, 通义千问等）。
+- **`OllamaProvider`** (`src/apis/providers/ollama.js`): 本地 Ollama 私有化部署驱动，处理 NDJSON (Newline Delimited JSON) 解析。
+- **`ProviderRegistry`** (`src/apis/providers/index.js`): 驱动注册中心，根据用户配置动态派发对应的驱动。
+
+---
+
+### 2. 如何接入一个新的自定义大模型 API (How to add a new custom LLM)
+
+只需三个简单步骤即可扩展您专属的大模型：
+
+1. **新建驱动类**：在 `src/apis/providers/` 下新建一个驱动文件（例如 `my-custom.js`），继承自 `BaseProvider` 并实现 `complete` 方法：
+   ```javascript
+   import { BaseProvider } from './base';
+
+   export class MyCustomProvider extends BaseProvider {
+     async complete(params, callback, signal) {
+       const { messages, model } = params;
+       
+       // 发起您的自定义请求
+       const response = await fetch('https://api.my-llm.com/v1/chat', {
+         method: 'POST',
+         body: JSON.stringify({ messages, model, stream: true }),
+         signal
+       });
+
+       // 使用基类提供的通用流式解析器 (或自定义解析逻辑)
+       await this.parseStream(
+         response.body, 
+         callback, 
+         signal, 
+         (parsedJson) => parsedJson.choices?.[0]?.delta?.content
+       );
+     }
+   }
+   ```
+
+2. **注册驱动**：在 `src/apis/providers/index.js` 中引入并注册您的新驱动：
+   ```javascript
+   import { MyCustomProvider } from './my-custom';
+   // ...
+   this.providers = {
+     demo: new DemoProvider(),
+     custom: new OpenAIProvider(),
+     ollama: new OllamaProvider(),
+     mycustom: new MyCustomProvider(), // 👈 注册在此处
+   };
+   ```
+
+3. **配置并使用**：在前端设置或配置 `.env` 环境，即可无缝激活并使用您的新大模型。
+
+---
+
+### 3. Docker 部署支持 (Self-Hosting via Docker)
+
+项目支持一键自托管部署。
+
+```bash
+# 1. 复制并根据需要修改环境变量
+cp .env.example .env
+
+# 2. 构建并运行 Docker 镜像
+docker build -t react-chat-gpt .
+docker run -d -p 8080:80 react-chat-gpt
+```
+
+---
+
 ## 接口扩展
 
 当前项目已经预留了后端接入结构，默认按 Open WebUI / Ollama 风格组织：
 
 - 鉴权：`/api/v1/auths/*`
 - 模型列表：`/api/models`
-- 聊天接口：`/ollama/api/chat`
+- 接口注册器：`src/apis/providers/index.js`
 
 如果要继续接真实服务，可以重点查看：
 

@@ -20,6 +20,7 @@
     "idb": "^8.0.0",
     "lucide-react": "^0.441.0",
     "mobx": "^6.13.2",
+    "mobx-react-lite": "^4.0.7",
     "postcss": "^8.4.45",
     "prettier": "^3.3.3",
     "react": "^18.3.1",
