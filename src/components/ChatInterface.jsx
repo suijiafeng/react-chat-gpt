@@ -84,6 +84,8 @@ const ChatInterface = () => {
   );
 
   const memoizedMessages = useMemo(() => messages, [messages]);
+  // 加载中先不当作"空对话"处理，避免欢迎页和输入框位置在消息加载完成的瞬间跳动
+  const showEmptyState = !isLoadingMore && memoizedMessages.length === 0 && !isStreaming;
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
 
@@ -181,7 +183,7 @@ const ChatInterface = () => {
                 )}
               </div>
             )}
-            {memoizedMessages.length === 0 && !isStreaming && (
+            {showEmptyState && (
               <div className="h-[40vh] flex items-end justify-center">
                 <div className="text-center select-none pb-10">
                   <div className={`text-lg md:text-4xl ${classes.mutedText}`}>今天想聊些什么呢？</div>
@@ -205,7 +207,7 @@ const ChatInterface = () => {
             setInput={setInput}
             handleSubmit={handleSubmit}
             isStreaming={isStreaming}
-            isEmpty={memoizedMessages.length === 0 && !isStreaming}
+            isEmpty={showEmptyState}
           />
         </div>
       </div>

@@ -4,7 +4,6 @@ import { generateChatCompletion, generateTitle } from '../apis/chat';
 import {
   saveMessageToDB,
   loadMessagesBySessionPaged,
-  clearSessionMessages,
   updateSessionTitle,
   touchSession,
 } from '../store/db';
@@ -32,12 +31,12 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
   const [messages, dispatchMessages] = useReducer(messagesReducer, []);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [controller, setController] = useState(null);
   const messagesEndRef = useRef(null);
   const sessionIdRef = useRef(sessionId);
   // 新建会话首次发消息时，直接在内存里持有消息，跳过 DB 重读
   const skipNextLoadRef = useRef(false);
-  // 记录当前正在流式生成的消息（取消时用于保存已生成的部分内容）
+  // 记录当前这个 hook 实例正在追踪的流式请求：{ messageId, sessionId, controller, getContent }
+  // 这是"有没有请求在飞、属于哪个会话"的唯一数据来源
   const streamingRef = useRef(null);
   // 用 ref 镜像最新的 onSessionTouched，避免它成为下面 useCallback 的依赖
   const onSessionTouchedRef = useRef(onSessionTouched);
@@ -54,6 +53,21 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
+  // 中止一个流式请求，并把它已经生成的部分内容保存下来。
+  // 不管是用户主动点"停止"、切换到了别的会话，还是组件被卸载，统一走这一个函数，
+  // 保证"离开一个还在生成中的会话"时的行为是一致、可预期的，不会丢内容。
+  const abortAndPersistPending = useCallback((pending) => {
+    if (!pending) return;
+    pending.controller?.abort();
+    const partialText = pending.getContent();
+    if (partialText) {
+      saveMessageToDB({ id: pending.messageId, text: partialText, isUser: false }, pending.sessionId)
+        .then(() => touchSession(pending.sessionId))
+        .then(() => onSessionTouchedRef.current?.())
+        .catch((error) => console.error('Error saving partial message:', error));
+    }
+  }, []);
+
   // 自动滚动到最新消息
   useEffect(() => {
     if (skipScrollToBottomRef.current) {
@@ -62,6 +76,18 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 切换会话（包括跳转到 /new）时，如果上一个会话还有没结束的流式请求，
+  // 主动中止并保存它已生成的部分内容——避免它在后台裸跑，
+  // 和切换后的新会话共用同一份 isStreaming/streamingRef 状态而互相干扰。
+  useEffect(() => {
+    const pending = streamingRef.current;
+    if (pending && pending.sessionId !== sessionId) {
+      streamingRef.current = null;
+      setIsStreaming(false);
+      abortAndPersistPending(pending);
+    }
+  }, [sessionId, abortAndPersistPending]);
 
   // 当 sessionId 变化时，加载对应会话的消息
   useEffect(() => {
@@ -76,6 +102,10 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       setHasMore(false);
       return;
     }
+    // 先清空上一个会话残留的消息，避免切换/刷新时短暂显示错误内容；
+    // hasMore 也重置为 true，避免沿用上一个会话的旧值导致"加载中"提示该出现时没出现
+    dispatchMessages({ type: 'CLEAR_HISTORY' });
+    setHasMore(true);
     const load = async () => {
       setIsLoadingMore(true);
       try {
@@ -122,12 +152,17 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     }
   }, [sessionId, isLoadingMore, hasMore, messages.length]);
 
-  // 组件卸载时中止请求
+  // 组件真正卸载时（区别于上面的"切换会话"），兜底中止并保存还没结束的流式请求。
+  // 依赖数组特意留空：只在挂载/卸载时绑定一次，cleanup 通过 ref 读取最新状态即可，
+  // 不需要像之前那样依赖 controller、导致每次请求开始/结束都触发一次这个 cleanup。
   useEffect(() => {
     return () => {
-      if (controller) controller.abort();
+      const pending = streamingRef.current;
+      streamingRef.current = null;
+      abortAndPersistPending(pending);
     };
-  }, [controller]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleChatCompletion = useCallback(
     async (input, conversation, directSessionId) => {
@@ -139,8 +174,18 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       const activeSessionId = directSessionId || sessionIdRef.current;
       if (!activeSessionId) return;
 
+      // 兜底：理论上不应该出现"上一个请求还没清理掉就开始新请求"，万一发生先结束它
+      if (streamingRef.current) {
+        const stalePending = streamingRef.current;
+        streamingRef.current = null;
+        abortAndPersistPending(stalePending);
+      }
+
       const userMessageId = uuidv4();
       const aiMessageId = uuidv4();
+      // 判断"这次回调是否还对应着 hook 当前在追踪的请求"——
+      // 避免一个已经被切走/取消的旧请求在竞态情况下反过来覆盖新请求的状态
+      const isCurrent = () => streamingRef.current?.messageId === aiMessageId;
 
       const userMessage = { id: userMessageId, text: input, isUser: true };
       const aiMessage = { id: aiMessageId, text: '', isUser: false };
@@ -153,15 +198,13 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       setIsStreaming(true);
 
       let aiMessageContent = '';
-      // 记录正在进行的流式回复，供 cancelChatCompletion 在用户主动取消时保存已生成的部分内容
+      const abortController = new AbortController();
       streamingRef.current = {
         messageId: aiMessageId,
         sessionId: activeSessionId,
+        controller: abortController,
         getContent: () => aiMessageContent,
       };
-
-      const abortController = new AbortController();
-      setController(abortController);
 
       try {
         await generateChatCompletion(
@@ -176,9 +219,10 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
           },
           async (chunk) => {
             if (chunk === '[DONE]') {
-              setIsStreaming(false);
-              setController(null);
-              streamingRef.current = null;
+              if (isCurrent()) {
+                setIsStreaming(false);
+                streamingRef.current = null;
+              }
 
               const completeAiMessage = { ...aiMessage, text: aiMessageContent };
               await saveMessageToDB(completeAiMessage, activeSessionId);
@@ -205,6 +249,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
                 }
               }
               // 通知外部（侧边栏）该会话有更新：刷新排序 / 拾取新标题
+              // 即使用户已经切走了，这条已经完整生成的回复也应该正确入库、侧边栏也该更新
               onSessionTouchedRef.current?.();
               return;
             }
@@ -218,38 +263,21 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
         if (error.name !== 'AbortError') {
           console.error('Error generating chat completion:', error);
         }
-        setIsStreaming(false);
-        setController(null);
+        if (isCurrent()) {
+          setIsStreaming(false);
+          streamingRef.current = null;
+        }
       }
     },
-    [currentModel]
+    [currentModel, abortAndPersistPending]
   );
 
   const cancelChatCompletion = useCallback(() => {
-    if (controller) {
-      controller.abort();
-      setController(null);
-      setIsStreaming(false);
-    }
-    // 取消时把已经流出来的部分内容落库，避免刷新/切换会话后这条回复整个消失
     const pending = streamingRef.current;
-    if (pending) {
-      streamingRef.current = null;
-      const partialText = pending.getContent();
-      if (partialText) {
-        saveMessageToDB({ id: pending.messageId, text: partialText, isUser: false }, pending.sessionId)
-          .then(() => touchSession(pending.sessionId))
-          .then(() => onSessionTouchedRef.current?.())
-          .catch((error) => console.error('Error saving partial message:', error));
-      }
-    }
-  }, [controller]);
-
-  const clearHistory = useCallback(async () => {
-    if (!sessionId) return;
-    await clearSessionMessages(sessionId);
-    dispatchMessages({ type: 'CLEAR_HISTORY' });
-  }, [sessionId]);
+    streamingRef.current = null;
+    setIsStreaming(false);
+    abortAndPersistPending(pending);
+  }, [abortAndPersistPending]);
 
   return {
     messages,
@@ -259,7 +287,6 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     handleChatCompletion,
     messagesEndRef,
     cancelChatCompletion,
-    clearHistory,
     hasMore,
     isLoadingMore,
     loadMoreMessages,

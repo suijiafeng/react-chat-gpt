@@ -8,6 +8,11 @@ body,
   height: 100%;
 }
 
+html {
+  /* 兜底默认值，正常情况下 index.html 里的内联脚本会在这之前就设置好实际颜色 */
+  background: #f7f7f8;
+}
+
 body {
   margin: 0;
   font-family:
