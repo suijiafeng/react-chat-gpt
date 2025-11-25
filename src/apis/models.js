@@ -4,10 +4,7 @@ import { WEBUI_BASE_URL, USE_LOCAL_DATA } from '../constants';
 // ── 本地 Mock 模型列表（后端就绪后可删除此段）──────────────
 const LOCAL_MODELS = {
   data: [
-    { id: 'llama3.1:latest',  name: 'Llama 3.1',    object: 'model' },
-    { id: 'gemma2:9b',        name: 'Gemma 2 9B',   object: 'model' },
-    { id: 'qwen2.5:7b',       name: 'Qwen 2.5 7B',  object: 'model' },
-    { id: 'deepseek-r1:7b',   name: 'DeepSeek R1',  object: 'model' },
+   
   ],
 };
 // ──────────────────────────────────────────────────────────
