@@ -71,3 +71,16 @@ img {
   50%  { opacity: 0; }
   100% { opacity: 1; }
 }
+
+/* Markdown renderer: blend highlight.js theme into our code block container */
+.markdown-body code.hljs {
+  background: transparent;
+  padding: 0;
+}
+
+/* KaTeX display math: scroll horizontally instead of overflowing */
+.markdown-body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
