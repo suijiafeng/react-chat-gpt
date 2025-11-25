@@ -19,10 +19,8 @@ const ChatHeader = ({ toggleSidebar }) => {
           <Menu size={20} />
         </button>
       </div>
-      <div className="flex items-center gap-3">
-        {/* <div className="hidden md:block">
-          <ModelSelector />
-        </div> */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <ModelSelector />
         <NavHeader />
       </div>
     </div>

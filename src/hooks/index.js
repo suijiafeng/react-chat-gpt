@@ -8,13 +8,6 @@ export * from './useChat';
 export const useLanguage = () => {
   const { t, i18n } = useTranslation();
 
-  useEffect(() => {
-    const savedLanguage = localStorage.getItem('appLanguage');
-    if (savedLanguage) {
-      i18n.changeLanguage(savedLanguage);
-    }
-  }, [i18n]);
-
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
     localStorage.setItem('appLanguage', lng);
@@ -30,11 +23,6 @@ export const useLanguage = () => {
 // ──────────────────────────────────────────────
 // Demo 快捷登录（保留兼容性）
 // ──────────────────────────────────────────────
-
-export const loginAsDemo = () => {
-  localStorage.setItem('demo_mode', 'true');
-  userStore.setUser({ email: 'demo@example.com', name: 'Demo User', profile_image_url: '' });
-};
 
 export const logoutDemo = () => {
   localStorage.removeItem('demo_mode');

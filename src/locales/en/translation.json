@@ -32,5 +32,17 @@
   "demoCredentialsHint": "Default account:",
   "Confirm Password": "Confirm Password",
   "Enter Your Password Again": "Enter Your Password Again",
-  "passwordMismatch": "Passwords do not match"
+  "passwordMismatch": "Passwords do not match",
+  "settings": "Model & API Settings",
+  "cancel": "Cancel",
+  "save": "Save",
+  "settingsSaved": "Settings saved!",
+  "apiProvider": "API Provider",
+  "demoMockMode": "Frontend Demo Mode",
+  "customOpenAi": "Custom OpenAI API",
+  "demoHint": "No API Key required. Simulates streaming replies offline safely.",
+  "customHint": "Supports any OpenAI compatible API (e.g. DeepSeek, OpenAI, Ollama, etc.).",
+  "apiUrl": "API Base URL",
+  "apiKey": "API Key",
+  "modelName": "Model Name"
 }
