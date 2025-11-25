@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { observer } from 'mobx-react-lite';
 import {
   MessageSquare,
   X,
@@ -16,7 +17,7 @@ import { userSignOut } from '../apis/auths';
 import { logoutDemo } from '../hooks';
 import { APP_NAME } from '../constants';
 
-const Sidebar = React.memo(({ isOpen, onClose, refreshKey }) => {
+const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   const { classes, isDark } = useTheme();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -135,29 +136,34 @@ const Sidebar = React.memo(({ isOpen, onClose, refreshKey }) => {
           ) : (
             <div className="space-y-1">
               {sessions.map((session) => (
-                <button
+                <div
                   key={session.id}
-                  onClick={() => handleSelectSession(session.id)}
-                  className={`group flex items-center justify-between w-full rounded-xl px-3 py-2.5 text-left text-sm ${classes.themeTransition} ${chatId === session.id
+                  className={`group flex items-center justify-between w-full rounded-xl text-sm ${classes.themeTransition} ${chatId === session.id
                     ? isDark
                       ? 'bg-white/[0.08] text-white'
                       : 'bg-black/[0.05] text-black'
                     : `${classes.text} ${classes.buttonHover}`
                     }`}
                 >
-                  <div className="flex items-center min-w-0 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectSession(session.id)}
+                    className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2.5 text-left"
+                  >
                     <MessageSquare size={16} className="shrink-0 opacity-70" />
                     <span className="truncate">{session.title || '新对话'}</span>
-                  </div>
-                  <span
+                  </button>
+                  <button
+                    type="button"
                     onClick={(e) => handleDeleteSession(e, session.id)}
-                    className={`ml-2 shrink-0 rounded-md p-1 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 ${isDark ? 'text-white/45 hover:bg-white/10 hover:text-red-300' : 'text-gray-400 hover:bg-black/5 hover:text-red-500'
-                      }`}
+                    aria-label="删除该对话"
                     title="删除"
+                    className={`mr-2 shrink-0 rounded-md p-1 opacity-60 transition-opacity duration-200 ease-out hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 ${isDark ? 'text-white/45 hover:bg-white/10 hover:text-red-300' : 'text-gray-400 hover:bg-black/5 hover:text-red-500'
+                      }`}
                   >
                     <X size={14} />
-                  </span>
-                </button>
+                  </button>
+                </div>
               ))}
             </div>
           )}

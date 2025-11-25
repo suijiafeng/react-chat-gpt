@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo, useLayoutEffect, useEffect } from 'react';
+import React, { useCallback, useState, useMemo, useLayoutEffect, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks';
 import Sidebar from '../components/Sidebar';
@@ -17,6 +17,11 @@ const ChatInterface = () => {
 
   const currentModel = localStorage.getItem('currentModel') || '';
 
+  // 会话有更新（完成一次回复 / 取消时保存了部分内容）时，刷新 Sidebar 的会话列表
+  const handleSessionTouched = useCallback(() => {
+    setSidebarRefreshKey((k) => k + 1);
+  }, []);
+
   const {
     messages,
     input,
@@ -25,7 +30,10 @@ const ChatInterface = () => {
     handleChatCompletion,
     messagesEndRef,
     cancelChatCompletion,
-  } = useChat(currentModel, sessionId);
+    hasMore,
+    isLoadingMore,
+    loadMoreMessages,
+  } = useChat(currentModel, sessionId, handleSessionTouched);
 
   const { classes } = useTheme();
 
@@ -71,9 +79,6 @@ const ChatInterface = () => {
 
       // 新建会话时直接传入 activeSessionId，绕过 state 异步更新避免竞态
       handleChatCompletion(input, conversation, isNewSession ? activeSessionId : undefined);
-      if (conversation.length === 1) {
-        setSidebarRefreshKey((k) => k + 1);
-      }
     },
     [input, isStreaming, messages, sessionId, currentModel, handleChatCompletion, cancelChatCompletion, navigate, setSidebarRefreshKey]
   );
@@ -93,6 +98,66 @@ const ChatInterface = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const scrollContainerRef = useRef(null);
+  const sentinelRef = useRef(null);
+  const prevScrollHeightRef = useRef(0);
+  const prevScrollTopRef = useRef(0);
+  const shouldAdjustScrollRef = useRef(false);
+
+  // 当加载更多历史消息时，记录当前滚动位置和容器高度
+  const handleLoadMore = useCallback(async () => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      prevScrollHeightRef.current = container.scrollHeight;
+      prevScrollTopRef.current = container.scrollTop;
+    }
+    shouldAdjustScrollRef.current = true;
+    const loadedCount = await loadMoreMessages();
+    if (!loadedCount) {
+      // 没有加载到新内容（已经是最后一页/请求失败），不需要做滚动校正
+      shouldAdjustScrollRef.current = false;
+    }
+  }, [loadMoreMessages]);
+
+  // 监听 sentinel 元素，实现向上滚动触底/触顶时加载更多
+  useEffect(() => {
+    if (!hasMore || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      {
+        root: scrollContainerRef.current,
+        threshold: 0.1,
+      }
+    );
+
+    const currentSentinel = sentinelRef.current;
+    if (currentSentinel) {
+      observer.observe(currentSentinel);
+    }
+
+    return () => {
+      if (currentSentinel) {
+        observer.unobserve(currentSentinel);
+      }
+    };
+  }, [hasMore, isLoadingMore, handleLoadMore]);
+
+  // 在 DOM 重新渲染后执行，校正滚动高度，防跳动（滚动锚定）
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container && shouldAdjustScrollRef.current) {
+      shouldAdjustScrollRef.current = false;
+      const newScrollHeight = container.scrollHeight;
+      const heightDifference = newScrollHeight - prevScrollHeightRef.current;
+      container.scrollTop = prevScrollTopRef.current + heightDifference;
+    }
+  }, [messages]);
+
   if (isSidebarOpen === null) return null;
 
   return (
@@ -102,8 +167,20 @@ const ChatInterface = () => {
         <ChatHeader toggleSidebar={toggleSidebar} />
         <div className="relative flex-1 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_28%)] pointer-events-none" />
-          <div className="h-full overflow-y-auto px-4 md:px-8">
+          <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 md:px-8">
             <div className="max-w-3xl mx-auto min-h-full pt-10 pb-44">
+            {hasMore && (
+              <div ref={sentinelRef} className="py-4 flex items-center justify-center text-xs text-neutral-400">
+                {isLoadingMore ? (
+                  <div className="flex items-center gap-2">
+                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-neutral-400 border-t-transparent"></span>
+                    <span>加载中...</span>
+                  </div>
+                ) : (
+                  <span></span>
+                )}
+              </div>
+            )}
             {memoizedMessages.length === 0 && !isStreaming && (
               <div className="h-[40vh] flex items-end justify-center">
                 <div className="text-center select-none pb-10">

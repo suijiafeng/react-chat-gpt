@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { generateChatCompletion, generateTitle } from '../apis/chat';
 import {
   saveMessageToDB,
-  loadMessagesBySession,
+  loadMessagesBySessionPaged,
   clearSessionMessages,
   updateSessionTitle,
   touchSession,
@@ -15,6 +15,8 @@ const messagesReducer = (state, action) => {
       return action.payload;
     case 'ADD_MESSAGE':
       return [...state, action.payload];
+    case 'PREPEND_MESSAGES':
+      return [...action.payload, ...state];
     case 'UPDATE_MESSAGE':
       return state.map((msg) =>
         msg.id === action.id ? { ...msg, text: msg.text + action.payload } : msg
@@ -26,7 +28,7 @@ const messagesReducer = (state, action) => {
   }
 };
 
-export const useChat = (currentModel, sessionId) => {
+export const useChat = (currentModel, sessionId, onSessionTouched) => {
   const [messages, dispatchMessages] = useReducer(messagesReducer, []);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -35,6 +37,18 @@ export const useChat = (currentModel, sessionId) => {
   const sessionIdRef = useRef(sessionId);
   // 新建会话首次发消息时，直接在内存里持有消息，跳过 DB 重读
   const skipNextLoadRef = useRef(false);
+  // 记录当前正在流式生成的消息（取消时用于保存已生成的部分内容）
+  const streamingRef = useRef(null);
+  // 用 ref 镜像最新的 onSessionTouched，避免它成为下面 useCallback 的依赖
+  const onSessionTouchedRef = useRef(onSessionTouched);
+  useEffect(() => {
+    onSessionTouchedRef.current = onSessionTouched;
+  }, [onSessionTouched]);
+
+  // 分页及滚动控制相关状态
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const skipScrollToBottomRef = useRef(false);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -42,6 +56,10 @@ export const useChat = (currentModel, sessionId) => {
 
   // 自动滚动到最新消息
   useEffect(() => {
+    if (skipScrollToBottomRef.current) {
+      skipScrollToBottomRef.current = false;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -49,19 +67,60 @@ export const useChat = (currentModel, sessionId) => {
   useEffect(() => {
     if (!sessionId) {
       dispatchMessages({ type: 'CLEAR_HISTORY' });
+      setHasMore(false);
       return;
     }
     // 新建会话首次发送时已在内存中持有消息，跳过 DB 重读避免竞态
     if (skipNextLoadRef.current) {
       skipNextLoadRef.current = false;
+      setHasMore(false);
       return;
     }
     const load = async () => {
-      const history = await loadMessagesBySession(sessionId);
-      dispatchMessages({ type: 'SET_MESSAGES', payload: history });
+      setIsLoadingMore(true);
+      try {
+        const PAGE_SIZE = 30;
+        const history = await loadMessagesBySessionPaged(sessionId, PAGE_SIZE, 0);
+        dispatchMessages({ type: 'SET_MESSAGES', payload: history });
+        if (history.length < PAGE_SIZE) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+      } catch (error) {
+        console.error('Error loading initial messages:', error);
+      } finally {
+        setIsLoadingMore(false);
+      }
     };
     load();
   }, [sessionId]);
+
+  // 加载更多历史消息
+  // 返回值：本次实际加载到的历史消息条数（0 表示没有更多/未加载到新内容）
+  const loadMoreMessages = useCallback(async () => {
+    if (!sessionId || isLoadingMore || !hasMore) return 0;
+    setIsLoadingMore(true);
+    try {
+      const PAGE_SIZE = 30;
+      const olderMessages = await loadMessagesBySessionPaged(sessionId, PAGE_SIZE, messages.length);
+      if (olderMessages.length < PAGE_SIZE) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+      }
+      if (olderMessages.length > 0) {
+        skipScrollToBottomRef.current = true;
+        dispatchMessages({ type: 'PREPEND_MESSAGES', payload: olderMessages });
+      }
+      return olderMessages.length;
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+      return 0;
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [sessionId, isLoadingMore, hasMore, messages.length]);
 
   // 组件卸载时中止请求
   useEffect(() => {
@@ -94,6 +153,12 @@ export const useChat = (currentModel, sessionId) => {
       setIsStreaming(true);
 
       let aiMessageContent = '';
+      // 记录正在进行的流式回复，供 cancelChatCompletion 在用户主动取消时保存已生成的部分内容
+      streamingRef.current = {
+        messageId: aiMessageId,
+        sessionId: activeSessionId,
+        getContent: () => aiMessageContent,
+      };
 
       const abortController = new AbortController();
       setController(abortController);
@@ -113,6 +178,7 @@ export const useChat = (currentModel, sessionId) => {
             if (chunk === '[DONE]') {
               setIsStreaming(false);
               setController(null);
+              streamingRef.current = null;
 
               const completeAiMessage = { ...aiMessage, text: aiMessageContent };
               await saveMessageToDB(completeAiMessage, activeSessionId);
@@ -138,6 +204,8 @@ export const useChat = (currentModel, sessionId) => {
                   console.error('Error generating title:', error);
                 }
               }
+              // 通知外部（侧边栏）该会话有更新：刷新排序 / 拾取新标题
+              onSessionTouchedRef.current?.();
               return;
             }
 
@@ -163,6 +231,18 @@ export const useChat = (currentModel, sessionId) => {
       setController(null);
       setIsStreaming(false);
     }
+    // 取消时把已经流出来的部分内容落库，避免刷新/切换会话后这条回复整个消失
+    const pending = streamingRef.current;
+    if (pending) {
+      streamingRef.current = null;
+      const partialText = pending.getContent();
+      if (partialText) {
+        saveMessageToDB({ id: pending.messageId, text: partialText, isUser: false }, pending.sessionId)
+          .then(() => touchSession(pending.sessionId))
+          .then(() => onSessionTouchedRef.current?.())
+          .catch((error) => console.error('Error saving partial message:', error));
+      }
+    }
   }, [controller]);
 
   const clearHistory = useCallback(async () => {
@@ -180,5 +260,8 @@ export const useChat = (currentModel, sessionId) => {
     messagesEndRef,
     cancelChatCompletion,
     clearHistory,
+    hasMore,
+    isLoadingMore,
+    loadMoreMessages,
   };
 };
