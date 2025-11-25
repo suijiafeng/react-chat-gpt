@@ -1,24 +1,8 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Loader } from 'lucide-react';
+import MarkdownRenderer from './MarkdownRenderer';
 
-const DEFAULT_AVATARS = {
-  user: '/user_avatar.png',
-  ai: '/ai_avatar.png',
-};
-
-const DEFAULT_NAMES = {
-  user: 'You',
-  ai: 'AI Assistant',
-};
-
-const Avatar = ({ src, alt, isUser }) => (
-  <img
-    src={src}
-    alt={alt}
-    className={`w-9 h-9 rounded-full object-cover ${isUser ? 'ml-3' : 'mr-3'}`}
-  />
-);
 const LoadingIndicator = ({ message, classes }) => {
   return message ? <span className="typing-cursor animate-pulse">|</span> : (
     <div className="flex justify-center  text-sm">
@@ -26,17 +10,8 @@ const LoadingIndicator = ({ message, classes }) => {
     </div>
   );
 };
-const ChatMessage = React.memo(({ message, isTyping, isUser, avatar, username }) => {
+const ChatMessage = React.memo(({ message, isTyping, isUser }) => {
   const { isDark, classes } = useTheme();
-
-  const messageAvatar = useMemo(
-    () => avatar || (isUser ? DEFAULT_AVATARS.user : DEFAULT_AVATARS.ai),
-    [avatar, isUser]
-  );
-  const messageName = useMemo(
-    () => username || (isUser ? DEFAULT_NAMES.user : DEFAULT_NAMES.ai),
-    [username, isUser]
-  );
 
   const containerClasses = `flex mb-8 ${isUser ? 'justify-end' : 'justify-start'}`;
   const contentContainerClasses = `flex flex-col max-w-[min(720px,82%)] ${
@@ -61,7 +36,11 @@ const ChatMessage = React.memo(({ message, isTyping, isUser, avatar, username })
           {messageName}
         </span> */}
         <div className={messageClasses}>
-          <span className="message-text whitespace-pre-wrap break-words">{message}</span>
+          {isUser ? (
+            <span className="message-text whitespace-pre-wrap break-words">{message}</span>
+          ) : (
+            <MarkdownRenderer content={message} />
+          )}
           {isTyping && <LoadingIndicator message={message} classes={classes} />}
         </div>
       </div>

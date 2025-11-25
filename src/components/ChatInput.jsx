@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Send, CircleStop, Plus, Mic } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
@@ -6,6 +6,14 @@ import { useLanguage } from '../hooks';
 const ChatInput = ({ input, setInput, handleSubmit, isStreaming, isEmpty = false }) => {
   const { classes, isDark } = useTheme();
   const { t } = useLanguage();
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+    }
+  }, [input]);
 
   return (
     <div
@@ -17,35 +25,38 @@ const ChatInput = ({ input, setInput, handleSubmit, isStreaming, isEmpty = false
     >
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
         <div
-          className={`flex items-center gap-3 rounded-[28px] border px-4 py-3 ${classes.input} ${classes.border} ${classes.themeTransition}`}
+          className={`flex items-end gap-3 rounded-[28px] border px-4 py-2 ${classes.input} ${classes.border} ${classes.themeTransition}`}
         >
           <button
             type="button"
-            className={`rounded-full p-2 ${isDark ? 'text-white/75 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}
+            className={`rounded-full p-2 mb-0.5 ${isDark ? 'text-white/75 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}
           >
             <Plus size={18} />
           </button>
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
+            rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 handleSubmit(e);
               }
             }}
-            className="flex-1 bg-transparent text-base outline-none"
+            className="flex-1 bg-transparent text-base outline-none resize-none overflow-y-auto py-2 h-[24px]"
             placeholder={t('enterMessage')}
+            style={{ maxHeight: '160px' }}
           />
           <button
             type="button"
-            className={`rounded-full p-2 ${isDark ? 'text-white/75 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}
+            className={`rounded-full p-2 mb-0.5 ${isDark ? 'text-white/75 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}
           >
             <Mic size={18} />
           </button>
           <button
             type="submit"
-            className={`flex h-11 w-11 items-center justify-center rounded-full ${classes.themeTransition} ${
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${classes.themeTransition} ${
               isStreaming || input.trim()
                 ? isDark
                   ? 'bg-white text-[#212121]'
