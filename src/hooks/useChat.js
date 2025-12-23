@@ -6,7 +6,10 @@ import {
   loadMessagesBySessionPaged,
   updateSessionTitle,
   touchSession,
+  deleteMessageFromDB,
+  deleteMessagesByIds,
 } from '../store/db';
+import { trimConversation } from '../utils/context';
 
 const messagesReducer = (state, action) => {
   switch (action.type) {
@@ -20,6 +23,16 @@ const messagesReducer = (state, action) => {
       return state.map((msg) =>
         msg.id === action.id ? { ...msg, text: msg.text + action.payload } : msg
       );
+    case 'SET_TEXT':
+      // 直接替换整条消息文本（编辑消息 / 重新生成前清空旧回复）
+      return state.map((msg) => (msg.id === action.id ? { ...msg, text: action.payload } : msg));
+    case 'REMOVE_MESSAGE':
+      return state.filter((msg) => msg.id !== action.id);
+    case 'TRUNCATE_AFTER': {
+      // 保留到指定消息为止（含），丢弃之后的所有消息——编辑分叉重发时使用
+      const idx = state.findIndex((msg) => msg.id === action.id);
+      return idx === -1 ? state : state.slice(0, idx + 1);
+    }
     case 'CLEAR_HISTORY':
       return [];
     default:
@@ -27,10 +40,16 @@ const messagesReducer = (state, action) => {
   }
 };
 
+// 内存中的消息数组 → 发给模型的 role/content 会话格式
+const toConversation = (msgs) =>
+  msgs.map((msg) => ({ role: msg.isUser ? 'user' : 'assistant', content: msg.text }));
+
 export const useChat = (currentModel, sessionId, onSessionTouched) => {
   const [messages, dispatchMessages] = useReducer(messagesReducer, []);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  // 上一次生成被用户手动停止且已有部分内容时为 true，此时展示"继续生成"入口
+  const [canContinue, setCanContinue] = useState(false);
   const messagesEndRef = useRef(null);
   const sessionIdRef = useRef(sessionId);
   // 新建会话首次发消息时，直接在内存里持有消息，跳过 DB 重读
@@ -87,6 +106,8 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       setIsStreaming(false);
       abortAndPersistPending(pending);
     }
+    // "继续生成"入口只对当前会话的中断有效，切换会话后不再展示
+    setCanContinue(false);
   }, [sessionId, abortAndPersistPending]);
 
   // 当 sessionId 变化时，加载对应会话的消息
@@ -164,16 +185,15 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleChatCompletion = useCallback(
-    async (input, conversation, directSessionId) => {
-      // directSessionId：新建会话时由外部直接传入，避免等待 React state 更新
-      if (directSessionId) {
-        skipNextLoadRef.current = true;   // 告知 load effect 跳过本次 DB 重读
-        sessionIdRef.current = directSessionId; // 立即更新 ref，无需等 useEffect
-      }
-      const activeSessionId = directSessionId || sessionIdRef.current;
-      if (!activeSessionId) return;
-
+  // ──────────────────────────────────────────────
+  // 流式请求核心：发送、重新生成、编辑重发、继续生成都复用这一个函数。
+  // - conversation：发给模型的完整会话（发送前会做上下文截断）
+  // - aiMessageId：本次流式输出写入的 AI 消息（须已存在于 messages state 中）
+  // - existingText："继续生成"时传入已有的部分内容，新 chunk 在其后追加
+  // - titlePrompt：非空时表示这是会话的首轮对话，结束后自动生成标题
+  // ──────────────────────────────────────────────
+  const runCompletion = useCallback(
+    async ({ conversation, aiMessageId, activeSessionId, existingText = '', titlePrompt = null }) => {
       // 兜底：理论上不应该出现"上一个请求还没清理掉就开始新请求"，万一发生先结束它
       if (streamingRef.current) {
         const stalePending = streamingRef.current;
@@ -181,23 +201,10 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
         abortAndPersistPending(stalePending);
       }
 
-      const userMessageId = uuidv4();
-      const aiMessageId = uuidv4();
-      // 判断"这次回调是否还对应着 hook 当前在追踪的请求"——
-      // 避免一个已经被切走/取消的旧请求在竞态情况下反过来覆盖新请求的状态
-      const isCurrent = () => streamingRef.current?.messageId === aiMessageId;
-
-      const userMessage = { id: userMessageId, text: input, isUser: true };
-      const aiMessage = { id: aiMessageId, text: '', isUser: false };
-
-      dispatchMessages({ type: 'ADD_MESSAGE', payload: userMessage });
-      dispatchMessages({ type: 'ADD_MESSAGE', payload: aiMessage });
-      await saveMessageToDB(userMessage, activeSessionId);
-
-      setInput('');
       setIsStreaming(true);
+      setCanContinue(false);
 
-      let aiMessageContent = '';
+      let aiMessageContent = existingText;
       const abortController = new AbortController();
       streamingRef.current = {
         messageId: aiMessageId,
@@ -205,13 +212,17 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
         controller: abortController,
         getContent: () => aiMessageContent,
       };
+      // 判断"这次回调是否还对应着 hook 当前在追踪的请求"——
+      // 避免一个已经被切走/取消的旧请求在竞态情况下反过来覆盖新请求的状态
+      const isCurrent = () => streamingRef.current?.messageId === aiMessageId;
 
       try {
         await generateChatCompletion(
           {
             stream: true,
             model: currentModel,
-            messages: conversation,
+            // 发送前按 token 预算截断历史，避免长对话超出模型上下文窗口
+            messages: trimConversation(conversation),
             options: {},
             session_id: activeSessionId,
             chat_id: activeSessionId,
@@ -224,22 +235,24 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
                 streamingRef.current = null;
               }
 
-              const completeAiMessage = { ...aiMessage, text: aiMessageContent };
-              await saveMessageToDB(completeAiMessage, activeSessionId);
+              await saveMessageToDB(
+                { id: aiMessageId, text: aiMessageContent, isUser: false },
+                activeSessionId
+              );
               await touchSession(activeSessionId);
 
               // 首条对话结束后，自动生成标题
-              if (conversation.length === 1) {
+              if (titlePrompt) {
                 try {
                   const titleResponse = await generateTitle({
                     model: currentModel,
-                    prompt: input,
+                    prompt: titlePrompt,
                     chat_id: activeSessionId,
                   });
                   const nextTitle =
                     titleResponse?.data?.title ||
                     titleResponse?.data?.data?.title ||
-                    input.trim().slice(0, 20);
+                    titlePrompt.trim().slice(0, 20);
 
                   if (nextTitle) {
                     await updateSessionTitle(activeSessionId, nextTitle);
@@ -272,10 +285,135 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     [currentModel, abortAndPersistPending]
   );
 
+  const handleChatCompletion = useCallback(
+    async (input, conversation, directSessionId) => {
+      // directSessionId：新建会话时由外部直接传入，避免等待 React state 更新
+      if (directSessionId) {
+        skipNextLoadRef.current = true; // 告知 load effect 跳过本次 DB 重读
+        sessionIdRef.current = directSessionId; // 立即更新 ref，无需等 useEffect
+      }
+      const activeSessionId = directSessionId || sessionIdRef.current;
+      if (!activeSessionId) return;
+
+      const userMessage = { id: uuidv4(), text: input, isUser: true };
+      const aiMessage = { id: uuidv4(), text: '', isUser: false };
+
+      dispatchMessages({ type: 'ADD_MESSAGE', payload: userMessage });
+      dispatchMessages({ type: 'ADD_MESSAGE', payload: aiMessage });
+      await saveMessageToDB(userMessage, activeSessionId);
+
+      setInput('');
+
+      await runCompletion({
+        conversation,
+        aiMessageId: aiMessage.id,
+        activeSessionId,
+        // 首轮对话（会话里只有这一条用户消息）结束后自动生成标题
+        titlePrompt: conversation.length === 1 ? input : null,
+      });
+    },
+    [runCompletion]
+  );
+
+  // 重新生成最后一条 AI 回复：删掉旧回复，基于同样的上下文重新请求
+  const regenerate = useCallback(async () => {
+    if (isStreaming) return;
+    const activeSessionId = sessionIdRef.current;
+    if (!activeSessionId || messages.length === 0) return;
+
+    const last = messages[messages.length - 1];
+    let aiMessageId;
+    let contextMessages;
+
+    if (!last.isUser) {
+      // 常规情况：复用这条 AI 消息的 id，清空后重新流式写入
+      aiMessageId = last.id;
+      contextMessages = messages.slice(0, -1);
+      await deleteMessageFromDB(last.id);
+      dispatchMessages({ type: 'SET_TEXT', id: last.id, payload: '' });
+    } else {
+      // 边界情况：最后一条是用户消息（比如上次生成失败），直接补一条 AI 消息
+      aiMessageId = uuidv4();
+      contextMessages = messages;
+      dispatchMessages({ type: 'ADD_MESSAGE', payload: { id: aiMessageId, text: '', isUser: false } });
+    }
+
+    await runCompletion({
+      conversation: toConversation(contextMessages),
+      aiMessageId,
+      activeSessionId,
+    });
+  }, [messages, isStreaming, runCompletion]);
+
+  // 编辑一条已发送的用户消息并分叉重发：
+  // 丢弃该消息之后的所有消息（内存 + DB），更新其内容，然后基于新内容重新请求
+  const editAndResend = useCallback(
+    async (messageId, newText) => {
+      if (isStreaming || !newText.trim()) return;
+      const activeSessionId = sessionIdRef.current;
+      if (!activeSessionId) return;
+
+      const idx = messages.findIndex((msg) => msg.id === messageId);
+      if (idx === -1 || !messages[idx].isUser) return;
+
+      // 清掉该消息之后的所有记录（都比它新，必然已加载在内存中）
+      const idsAfter = messages.slice(idx + 1).map((msg) => msg.id);
+      await deleteMessagesByIds(idsAfter);
+
+      // 更新消息内容（保留原 id，时间戳刷新为当前，仍排在会话末尾）
+      await saveMessageToDB({ id: messageId, text: newText, isUser: true }, activeSessionId);
+      dispatchMessages({ type: 'TRUNCATE_AFTER', id: messageId });
+      dispatchMessages({ type: 'SET_TEXT', id: messageId, payload: newText });
+
+      const aiMessage = { id: uuidv4(), text: '', isUser: false };
+      dispatchMessages({ type: 'ADD_MESSAGE', payload: aiMessage });
+
+      const conversation = [
+        ...toConversation(messages.slice(0, idx)),
+        { role: 'user', content: newText },
+      ];
+      await runCompletion({
+        conversation,
+        aiMessageId: aiMessage.id,
+        activeSessionId,
+        // 编辑的是会话第一条消息时，重新生成标题
+        titlePrompt: idx === 0 ? newText : null,
+      });
+    },
+    [messages, isStreaming, runCompletion]
+  );
+
+  // 继续生成：上次被手动停止后，让模型从中断处接着写。
+  // 会话以"部分完成的 assistant 消息"结尾发送，新内容追加到同一条消息上。
+  const continueGeneration = useCallback(async () => {
+    if (isStreaming) return;
+    const activeSessionId = sessionIdRef.current;
+    if (!activeSessionId) return;
+
+    const last = messages[messages.length - 1];
+    if (!last || last.isUser || !last.text) return;
+
+    await runCompletion({
+      conversation: toConversation(messages),
+      aiMessageId: last.id,
+      activeSessionId,
+      existingText: last.text,
+    });
+  }, [messages, isStreaming, runCompletion]);
+
   const cancelChatCompletion = useCallback(() => {
     const pending = streamingRef.current;
     streamingRef.current = null;
     setIsStreaming(false);
+    if (pending) {
+      if (pending.getContent()) {
+        // 有部分内容：保存下来，并允许"继续生成"
+        setCanContinue(true);
+      } else {
+        // 一个字都没生成就停止了：移除空的 AI 消息气泡
+        dispatchMessages({ type: 'REMOVE_MESSAGE', id: pending.messageId });
+      }
+    }
     abortAndPersistPending(pending);
   }, [abortAndPersistPending]);
 
@@ -290,5 +428,10 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     hasMore,
     isLoadingMore,
     loadMoreMessages,
+    // 消息级交互
+    canContinue,
+    regenerate,
+    editAndResend,
+    continueGeneration,
   };
 };

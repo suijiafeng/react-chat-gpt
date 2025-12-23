@@ -181,6 +181,21 @@ export const loadMessagesBySessionPaged = async (sessionId, limit = 30, offset =
   return messages.reverse();
 };
 
+// 删除单条消息（不存在时静默忽略）
+export const deleteMessageFromDB = async (messageId) => {
+  const db = await initDB();
+  await db.delete(MESSAGES_STORE, messageId);
+};
+
+// 批量删除消息（编辑消息分叉重发时，清掉该消息之后的所有记录）
+export const deleteMessagesByIds = async (messageIds) => {
+  if (!messageIds?.length) return;
+  const db = await initDB();
+  const tx = db.transaction(MESSAGES_STORE, 'readwrite');
+  await Promise.all(messageIds.map((id) => tx.store.delete(id)));
+  await tx.done;
+};
+
 export const clearSessionMessages = async (sessionId) => {
   const db = await initDB();
   const messages = await db.getAllFromIndex(MESSAGES_STORE, 'sessionId', sessionId);

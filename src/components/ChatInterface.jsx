@@ -33,6 +33,10 @@ const ChatInterface = () => {
     hasMore,
     isLoadingMore,
     loadMoreMessages,
+    canContinue,
+    regenerate,
+    editAndResend,
+    continueGeneration,
   } = useChat(currentModel, sessionId, handleSessionTouched);
 
   const { classes } = useTheme();
@@ -193,10 +197,16 @@ const ChatInterface = () => {
             {memoizedMessages.map((message, index) => (
               <ChatMessage
                 key={message.id}
+                messageId={message.id}
                 message={message.text}
                 isUser={message.isUser}
                 isStreaming={isStreaming}
                 isTyping={!message.isUser && index === messages.length - 1 && isStreaming}
+                isLast={index === messages.length - 1}
+                canContinue={canContinue}
+                onRegenerate={regenerate}
+                onContinue={continueGeneration}
+                onEdit={editAndResend}
               />
             ))}
             <div ref={messagesEndRef} />
