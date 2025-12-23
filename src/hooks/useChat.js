@@ -66,6 +66,12 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
   // 分页及滚动控制相关状态
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  // 当前会话是否已完成首次消息加载。
+  // 刷新 /c/:id 页面时，在首屏加载完成前不能断言"这是个空会话"，
+  // 否则欢迎语和居中输入框会先闪现一下再跳回消息布局（页面抖动）。
+  // /new（无 sessionId）没有历史可加载，首帧即视为加载完成——
+  // 否则会反过来：输入框先渲染在底部，effect 跑完才跳到居中（同样是抖动）
+  const [initialLoaded, setInitialLoaded] = useState(!sessionId);
   const skipScrollToBottomRef = useRef(false);
 
   useEffect(() => {
@@ -115,14 +121,17 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     if (!sessionId) {
       dispatchMessages({ type: 'CLEAR_HISTORY' });
       setHasMore(false);
+      setInitialLoaded(true); // /new 没有历史可加载，可以立即展示空状态
       return;
     }
     // 新建会话首次发送时已在内存中持有消息，跳过 DB 重读避免竞态
     if (skipNextLoadRef.current) {
       skipNextLoadRef.current = false;
       setHasMore(false);
+      setInitialLoaded(true);
       return;
     }
+    setInitialLoaded(false);
     // 先清空上一个会话残留的消息，避免切换/刷新时短暂显示错误内容；
     // hasMore 也重置为 true，避免沿用上一个会话的旧值导致"加载中"提示该出现时没出现
     dispatchMessages({ type: 'CLEAR_HISTORY' });
@@ -142,6 +151,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
         console.error('Error loading initial messages:', error);
       } finally {
         setIsLoadingMore(false);
+        setInitialLoaded(true);
       }
     };
     load();
@@ -428,6 +438,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     hasMore,
     isLoadingMore,
     loadMoreMessages,
+    initialLoaded,
     // 消息级交互
     canContinue,
     regenerate,

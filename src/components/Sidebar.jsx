@@ -23,7 +23,9 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   const navigate = useNavigate();
   const { chatId } = useParams();
   const { userProfile } = userStore;
-  const [sessions, setSessions] = useState([]);
+  // null = 尚未从 IndexedDB 加载完成。加载完成前不渲染"暂无聊天记录"，
+  // 避免刷新时占位文字先闪现、列表随后才顶上来的抖动
+  const [sessions, setSessions] = useState(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
@@ -131,7 +133,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
         </div>
 
         <div className="px-3 pb-4 overflow-y-auto flex-1 min-h-0">
-          {sessions.length === 0 ? (
+          {sessions === null ? null : sessions.length === 0 ? (
             <div className={`px-3 py-6 text-sm ${classes.mutedText}`}>暂无聊天记录</div>
           ) : (
             <div className="space-y-1">

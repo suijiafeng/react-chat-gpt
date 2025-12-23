@@ -1,8 +1,8 @@
 import request from "./config";
-import { WEBUI_API_BASE_URL, WEBUI_BASE_URL, USE_LOCAL_DATA, DEFAULT_LLM_PROVIDER } from '../constants';
+import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '../constants';
 import { providerRegistry } from './providers';
-
-const isDemoMode = () => USE_LOCAL_DATA || localStorage.getItem('demo_mode') === 'true';
+// 演示/正式模式与 provider 的判断统一收敛在配置中心，这里只负责调用
+import { isDemoMode, resolveProviderName } from '../store/llmConfig';
 
 export const queryMemory = (params) => {
   const { content, token } = params;
@@ -27,22 +27,7 @@ export const createNewChat = (params = {}) => {
 };
 
 export const generateChatCompletion = async (params, callback, signal) => {
-  // 用户在「设置」弹窗里保存过的选择始终优先；只有从未设置过（首次使用）时才走自动推断的默认值
-  const storedProvider = localStorage.getItem('llm_provider');
-  let providerName;
-
-  if (storedProvider === 'custom' || storedProvider === 'demo') {
-    // 显式选择过，原样尊重（即使切换到了真实后端部署，'演示模式' 也应该继续返回 mock 回复）
-    providerName = storedProvider;
-  } else if (isDemoMode()) {
-    // 未设置过偏好：本地数据模式 / 演示账号快捷登录下，默认走演示回复
-    providerName = 'demo';
-  } else {
-    // 未设置过偏好，也不在演示模式：回退到部署时配置的默认 provider（默认 'ollama'）
-    providerName = DEFAULT_LLM_PROVIDER === 'custom' ? 'custom' : (DEFAULT_LLM_PROVIDER === 'demo' ? 'demo' : 'ollama');
-  }
-
-  const provider = providerRegistry.getProvider(providerName);
+  const provider = providerRegistry.getProvider(resolveProviderName());
 
   try {
     await provider.complete(params, callback, signal);

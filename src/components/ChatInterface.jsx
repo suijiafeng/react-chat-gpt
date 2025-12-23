@@ -7,15 +7,20 @@ import ChatHeader from '../components/ChatHeader';
 import ChatInput from '../components/ChatInput';
 import { useTheme } from '../contexts/ThemeContext';
 import { createSession } from '../store/db';
+import { useLlmConfig, resolveCurrentModel } from '../store/llmConfig';
 
 const ChatInterface = () => {
   const { chatId } = useParams(); // /c/:chatId 时有值，/new 时无值
   const navigate = useNavigate();
-  const [sessionId, setSessionId] = useState(null);
+  // 直接用路由参数初始化，避免刷新时出现"sessionId 先是 null 再变成 chatId"的中间态——
+  // 那个中间态会让空会话欢迎页闪现一下再切回消息列表（页面抖动）
+  const [sessionId, setSessionId] = useState(chatId || null);
   // 用于触发 Sidebar 重新加载会话列表
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
-  const currentModel = localStorage.getItem('currentModel') || '';
+  // 订阅配置中心：设置弹窗或模型切换器改动后，这里即时拿到新模型，无需刷新页面
+  useLlmConfig();
+  const currentModel = resolveCurrentModel();
 
   // 会话有更新（完成一次回复 / 取消时保存了部分内容）时，刷新 Sidebar 的会话列表
   const handleSessionTouched = useCallback(() => {
@@ -33,6 +38,7 @@ const ChatInterface = () => {
     hasMore,
     isLoadingMore,
     loadMoreMessages,
+    initialLoaded,
     canContinue,
     regenerate,
     editAndResend,
@@ -88,8 +94,10 @@ const ChatInterface = () => {
   );
 
   const memoizedMessages = useMemo(() => messages, [messages]);
-  // 加载中先不当作"空对话"处理，避免欢迎页和输入框位置在消息加载完成的瞬间跳动
-  const showEmptyState = !isLoadingMore && memoizedMessages.length === 0 && !isStreaming;
+  // 首屏加载完成（initialLoaded）之前不当作"空对话"处理，
+  // 避免刷新会话页时欢迎页和居中输入框闪现后又跳回消息布局
+  const showEmptyState =
+    initialLoaded && !isLoadingMore && memoizedMessages.length === 0 && !isStreaming;
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
 
@@ -175,22 +183,14 @@ const ChatInterface = () => {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_28%)] pointer-events-none" />
           <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 md:px-8">
             <div className="max-w-3xl mx-auto min-h-full pt-10 pb-44">
-            {hasMore && (
-              <div ref={sentinelRef} className="py-4 flex items-center justify-center text-xs text-neutral-400">
-                {isLoadingMore ? (
-                  <div className="flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-neutral-400 border-t-transparent"></span>
-                    <span>加载中...</span>
-                  </div>
-                ) : (
-                  <span></span>
-                )}
-              </div>
-            )}
+            {/* 加载更多的哨兵元素：只在首屏加载完成后渲染。
+                首屏加载期间它会在消息上方占位，加载完成后消失导致内容上移（抖动） */}
             {showEmptyState && (
-              <div className="h-[40vh] flex items-end justify-center">
-                <div className="text-center select-none pb-10">
-                  <div className={`text-lg md:text-4xl ${classes.mutedText}`}>今天想聊些什么呢？</div>
+              <div className="flex min-h-[50vh] items-center justify-center px-4">
+                <div className="text-center select-none">
+                  <div className={`text-lg md:text-4xl leading-relaxed ${classes.mutedText}`}>
+                    今天想聊些什么呢？
+                  </div>
                 </div>
               </div>
             )}
