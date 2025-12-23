@@ -26,6 +26,139 @@ body {
     color 200ms ease-out;
 }
 
+.settings-modal .ant-modal-content {
+  overflow: hidden;
+  padding: 0;
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+}
+
+.settings-modal .ant-modal-header {
+  margin: 0;
+  padding: 22px 24px 16px;
+}
+
+.settings-modal .ant-modal-body {
+  max-height: min(72vh, 720px);
+  overflow-y: auto;
+  padding: 0 24px;
+}
+
+.settings-modal .ant-modal-footer {
+  margin-top: 0;
+  padding: 16px 24px 22px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.settings-modal .ant-modal-close {
+  top: 20px;
+  inset-inline-end: 20px;
+  border-radius: 12px;
+}
+
+.settings-modal .ant-input,
+.settings-modal .ant-input-password,
+.settings-modal .ant-input-number,
+.settings-modal .ant-select-selector {
+  min-height: 42px;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+.settings-modal .ant-input-number-input {
+  height: 40px;
+}
+
+.settings-modal .ant-radio-button-wrapper::before {
+  display: none;
+}
+
+.settings-modal-light .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
+.settings-modal-light .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover {
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.settings-modal-dark .ant-modal-content,
+.settings-modal-dark .ant-modal-footer {
+  background: #18181b;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.settings-modal-dark .ant-modal-content {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58);
+}
+
+.settings-modal-dark .ant-modal-close,
+.settings-modal-dark .ant-modal-close:hover,
+.settings-modal-dark .ant-modal-close-x,
+.settings-modal-dark .ant-input-password-icon,
+.settings-modal-dark .ant-select-arrow,
+.settings-modal-dark .ant-input-number-handler-wrap {
+  color: #a1a1aa;
+}
+
+.settings-modal-dark .ant-input,
+.settings-modal-dark .ant-input-affix-wrapper,
+.settings-modal-dark .ant-input-number,
+.settings-modal-dark .ant-select-selector,
+.settings-modal-dark .ant-select-selection-overflow,
+.settings-modal-dark .ant-select-selection-search-input {
+  color: #f4f4f5 !important;
+  background: #121212 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.settings-modal-dark .ant-input::placeholder,
+.settings-modal-dark .ant-select-selection-placeholder {
+  color: #71717a !important;
+}
+
+.settings-modal-dark .ant-select-selection-item {
+  color: #f4f4f5;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.settings-modal-dark .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
+.settings-modal-dark .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover {
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.18);
+  border-color: #60a5fa;
+}
+
+.settings-modal-dropdown-dark {
+  background: #18181b;
+}
+
+.settings-modal-dropdown-dark .ant-select-item {
+  color: #e4e4e7;
+}
+
+.settings-modal-dropdown-dark .ant-select-item-option-active,
+.settings-modal-dropdown-dark .ant-select-item-option-selected {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+@media (max-width: 640px) {
+  .settings-modal {
+    max-width: calc(100vw - 24px);
+  }
+
+  .settings-modal .ant-modal-header {
+    padding: 18px 18px 14px;
+  }
+
+  .settings-modal .ant-modal-body {
+    padding: 0 18px;
+  }
+
+  .settings-modal .ant-modal-footer {
+    padding: 14px 18px 18px;
+  }
+}
+
 button,
 input,
 textarea,

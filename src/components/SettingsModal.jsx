@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Input, Radio, Button, Select, InputNumber, message } from 'antd';
-import { Zap, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Zap, CheckCircle2, XCircle, Loader2, ServerCog } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { getConfig, saveConfig } from '../store/llmConfig';
@@ -16,7 +16,7 @@ const PLATFORM_PRESETS = [
 ];
 
 const SettingsModal = ({ isOpen, onClose }) => {
-  const { isDark } = useTheme();
+  const { isDark, classes } = useTheme();
   const { t } = useLanguage();
 
   const [provider, setProvider] = useState('demo');
@@ -112,50 +112,69 @@ const SettingsModal = ({ isOpen, onClose }) => {
     onClose();
   };
 
-  const labelCls = `block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`;
-  const inputCls = `rounded-xl px-4 py-2.5 text-sm ${
+  const modalThemeClass = isDark ? 'settings-modal settings-modal-dark' : 'settings-modal settings-modal-light';
+  const labelCls = `block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`;
+  const helpTextCls = `text-xs leading-relaxed ${isDark ? 'text-zinc-500' : 'text-slate-500'}`;
+  const fieldGroupCls = `rounded-2xl border p-4 ${classes.themeTransition} ${
+    isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'
+  }`;
+  const inputCls = `rounded-xl px-4 py-2.5 text-sm ${classes.themeTransition} ${
     isDark
-      ? 'bg-zinc-900 text-white border-zinc-800 focus:bg-zinc-900 focus:border-zinc-600 focus:text-white'
-      : 'bg-white text-black border-gray-300'
+      ? 'bg-[#121212] text-white border-white/10 focus:bg-[#121212] focus:border-zinc-500 focus:text-white placeholder:text-zinc-600'
+      : 'bg-white text-slate-950 border-slate-200 placeholder:text-slate-400'
   }`;
 
   return (
     <Modal
       title={
-        <span className={isDark ? 'text-white' : 'text-gray-900'}>
-          {t('settings') || '模型与 API 配置'}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
+            isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-50 text-blue-600'
+          }`}>
+            <ServerCog size={20} />
+          </span>
+          <div>
+            <span className={`block text-base font-semibold ${isDark ? 'text-white' : 'text-slate-950'}`}>
+              {t('settings') || '模型与 API 配置'}
+            </span>
+            <span className={`block text-xs font-normal ${isDark ? 'text-zinc-500' : 'text-slate-500'}`}>
+              选择演示模式或接入兼容 OpenAI 的模型服务
+            </span>
+          </div>
+        </div>
       }
       open={isOpen}
       onCancel={onClose}
       footer={[
-        <Button key="cancel" onClick={onClose} className={isDark ? 'bg-transparent text-gray-400 border-gray-700' : ''}>
+        <Button key="cancel" onClick={onClose} className={isDark ? 'bg-transparent text-zinc-300 border-white/10 hover:bg-white/5' : ''}>
           {t('cancel') || '取消'}
         </Button>,
-        <Button key="save" type="primary" onClick={handleSave} className="bg-blue-600 hover:bg-blue-500 border-0">
+        <Button key="save" type="primary" onClick={handleSave} className="bg-blue-600 hover:bg-blue-500 border-0 shadow-none">
           {t('save') || '保存'}
         </Button>,
       ]}
-      className={isDark ? 'dark-modal' : ''}
-      wrapClassName={isDark ? 'dark-theme-modal-wrap' : ''}
+      className={modalThemeClass}
+      wrapClassName={isDark ? 'settings-modal-wrap settings-modal-wrap-dark' : 'settings-modal-wrap'}
+      centered
+      width={720}
       styles={{
         body: {
-          backgroundColor: isDark ? '#1e1e1e' : '#ffffff',
-          color: isDark ? '#ffffff' : '#000000',
+          backgroundColor: isDark ? '#18181b' : '#ffffff',
+          color: isDark ? '#f4f4f5' : '#0f172a',
         },
         header: {
-          backgroundColor: isDark ? '#1e1e1e' : '#ffffff',
-          borderBottom: isDark ? '1px solid #2d2d2d' : '1px solid #f0f0f0',
-          paddingBottom: '12px',
+          backgroundColor: isDark ? '#18181b' : '#ffffff',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+          paddingBottom: '16px',
         },
         mask: {
-          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          backgroundColor: isDark ? 'rgba(0, 0, 0, 0.68)' : 'rgba(15, 23, 42, 0.36)',
         },
       }}
     >
-      <div className="py-4 space-y-5">
+      <div className="py-5 space-y-4">
         {/* 服务提供商选择 */}
-        <div className="space-y-2">
+        <div className={`${fieldGroupCls} space-y-3`}>
           <label className={labelCls}>{t('apiProvider') || '接口服务提供商'}</label>
           <Radio.Group
             value={provider}
@@ -169,17 +188,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
               <Radio.Button
                 key={opt.value}
                 value={opt.value}
-                className={`flex-1 text-center py-1.5 h-auto rounded-xl ${
+                className={`flex-1 text-center py-2 h-auto rounded-xl ${classes.themeTransition} ${
                   isDark
-                    ? 'bg-zinc-800 text-white border-zinc-700 hover:text-white hover:border-zinc-500'
-                    : 'bg-white text-gray-800 border-gray-300'
+                    ? 'bg-[#121212] text-zinc-200 border-white/10 hover:text-white hover:border-zinc-500'
+                    : 'bg-white text-slate-700 border-slate-200 hover:text-slate-950 hover:border-slate-300'
                 }`}
               >
                 {opt.label}
               </Radio.Button>
             ))}
           </Radio.Group>
-          <p className={`text-xs ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+          <p className={helpTextCls}>
             {provider === 'demo'
               ? (t('demoHint') || '演示模式下无需配置 key，AI 回复采用预设素材，流式打字返回，安全省心。')
               : (t('customHint') || '支持任何兼容 OpenAI 格式的大模型 API。选择下方平台快速填入，或手动配置。')}
@@ -189,7 +208,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         {provider === 'custom' && (
           <div className="space-y-4 animate-fadeIn">
             {/* 平台预设 */}
-            <div className="space-y-2">
+            <div className={`${fieldGroupCls} space-y-3`}>
               <label className={labelCls}>常用平台</label>
               <div className="flex flex-wrap gap-2">
                 {PLATFORM_PRESETS.map((preset) => (
@@ -197,12 +216,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     key={preset.name}
                     type="button"
                     onClick={() => applyPreset(preset)}
-                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                    className={`rounded-full border px-3 py-1.5 text-xs ${classes.themeTransition} ${
                       apiUrl === preset.apiUrl
-                        ? 'border-blue-500 text-blue-500'
+                        ? isDark
+                          ? 'border-blue-400 bg-blue-500/10 text-blue-300'
+                          : 'border-blue-500 bg-blue-50 text-blue-600'
                         : isDark
-                        ? 'border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                        ? 'border-white/10 bg-black/20 text-zinc-300 hover:border-zinc-500 hover:text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
                     }`}
                   >
                     {preset.name}
@@ -212,7 +233,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             </div>
 
             {/* API 地址 */}
-            <div className="space-y-2">
+            <div className={`${fieldGroupCls} space-y-2`}>
               <label className={labelCls}>{t('apiUrl') || 'API 接口地址 (Base URL)'}</label>
               <Input
                 value={apiUrl}
@@ -223,7 +244,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             </div>
 
             {/* API 密钥 */}
-            <div className="space-y-2">
+            <div className={`${fieldGroupCls} space-y-2`}>
               <label className={labelCls}>{t('apiKey') || 'API 密钥 (API Key)'}</label>
               <Input.Password
                 value={apiKey}
@@ -231,13 +252,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
                 className={inputCls}
               />
-              <p className={`text-xs ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+              <p className={helpTextCls}>
                 密钥仅保存在你的浏览器本地（简单编码、非加密）。生产环境建议通过后端代理转发请求。
               </p>
             </div>
 
             {/* 连接测试 */}
-            <div className="space-y-2">
+            <div className={`${fieldGroupCls} space-y-2`}>
               <Button
                 onClick={handleTest}
                 disabled={!apiUrl.trim() || testState === 'testing'}
@@ -247,8 +268,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   : testState === 'fail' ? <XCircle size={14} className="inline text-red-500" />
                   : <Zap size={14} className="inline" />
                 }
-                className={`rounded-xl flex items-center gap-1.5 ${
-                  isDark ? 'bg-zinc-800 text-white border-zinc-700' : ''
+                className={`rounded-xl flex items-center gap-1.5 ${classes.themeTransition} ${
+                  isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
                 }`}
               >
                 {testState === 'testing' ? '测试中...' : '测试连接'}
@@ -261,7 +282,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             </div>
 
             {/* 模型列表（可多选维护，顶部选择器里切换） */}
-            <div className="space-y-2">
+            <div className={`${fieldGroupCls} space-y-2`}>
               <label className={labelCls}>{t('modelName') || '模型列表'}</label>
               <Select
                 mode="tags"
@@ -272,26 +293,26 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 }}
                 placeholder="输入模型名后回车添加，例如 deepseek-chat"
                 className="w-full"
-                popupClassName={isDark ? 'dark-modal' : ''}
+                popupClassName={isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown'}
                 open={false /* tags 模式下无候选项，关闭下拉避免空面板 */}
                 suffixIcon={null}
                 tokenSeparators={[',', ' ']}
               />
-              <p className={`text-xs ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+              <p className={helpTextCls}>
                 这里维护的模型会出现在顶部的模型切换器中，支持逗号分隔批量粘贴。
               </p>
             </div>
 
             {/* 默认模型 */}
             {models.length > 1 && (
-              <div className="space-y-2">
+              <div className={`${fieldGroupCls} space-y-2`}>
                 <label className={labelCls}>默认模型</label>
                 <Select
                   value={models.includes(defaultModel) ? defaultModel : models[0]}
                   onChange={setDefaultModel}
                   options={models.map((m) => ({ value: m, label: m }))}
                   className="w-full"
-                  popupClassName={isDark ? 'dark-modal' : ''}
+                  popupClassName={isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown'}
                 />
               </div>
             )}
@@ -299,7 +320,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         )}
 
         {/* 上下文预算：demo / custom 都展示 */}
-        <div className="space-y-2">
+        <div className={`${fieldGroupCls} space-y-2`}>
           <label className={labelCls}>上下文长度预算 (Token)</label>
           <InputNumber
             value={contextTokens}
@@ -307,9 +328,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
             min={1000}
             max={200000}
             step={1000}
-            className={`w-full ${isDark ? 'bg-zinc-900 border-zinc-800' : ''}`}
+            className={`w-full ${isDark ? 'bg-[#121212] border-white/10' : ''}`}
           />
-          <p className={`text-xs ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+          <p className={helpTextCls}>
             发送前按此预算截断历史消息，避免长对话超出模型上下文窗口。应小于所用模型的窗口大小并留出回复余量。
           </p>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { ChevronDown, Settings, Check } from 'lucide-react';
+import { ChevronDown, Check } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   useLlmConfig,
@@ -8,12 +8,10 @@ import {
   resolveCurrentModel,
   DEMO_MODELS,
 } from '../store/llmConfig';
-import SettingsModal from './SettingsModal';
 
 const ModelSelector = React.memo(() => {
   const { isDark, classes } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const containerRef = useRef(null);
 
   // 订阅配置中心：设置弹窗保存后，这里的 provider / 模型列表 / 当前模型即时更新
@@ -68,24 +66,9 @@ const ModelSelector = React.memo(() => {
               onSelect={handleModelSelect}
               isDark={isDark}
             />
-            <div className={`border-t my-1 ${isDark ? 'border-zinc-800' : 'border-gray-100'}`} />
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                setIsSettingsOpen(true);
-              }}
-              className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-blue-500 font-medium ${
-                isDark ? 'hover:bg-zinc-800' : 'hover:bg-gray-50'
-              }`}
-            >
-              <Settings size={14} />
-              模型与 API 配置...
-            </button>
           </div>
         </div>
       )}
-
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 });

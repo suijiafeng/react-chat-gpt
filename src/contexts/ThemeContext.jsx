@@ -12,6 +12,8 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem('isDarkTheme', JSON.stringify(isDark));
     // 同步 body 背景色 & CSS 变量，避免初始闪白/闪黑
     document.body.style.background = isDark ? '#212121' : '#f7f7f8';
+    document.documentElement.classList.toggle('dark-theme', isDark);
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     document.documentElement.style.setProperty('--cursor-color', isDark ? '#fff' : '#1f1f1f');
     document.documentElement.style.setProperty('--scrollbar-thumb', isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.18)');
   }, [isDark]);
