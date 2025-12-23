@@ -1,0 +1,19 @@
+{
+  "name": "react-chat-gpt-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "登录注册 + LLM 请求代理后端，配套 react-chat-gpt 前端使用",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0"
+  }
+}
