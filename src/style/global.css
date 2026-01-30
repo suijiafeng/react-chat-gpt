@@ -175,16 +175,6 @@ img {
     opacity 200ms ease-out;
 }
 
-.typing-cursor {
-  display: inline-block;
-  width: 1px;
-  height: 1.1em;
-  background-color: var(--cursor-color, #1f1f1f);
-  animation: blink 1s steps(1) infinite;
-  margin-left: 2px;
-  vertical-align: middle;
-}
-
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -197,6 +187,17 @@ img {
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.typing-cursor {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background-color: currentColor;
+  animation: blink 1s steps(1) infinite;
 }
 
 @keyframes blink {

@@ -1,15 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { Loader, Copy, Check, RefreshCw, Pencil, StepForward } from 'lucide-react';
+import { Loader, Copy, Check, RefreshCw, Pencil, StepForward, AlertTriangle, ChevronDown } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
-const LoadingIndicator = ({ message, classes }) => {
-  return message ? <span className="typing-cursor animate-pulse">|</span> : (
-    <div className="flex justify-center  text-sm">
-      <Loader size={18} className={`${classes.text} animate-spin-slow`} />
-    </div>
-  );
-};
+// 还没收到第一个字符前展示的等待动画。
+const LoadingIndicator = ({ classes }) => (
+  <div className="flex justify-center text-sm">
+    <Loader size={18} className={`${classes.text} animate-spin-slow`} />
+  </div>
+);
 
 // 操作栏里的小图标按钮
 const ActionButton = ({ title, onClick, isDark, children }) => (
@@ -28,9 +27,11 @@ const ActionButton = ({ title, onClick, isDark, children }) => (
 const ChatMessage = React.memo(
   ({
     message,
+    reasoning,
     messageId,
     isTyping,
     isUser,
+    isError = false,
     isLast = false,
     isStreaming = false,
     canContinue = false,
@@ -42,7 +43,9 @@ const ChatMessage = React.memo(
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message);
+    const [reasoningExpanded, setReasoningExpanded] = useState(false);
     const editRef = useRef(null);
+    const reasoningScrollRef = useRef(null);
 
     // 进入编辑态时聚焦并自适应高度
     useEffect(() => {
@@ -54,6 +57,24 @@ const ChatMessage = React.memo(
         el.setSelectionRange(el.value.length, el.value.length);
       }
     }, [isEditing]);
+
+    // 正式内容出现后，自动折叠并进一步弱化思考过程
+    useEffect(() => {
+      if (message) {
+        setReasoningExpanded(false);
+      }
+    }, [message]);
+
+    // 思考区展开后，流式更新时始终跟随到最新内容
+    useEffect(() => {
+      if (!reasoningExpanded) return;
+      const el = reasoningScrollRef.current;
+      if (!el) return;
+
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    }, [reasoningExpanded, reasoning]);
 
     const handleCopy = () => {
       navigator.clipboard.writeText(message);
@@ -85,6 +106,10 @@ const ChatMessage = React.memo(
           ? isDark
             ? 'rounded-[28px] bg-white/[0.06] text-white'
             : 'rounded-[28px] bg-black/[0.04] text-black'
+          : isError
+          ? isDark
+            ? 'rounded-2xl border border-red-500/30 bg-red-500/10 text-red-200'
+            : 'rounded-2xl border border-red-200 bg-red-50 text-red-700'
           : 'bg-transparent text-inherit'
       }
     `;
@@ -149,10 +174,68 @@ const ChatMessage = React.memo(
           <div className={messageClasses}>
             {isUser ? (
               <span className="message-text whitespace-pre-wrap break-words">{message}</span>
+            ) : message || reasoning ? (
+              <>
+                {isError && (
+                  <div className="flex items-center gap-1.5 mb-1 text-xs font-medium uppercase tracking-wide">
+                    <AlertTriangle size={13} />
+                    <span>出错了</span>
+                  </div>
+                )}
+                {reasoning && (
+                  <div
+                    className={`mb-3 px-1 text-[11px] leading-5 ${
+                      message
+                        ? isDark
+                          ? 'text-white/35'
+                          : 'text-black/35'
+                        : isDark
+                        ? 'text-white/55'
+                        : 'text-black/55'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setReasoningExpanded((v) => !v)}
+                      className={`inline-flex items-center gap-1.5 select-none ${
+                        isDark ? 'text-white/65 hover:text-white/90' : 'text-black/55 hover:text-black/80'
+                      }`}
+                    >
+                      <span>{isTyping && !message ? '思考中' : '思考过程'}</span>
+                      {isTyping && !message && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
+                          <span
+                            className="h-1 w-1 rounded-full bg-current animate-pulse"
+                            style={{ animationDelay: '140ms' }}
+                          />
+                          <span
+                            className="h-1 w-1 rounded-full bg-current animate-pulse"
+                            style={{ animationDelay: '280ms' }}
+                          />
+                        </span>
+                      )}
+                      <ChevronDown
+                        size={13}
+                        className={`transition-transform ${reasoningExpanded ? 'rotate-180' : 'rotate-0'}`}
+                      />
+                    </button>
+
+                    {reasoningExpanded && (
+                      <div
+                        ref={reasoningScrollRef}
+                        className="mt-1 max-h-44 overflow-y-auto whitespace-pre-wrap break-words"
+                      >
+                        {reasoning}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {message && <MarkdownRenderer content={message} isTyping={isTyping} />}
+              </>
             ) : (
-              <MarkdownRenderer content={message} />
+              isTyping && <LoadingIndicator classes={classes} />
             )}
-            {isTyping && <LoadingIndicator message={message} classes={classes} />}
           </div>
           {/* 操作栏：AI 最后一条常驻，其余消息 hover 时显示；生成中不显示 */}
           {!isTyping && !(isStreaming && isLast) && message && (

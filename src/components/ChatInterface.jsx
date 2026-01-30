@@ -172,6 +172,18 @@ const ChatInterface = () => {
     }
   }, [messages]);
 
+  // 流式生成期间，跟随外层聊天窗口滚动到底部（窗口滚动效果）
+  useEffect(() => {
+    if (!isStreaming || isLoadingMore || shouldAdjustScrollRef.current) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, [memoizedMessages, isStreaming, isLoadingMore]);
+
   if (isSidebarOpen === null) return null;
 
   return (
@@ -199,7 +211,9 @@ const ChatInterface = () => {
                 key={message.id}
                 messageId={message.id}
                 message={message.text}
+                reasoning={message.reasoning}
                 isUser={message.isUser}
+                isError={message.isError}
                 isStreaming={isStreaming}
                 isTyping={!message.isUser && index === messages.length - 1 && isStreaming}
                 isLast={index === messages.length - 1}

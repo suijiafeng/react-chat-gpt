@@ -3,7 +3,7 @@ import { OLLAMA_API_BASE_URL } from '../../constants';
 
 export class OllamaProvider extends BaseProvider {
   async complete(params, callback, signal) {
-    const { chat_id, id, messages, model, options, session_id, stream } = params;
+    const { chat_id, id, messages, model, options, session_id, stream, think } = params;
 
     const response = await fetch(`${OLLAMA_API_BASE_URL}/api/chat`, {
       method: 'POST',
@@ -12,7 +12,7 @@ export class OllamaProvider extends BaseProvider {
         'x-vail': 'application/x-ndjson',
         'Authorization': localStorage.getItem('token') || '',
       },
-      body: JSON.stringify({ chat_id, id, messages, model, options, session_id, stream }),
+      body: JSON.stringify({ chat_id, id, messages, model, options, session_id, stream, think: Boolean(think) }),
       signal,
     });
 
@@ -27,7 +27,9 @@ export class OllamaProvider extends BaseProvider {
     try {
       while (true) {
         if (signal?.aborted) {
-          throw new DOMException('The operation was aborted.', 'AbortError');
+          // 保留真实的中止原因（比如超时看门狗构造的 TimeoutError），
+          // 不要一律说成通用 AbortError，上层要靠 error.name 区分场景
+          throw signal.reason ?? new DOMException('The operation was aborted.', 'AbortError');
         }
 
         const { value, done } = await reader.read();
@@ -47,8 +49,13 @@ export class OllamaProvider extends BaseProvider {
             const chunk = JSON.parse(trimmed);
             if (chunk.done) {
               callback('[DONE]');
-            } else if (chunk.message && chunk.message.content) {
-              callback(chunk.message.content);
+            } else {
+              if (chunk.message?.thinking) {
+                callback(chunk.message.thinking, { isReasoning: true });
+              }
+              if (chunk.message?.content) {
+                callback(chunk.message.content);
+              }
             }
           } catch (jsonError) {
             console.error('Ollama JSON 解析错误：', jsonError, trimmed);
@@ -62,8 +69,13 @@ export class OllamaProvider extends BaseProvider {
           const chunk = JSON.parse(buffer.trim());
           if (chunk.done) {
             callback('[DONE]');
-          } else if (chunk.message && chunk.message.content) {
-            callback(chunk.message.content);
+          } else {
+            if (chunk.message?.thinking) {
+              callback(chunk.message.thinking, { isReasoning: true });
+            }
+            if (chunk.message?.content) {
+              callback(chunk.message.content);
+            }
           }
         } catch {
           // ignore

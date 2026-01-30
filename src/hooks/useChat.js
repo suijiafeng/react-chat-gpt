@@ -9,6 +9,7 @@ import {
   deleteMessageFromDB,
   deleteMessagesByIds,
 } from '../store/db';
+import { getConfig } from '../store/llmConfig';
 import { trimConversation } from '../utils/context';
 
 const messagesReducer = (state, action) => {
@@ -23,9 +24,30 @@ const messagesReducer = (state, action) => {
       return state.map((msg) =>
         msg.id === action.id ? { ...msg, text: msg.text + action.payload } : msg
       );
+    case 'UPDATE_REASONING':
+      return state.map((msg) =>
+        msg.id === action.id
+          ? { ...msg, reasoning: `${msg.reasoning || ''}${action.payload}` }
+          : msg
+      );
+    case 'APPEND_ERROR':
+      // 错误文本单独追加一段，并打上 isError 标记供 ChatMessage 做视觉区分——
+      // 不和 UPDATE_MESSAGE 共用，避免错误信息被当成模型的正常输出拼接在一起
+      return state.map((msg) =>
+        msg.id === action.id
+          ? {
+              ...msg,
+              text: msg.text ? `${msg.text}\n\n${action.payload}` : action.payload,
+              isError: true,
+            }
+          : msg
+      );
     case 'SET_TEXT':
-      // 直接替换整条消息文本（编辑消息 / 重新生成前清空旧回复）
-      return state.map((msg) => (msg.id === action.id ? { ...msg, text: action.payload } : msg));
+      // 直接替换整条消息文本（编辑消息 / 重新生成前清空旧回复），
+      // 顺带清掉上一次可能残留的错误标记——这条消息正在被重新生成
+      return state.map((msg) =>
+        msg.id === action.id ? { ...msg, text: action.payload, isError: false } : msg
+      );
     case 'REMOVE_MESSAGE':
       return state.filter((msg) => msg.id !== action.id);
     case 'TRUNCATE_AFTER': {
@@ -215,7 +237,9 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       setCanContinue(false);
 
       let aiMessageContent = existingText;
+      let hadError = false;
       const abortController = new AbortController();
+      const { think } = getConfig();
       streamingRef.current = {
         messageId: aiMessageId,
         sessionId: activeSessionId,
@@ -226,6 +250,47 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       // 避免一个已经被切走/取消的旧请求在竞态情况下反过来覆盖新请求的状态
       const isCurrent = () => streamingRef.current?.messageId === aiMessageId;
 
+      // 节流批量写入 state：模型/演示 provider 是逐字符或逐 token 回调的，
+      // 如果每个字符都单独 dispatch 一次，Markdown 渲染层（react-markdown）会在
+      // 每次更新时把已累积的全部文本重新解析一遍——文本越长，越到后面单次解析越贵，
+      // 总耗时随内容长度呈平方增长，长回复会让页面卡死。
+      // 这里把高频的字符级更新合并成固定节奏（约 20 次/秒）的批量更新，
+      // dispatch 次数不再随内容长度增长，只随生成耗时增长，从根上避免平方级开销。
+      let pendingChunk = '';
+      let pendingReasoningChunk = '';
+      let flushTimer = null;
+      const flushPending = () => {
+        flushTimer = null;
+        if (pendingReasoningChunk) {
+          const toFlush = pendingReasoningChunk;
+          pendingReasoningChunk = '';
+          dispatchMessages({ type: 'UPDATE_REASONING', id: aiMessageId, payload: toFlush });
+        }
+        if (pendingChunk) {
+          const toFlush = pendingChunk;
+          pendingChunk = '';
+          dispatchMessages({ type: 'UPDATE_MESSAGE', id: aiMessageId, payload: toFlush });
+        }
+      };
+      const scheduleFlush = () => {
+        if (flushTimer) return;
+        flushTimer = setTimeout(flushPending, 50);
+      };
+
+      // 空闲看门狗：请求发出后若连续一段时间收不到任何新内容（包括还没收到第一个字节），
+      // 视为"接口卡住了"，自动中止并展示为错误——而不是让用户对着光标干等，
+      // 又不知道是该继续等还是该手动点停止。
+      // 用带 reason 的 abort 触发，这样能在下面 catch 里和"用户手动点停止"区分开
+      // （手动取消走的是无 reason 的 abort，产生标准 AbortError）。
+      const STALL_TIMEOUT_MS = 30000;
+      const triggerStallAbort = () =>
+        abortController.abort(new DOMException('模型长时间无响应', 'TimeoutError'));
+      let stallTimer = setTimeout(triggerStallAbort, STALL_TIMEOUT_MS);
+      const resetStallTimer = () => {
+        clearTimeout(stallTimer);
+        stallTimer = setTimeout(triggerStallAbort, STALL_TIMEOUT_MS);
+      };
+
       try {
         await generateChatCompletion(
           {
@@ -234,19 +299,27 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
             // 发送前按 token 预算截断历史，避免长对话超出模型上下文窗口
             messages: trimConversation(conversation),
             options: {},
+            think,
             session_id: activeSessionId,
             chat_id: activeSessionId,
             id: uuidv4(),
           },
-          async (chunk) => {
+          async (chunk, meta) => {
             if (chunk === '[DONE]') {
+              // 请求正常结束，看门狗不用再守了（不重启，直接清掉）
+              clearTimeout(stallTimer);
+
+              // 结束前把节流缓冲区里还没落地的最后一小段内容 flush 掉，避免丢字
+              if (flushTimer) clearTimeout(flushTimer);
+              flushPending();
+
               if (isCurrent()) {
                 setIsStreaming(false);
                 streamingRef.current = null;
               }
 
               await saveMessageToDB(
-                { id: aiMessageId, text: aiMessageContent, isUser: false },
+                { id: aiMessageId, text: aiMessageContent, isUser: false, isError: hadError },
                 activeSessionId
               );
               await touchSession(activeSessionId);
@@ -277,12 +350,44 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
               return;
             }
 
+            if (meta?.isError) {
+              // 请求已经以错误告终，看门狗不用再守了
+              clearTimeout(stallTimer);
+
+              // 错误前先把已缓冲的正常内容 flush 掉，保证两者不会被合并进同一次 dispatch
+              if (flushTimer) clearTimeout(flushTimer);
+              flushPending();
+
+              hadError = true;
+              aiMessageContent = aiMessageContent ? `${aiMessageContent}\n\n${chunk}` : chunk;
+              dispatchMessages({ type: 'APPEND_ERROR', id: aiMessageId, payload: chunk });
+              return;
+            }
+
+            // 收到了正常内容，说明接口没有卡住，重新起算看门狗倒计时
+            resetStallTimer();
+
+            if (meta?.isReasoning) {
+              pendingReasoningChunk += chunk;
+              scheduleFlush();
+              return;
+            }
+
             aiMessageContent += chunk;
-            dispatchMessages({ type: 'UPDATE_MESSAGE', id: aiMessageId, payload: chunk });
+            pendingChunk += chunk;
+            scheduleFlush();
           },
           abortController.signal
         );
       } catch (error) {
+        // 请求已经以异常告终（包括看门狗触发的超时中止），不再需要看门狗
+        clearTimeout(stallTimer);
+
+        // 无论是被中止还是意外抛错，都把缓冲区里还没上屏的内容 flush 掉，
+        // 避免"停止生成"那一刻恰好卡在节流窗口内，界面短暂丢失最后几个字
+        if (flushTimer) clearTimeout(flushTimer);
+        flushPending();
+
         if (error.name !== 'AbortError') {
           console.error('Error generating chat completion:', error);
         }

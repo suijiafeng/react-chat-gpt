@@ -30,7 +30,10 @@ export class BaseProvider {
     try {
       while (true) {
         if (signal?.aborted) {
-          throw new DOMException('The operation was aborted.', 'AbortError');
+          // 优先抛出调用方传入的真实中止原因（比如超时看门狗构造的 TimeoutError），
+          // 而不是一律说成通用 AbortError——上层需要靠 error.name 区分
+          // "用户手动点了停止"和"请求卡住被自动中止"，两者的 UI 表现不同。
+          throw signal.reason ?? new DOMException('The operation was aborted.', 'AbortError');
         }
 
         const { value, done } = await reader.read();
@@ -60,9 +63,13 @@ export class BaseProvider {
 
             try {
               const parsed = JSON.parse(dataStr);
-              const content = dataParser(parsed);
-              if (content) {
-                callback(content);
+              const parsedChunk = dataParser(parsed);
+              if (parsedChunk) {
+                if (typeof parsedChunk === 'object' && 'content' in parsedChunk) {
+                  callback(parsedChunk.content, parsedChunk.meta);
+                } else {
+                  callback(parsedChunk);
+                }
               }
             } catch (e) {
               console.error('Error parsing SSE line:', e, cleanedLine);
@@ -79,9 +86,13 @@ export class BaseProvider {
           if (dataStr !== '[DONE]') {
             try {
               const parsed = JSON.parse(dataStr);
-              const content = dataParser(parsed);
-              if (content) {
-                callback(content);
+              const parsedChunk = dataParser(parsed);
+              if (parsedChunk) {
+                if (typeof parsedChunk === 'object' && 'content' in parsedChunk) {
+                  callback(parsedChunk.content, parsedChunk.meta);
+                } else {
+                  callback(parsedChunk);
+                }
               }
             } catch {
               // ignore

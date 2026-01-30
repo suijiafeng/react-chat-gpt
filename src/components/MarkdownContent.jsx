@@ -7,6 +7,26 @@ import rehypeHighlightLite from './markdown/rehypeHighlightLite';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github-dark.css';
 
+const remarkMarkLastParagraph = () => (tree) => {
+  const paragraphs = [];
+  const visitNode = (node) => {
+    if (!node) return;
+    if (node.type === 'paragraph') paragraphs.push(node);
+    if (Array.isArray(node.children)) node.children.forEach(visitNode);
+  };
+  visitNode(tree);
+  const lastParagraph = paragraphs[paragraphs.length - 1];
+  if (lastParagraph) {
+    lastParagraph.data = {
+      ...lastParagraph.data,
+      hProperties: {
+        ...lastParagraph.data?.hProperties,
+        'data-last-paragraph': 'true',
+      },
+    };
+  }
+};
+
 // 带复制按钮的代码块组件
 const CodeBlock = React.memo(({ lang, codeText, children }) => {
   const [copied, setCopied] = useState(false);
@@ -99,7 +119,15 @@ const components = {
   h4: ({ children }) => <h4 className="text-lg font-semibold my-2 text-inherit">{children}</h4>,
   h5: ({ children }) => <h5 className="text-base font-semibold my-2 text-inherit">{children}</h5>,
   h6: ({ children }) => <h6 className="text-sm font-semibold my-2 text-inherit">{children}</h6>,
-  p: ({ children }) => <p className="leading-7 my-2">{children}</p>,
+  p: ({ children, node }) => {
+    const showCursor = node?.properties?.['data-last-paragraph'] === 'true';
+    return (
+      <p className="leading-7 my-2">
+        {children}
+        {showCursor && <span className="typing-cursor" aria-hidden="true" />}
+      </p>
+    );
+  },
   hr: () => <hr className="my-6 border-t border-gray-200 dark:border-gray-800" />,
   blockquote: ({ children }) => (
     <blockquote className="border-l-4 border-gray-300 dark:border-gray-700 pl-4 py-1.5 my-3 bg-black/[0.02] dark:bg-white/[0.02] rounded-r italic text-gray-600 dark:text-gray-300 text-sm">
@@ -138,13 +166,19 @@ const components = {
   ),
 };
 
-const MarkdownContent = ({ content }) => {
+const MarkdownContent = ({ content, isTyping }) => {
   if (!content) return null;
 
+  const remarkPlugins = isTyping
+    ? [remarkGfm, remarkMath, remarkMarkLastParagraph]
+    : [remarkGfm, remarkMath];
+
   return (
-    <div className="markdown-body space-y-1 text-inherit leading-7 break-words">
+    <div
+      className="markdown-body space-y-1 text-inherit leading-7 break-words"
+    >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={remarkPlugins}
         rehypePlugins={[rehypeKatex, rehypeHighlightLite]}
         components={components}
       >
