@@ -20,8 +20,14 @@ const ChatInput = ({ input, setInput, handleSubmit, isStreaming, isEmpty = false
       className={`inset-x-0 z-20 px-4 ${classes.themeTransition} ${
         isEmpty
           ? 'absolute top-1/2 -translate-y-1/2'
-          : 'absolute bottom-0 pb-6 pt-10'
-      } ${isDark ? 'from-[#212121] via-[#212121]/90' : 'from-[#f7f7f8] via-[#f7f7f8]/90'}`}
+          : // 缺一个 bg-gradient-to-t 方向类，from-/via- 色标就不会生效——
+            // 之前整个容器其实是透明的，滚动的消息内容会从输入框周围穿透显示出来
+            `absolute bottom-0 pb-6 pt-10 bg-gradient-to-t ${
+                isDark
+                  ? 'from-[#212121] via-[#212121]/90 to-transparent'
+                  : 'from-[#f7f7f8] via-[#f7f7f8]/90 to-transparent'
+              }`
+      }`}
     >
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
         <div

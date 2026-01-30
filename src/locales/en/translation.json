@@ -40,8 +40,10 @@
   "apiProvider": "API Provider",
   "demoMockMode": "Frontend Demo Mode",
   "customOpenAi": "Custom OpenAI API",
+  "backendHosted": "Server-hosted",
   "demoHint": "No API Key required. Simulates streaming replies offline safely.",
   "customHint": "Supports any OpenAI compatible API (e.g. DeepSeek, OpenAI, Ollama, etc.).",
+  "backendHint": "After signing in, requests are proxied through the server. The API key stays server-side, never touches the browser, and isn't subject to each provider's CORS policy.",
   "apiUrl": "API Base URL",
   "apiKey": "API Key",
   "modelName": "Model Name"
