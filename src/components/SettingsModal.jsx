@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Input, Radio, Button, Select, InputNumber, message } from 'antd';
+import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message } from 'antd';
 import { Zap, CheckCircle2, XCircle, Loader2, ServerCog } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { getConfig, saveConfig } from '../store/llmConfig';
+import { getBackendLlmConfig, saveBackendLlmConfig } from '../apis/llm';
+import { USE_LOCAL_DATA } from '../constants';
 
 // 常用平台预设：一键填入接口地址和推荐模型，降低配置门槛
 const PLATFORM_PRESETS = [
@@ -25,22 +27,55 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [models, setModels] = useState([]);
   const [defaultModel, setDefaultModel] = useState('');
   const [contextTokens, setContextTokens] = useState(8000);
+  const [think, setThink] = useState(false);
   // 连接测试状态：idle | testing | ok | fail
   const [testState, setTestState] = useState('idle');
   const [testMessage, setTestMessage] = useState('');
+
+  // "服务器托管"模式专用状态：配置存在后端账号下，不进 localStorage
+  const [backendApiUrl, setBackendApiUrl] = useState('');
+  const [backendApiKey, setBackendApiKey] = useState('');
+  const [backendModel, setBackendModel] = useState('');
+  const [backendHasApiKey, setBackendHasApiKey] = useState(false);
+  const [backendLoading, setBackendLoading] = useState(false);
+  const [backendLoadError, setBackendLoadError] = useState('');
 
   // 打开弹窗时从配置中心加载当前值
   useEffect(() => {
     if (!isOpen) return;
     const config = getConfig();
-    setProvider(config.provider === 'custom' ? 'custom' : 'demo');
+    setProvider(
+      config.provider === 'custom' || config.provider === 'backend' ? config.provider : 'demo'
+    );
     setApiUrl(config.apiUrl);
     setApiKey(config.apiKey);
     setModels(config.models);
     setDefaultModel(config.model);
     setContextTokens(config.contextTokens);
+    setThink(config.think);
     setTestState('idle');
     setTestMessage('');
+    setBackendLoadError('');
+
+    // 服务器托管模式的配置存在后端，需要单独拉取（依赖登录 session）
+    if (!USE_LOCAL_DATA) {
+      setBackendLoading(true);
+      getBackendLlmConfig()
+        .then((res) => {
+          setBackendApiUrl(res.data?.apiUrl || '');
+          setBackendModel(res.data?.model || '');
+          setBackendHasApiKey(Boolean(res.data?.hasApiKey));
+          setBackendApiKey('');
+        })
+        .catch((error) => {
+          setBackendLoadError(
+            error.response?.status === 401
+              ? '请先登录后再配置服务器托管模式'
+              : '加载后端配置失败：' + (error.response?.data?.message || error.message)
+          );
+        })
+        .finally(() => setBackendLoading(false));
+    }
   }, [isOpen]);
 
   // 应用平台预设：填入地址和推荐模型。
@@ -80,7 +115,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (provider === 'custom') {
       const cleanModels = models.map((m) => m.trim()).filter(Boolean);
       if (!apiUrl.trim()) {
@@ -100,12 +135,42 @@ const SettingsModal = ({ isOpen, onClose }) => {
         model,
         currentModel: model,
         contextTokens: contextTokens || 8000,
+        think,
+      });
+    } else if (provider === 'backend') {
+      if (!backendApiUrl.trim()) {
+        message.warning('请填写 API 接口地址');
+        return;
+      }
+      if (!backendModel.trim()) {
+        message.warning('请填写模型名称');
+        return;
+      }
+      try {
+        // apiKey 为空表示"沿用后端已保存的旧值"，避免每次打开都要求重新输入
+        await saveBackendLlmConfig({
+          apiUrl: backendApiUrl,
+          apiKey: backendApiKey,
+          model: backendModel,
+        });
+      } catch (error) {
+        message.error('保存到服务器失败：' + (error.response?.data?.message || error.message));
+        return;
+      }
+      // 本地只记一个指针：当前用的是 backend 模式 + 展示哪个模型，真正的 Key 留在服务端
+      saveConfig({
+        provider: 'backend',
+        currentModel: backendModel.trim(),
+        model: backendModel.trim(),
+        contextTokens: contextTokens || 8000,
+        think,
       });
     } else {
       saveConfig({
         provider: 'demo',
         currentModel: 'demo-assistant',
         contextTokens: contextTokens || 8000,
+        think,
       });
     }
     message.success(t('settingsSaved') || '设置已保存，立即生效');
@@ -184,6 +249,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
             {[
               { value: 'demo', label: `🚀 ${t('demoMockMode') || '前端演示模式'}` },
               { value: 'custom', label: `🤖 ${t('customOpenAi') || '自定义 OpenAI 接口'}` },
+              // 服务器托管模式依赖真实登录后端（USE_LOCAL_DATA=false 部署），
+              // 演示/本地部署下没有意义，不展示这个选项，避免用户点了却因为没登录而困惑
+              ...(!USE_LOCAL_DATA
+                ? [{ value: 'backend', label: `🖥️ ${t('backendHosted') || '服务器托管'}` }]
+                : []),
             ].map((opt) => (
               <Radio.Button
                 key={opt.value}
@@ -200,8 +270,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
           </Radio.Group>
           <p className={helpTextCls}>
             {provider === 'demo'
-              ? (t('demoHint') || '演示模式下无需配置 key，AI 回复采用预设素材，流式打字返回，安全省心。')
-              : (t('customHint') || '支持任何兼容 OpenAI 格式的大模型 API。选择下方平台快速填入，或手动配置。')}
+              ? t('demoHint') || '演示模式下无需配置 key，AI 回复采用预设素材，流式打字返回，安全省心。'
+              : provider === 'backend'
+              ? t('backendHint') ||
+                '登录后台账号后，模型请求经服务端转发，API Key 只存在服务端，不经过浏览器，也不受各家模型商 CORS 限制。'
+              : t('customHint') || '支持任何兼容 OpenAI 格式的大模型 API。选择下方平台快速填入，或手动配置。'}
           </p>
         </div>
 
@@ -319,6 +392,54 @@ const SettingsModal = ({ isOpen, onClose }) => {
           </div>
         )}
 
+        {provider === 'backend' && (
+          <div className="space-y-4 animate-fadeIn">
+            {backendLoadError && (
+              <div
+                className={`${fieldGroupCls} text-sm ${isDark ? 'text-red-300' : 'text-red-600'}`}
+              >
+                {backendLoadError}
+              </div>
+            )}
+
+            <div className={`${fieldGroupCls} space-y-2`}>
+              <label className={labelCls}>{t('apiUrl') || 'API 接口地址 (Base URL)'}</label>
+              <Input
+                value={backendApiUrl}
+                onChange={(e) => setBackendApiUrl(e.target.value)}
+                placeholder="例如: https://api.deepseek.com/v1"
+                disabled={backendLoading}
+                className={inputCls}
+              />
+            </div>
+
+            <div className={`${fieldGroupCls} space-y-2`}>
+              <label className={labelCls}>{t('apiKey') || 'API 密钥 (API Key)'}</label>
+              <Input.Password
+                value={backendApiKey}
+                onChange={(e) => setBackendApiKey(e.target.value)}
+                placeholder={backendHasApiKey ? '已在服务器保存，留空则不修改' : 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'}
+                disabled={backendLoading}
+                className={inputCls}
+              />
+              <p className={helpTextCls}>
+                密钥经加密后保存在服务器数据库里，浏览器只知道&ldquo;已配置&rdquo;，不会拿到明文。
+              </p>
+            </div>
+
+            <div className={`${fieldGroupCls} space-y-2`}>
+              <label className={labelCls}>{t('modelName') || '模型名称'}</label>
+              <Input
+                value={backendModel}
+                onChange={(e) => setBackendModel(e.target.value)}
+                placeholder="例如: deepseek-chat"
+                disabled={backendLoading}
+                className={inputCls}
+              />
+            </div>
+          </div>
+        )}
+
         {/* 上下文预算：demo / custom 都展示 */}
         <div className={`${fieldGroupCls} space-y-2`}>
           <label className={labelCls}>上下文长度预算 (Token)</label>
@@ -333,6 +454,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
           <p className={helpTextCls}>
             发送前按此预算截断历史消息，避免长对话超出模型上下文窗口。应小于所用模型的窗口大小并留出回复余量。
           </p>
+        </div>
+
+        <div className={`${fieldGroupCls} flex items-center justify-between gap-4`}>
+          <div className="space-y-1">
+            <label className={labelCls}>Think 模式</label>
+            <p className={helpTextCls}>
+              开启后请求会携带 think: true，并在支持的 Ollama 模型中显示思考过程；关闭时携带 think: false。
+            </p>
+          </div>
+          <Switch checked={think} onChange={setThink} />
         </div>
       </div>
     </Modal>

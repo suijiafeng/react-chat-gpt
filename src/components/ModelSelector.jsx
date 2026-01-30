@@ -75,6 +75,7 @@ const ModelSelector = React.memo(() => {
 
 // 下拉里的模型列表：
 // demo → 固定演示模型；custom → 用户在设置里维护的列表；
+// backend（服务器托管）→ 后端账号配置的单一模型；
 // ollama（后端部署模式）→ 从后端接口拉取，失败时回退到用户配置的列表
 const ModelList = ({ providerName, currentModel, onSelect, isDark }) => {
   const config = useLlmConfig();
@@ -97,7 +98,11 @@ const ModelList = ({ providerName, currentModel, onSelect, isDark }) => {
   }, [providerName]);
 
   const models =
-    providerName === 'demo' ? DEMO_MODELS : remoteModels || config.models;
+    providerName === 'demo'
+      ? DEMO_MODELS
+      : providerName === 'backend'
+      ? (config.model ? [config.model] : [])
+      : remoteModels || config.models;
 
   if (models.length === 0) {
     return (

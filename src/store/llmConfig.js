@@ -16,6 +16,7 @@ const KEYS = {
   model: 'llm_model',
   models: 'llm_models', // JSON 数组：用户维护的可选模型列表
   contextTokens: 'llm_context_tokens',
+  think: 'llm_think',
   currentModel: 'currentModel',
 };
 
@@ -80,6 +81,7 @@ export const getConfig = () => {
     model,
     models: models.length ? models : [model],
     contextTokens: parseInt(localStorage.getItem(KEYS.contextTokens), 10) || 8000,
+    think: localStorage.getItem(KEYS.think) === 'true',
     currentModel: localStorage.getItem(KEYS.currentModel) || '',
   };
   return snapshot;
@@ -103,6 +105,9 @@ export const saveConfig = (partial) => {
   }
   if (partial.contextTokens !== undefined) {
     localStorage.setItem(KEYS.contextTokens, String(partial.contextTokens));
+  }
+  if (partial.think !== undefined) {
+    localStorage.setItem(KEYS.think, String(Boolean(partial.think)));
   }
   if (partial.currentModel !== undefined) {
     localStorage.setItem(KEYS.currentModel, partial.currentModel);
@@ -135,7 +140,7 @@ export const isDemoMode = () =>
  */
 export const resolveProviderName = () => {
   const stored = localStorage.getItem(KEYS.provider);
-  if (stored === 'custom' || stored === 'demo') {
+  if (stored === 'custom' || stored === 'demo' || stored === 'backend') {
     // 显式选择过，原样尊重（即使切换到了真实后端部署，'演示模式'也应继续返回 mock 回复）
     return stored;
   }
@@ -148,8 +153,13 @@ export const resolveProviderName = () => {
 /** 当前生效的模型显示名（模型选择器 / 发请求时用） */
 export const resolveCurrentModel = () => {
   const config = getConfig();
-  if (resolveProviderName() === 'demo') {
+  const provider = resolveProviderName();
+  if (provider === 'demo') {
     return DEMO_MODELS.includes(config.currentModel) ? config.currentModel : DEMO_MODELS[0];
+  }
+  if (provider === 'backend') {
+    // 服务器托管模式：模型由后端账号配置决定，不走本地 models 列表
+    return config.currentModel || config.model;
   }
   // custom：优先当前选中的；不在列表里则回退到默认模型
   return config.models.includes(config.currentModel) ? config.currentModel : config.model;
