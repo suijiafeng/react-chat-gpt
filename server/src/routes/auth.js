@@ -18,6 +18,16 @@ const toPublicUser = (user) => ({
   profile_image_url: user.profile_image_url || '',
 });
 
+// 登录/注册成功后建立会话：先 regenerate 更换会话 ID 再写入 userId，
+// 防会话固定攻击——认证前的匿名会话 ID 不应在认证后继续有效。
+const establishSession = (req, res, user) => {
+  req.session.regenerate((err) => {
+    if (err) return res.status(500).json({ message: '会话创建失败，请重试' });
+    req.session.userId = user.id;
+    res.json(toPublicUser(user));
+  });
+};
+
 router.post('/signup', async (req, res) => {
   const { name, email, password, profile_image_url = '' } = req.body || {};
 
@@ -40,8 +50,7 @@ router.post('/signup', async (req, res) => {
     created_at: new Date().toISOString(),
   });
 
-  req.session.userId = user.id;
-  res.json(toPublicUser(user));
+  establishSession(req, res, user);
 });
 
 router.post('/signin', async (req, res) => {
@@ -55,8 +64,7 @@ router.post('/signin', async (req, res) => {
   const matches = await bcrypt.compare(password, user.password_hash);
   if (!matches) return res.status(401).json({ message: '密码错误' });
 
-  req.session.userId = user.id;
-  res.json(toPublicUser(user));
+  establishSession(req, res, user);
 });
 
 router.post('/signout', (req, res) => {

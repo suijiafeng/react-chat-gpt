@@ -3,6 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { getSession, userSignOut } from '../apis/auths';
 import { seedDemoUser } from '../store/db';
 import { userStore } from '../store';
+import { isDemoMode } from '../store/llmConfig';
+import { handleSessionExpired } from '../utils/session';
+import { WEBUI_API_BASE_URL } from '../constants';
+import request from '../apis/config';
 export * from './useChat';
 
 export const useLanguage = () => {
@@ -56,6 +60,18 @@ export const useAuth = () => {
   useEffect(() => {
     // 预置演示账号（首次启动时异步写入，不阻塞登录检测）
     seedDemoUser().catch(() => {});
+
+    // 主动校验后端会话是否仍有效，纠正"localStorage 还在、cookie 已失效"的假登录。
+    // 三重守卫缺一不可：
+    //  - !isDemoMode()：演示构建(USE_LOCAL_DATA)没有后端；快捷演示登录(demo_mode)没有
+    //    后端会话，探测必 401 会把演示用户误踢下线——这两种情况都不发请求，演示模式零影响
+    //  - getSession()?.id：本地本来就没登录态时无需校验（未登录本就会被路由挡去登录页）
+    // 401 之外的错误（网络抖动、服务暂不可用）不动登录态，避免误伤。
+    if (!isDemoMode() && getSession()?.id) {
+      request.get(`${WEBUI_API_BASE_URL}/auths/me`).catch((error) => {
+        if (error.response?.status === 401) handleSessionExpired();
+      });
+    }
   }, []);
 
   // isLoading 恒为 false：校验是同步的，保留字段只为兼容现有调用方

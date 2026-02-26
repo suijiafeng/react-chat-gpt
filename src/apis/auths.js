@@ -84,6 +84,12 @@ export const userSignIn = async ({ email, password }) => {
 // ──────────────────────────────────────────────
 
 export const userSignOut = () => {
+  // 后端模式下必须同时销毁服务端会话：httpOnly cookie 前端删不掉，
+  // 只清 localStorage 的话 cookie 在 7 天有效期内依然能调 /llm/* 等受保护接口。
+  // fire-and-forget：本地清理不应被网络失败阻塞（下线的兜底是被动 401 处理）。
+  if (!USE_LOCAL_DATA) {
+    request.post(`${WEBUI_API_BASE_URL}/auths/signout`).catch(() => {});
+  }
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem('demo_mode');
 };
