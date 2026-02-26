@@ -27,6 +27,7 @@
   "signInSuccess": "Sign in successful!",
   "signUpSuccess": "Account created successfully!",
   "alreadyLoggedIn": "Already logged in, redirecting...",
+  "sessionExpired": "Your session has expired, please sign in again",
   "demoLogin": "Demo Login (No Backend Required)",
   "useDemoAccount": "Use Default Demo Account",
   "demoCredentialsHint": "Default account:",

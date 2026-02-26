@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { handleSessionExpired } from './session';
 
 // Create a function that returns an axios instance with custom options
 export const createApiInstance = (baseURL, timeout) => {
@@ -31,9 +32,11 @@ export const createApiInstance = (baseURL, timeout) => {
     (response) => response,
     (error) => {
       if (error.response) {
-        if (error.response.status === 401) {
-          // Handle unauthorized access (e.g., redirect to login page)
-          // Example: window.location = '/login';
+        // 后端返回 401 且不是登录/注册接口本身（那类 401 是密码错误，应留在表单里提示）：
+        // 说明会话已失效，清掉本地登录态并跳登录页，纠正前后端登录态不一致
+        const url = error.config?.url || '';
+        if (error.response.status === 401 && !url.includes('/auths/')) {
+          handleSessionExpired();
         }
       } else if (error.request) {
         console.error('Request error:', error.request);

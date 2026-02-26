@@ -27,6 +27,7 @@
   "signInSuccess": "登录成功！",
   "signUpSuccess": "账号注册成功！",
   "alreadyLoggedIn": "您已经登录，正在跳转...",
+  "sessionExpired": "登录已过期，请重新登录",
   "demoLogin": "演示登录（无需后端）",
   "useDemoAccount": "使用默认演示账号登录",
   "demoCredentialsHint": "默认账号：",

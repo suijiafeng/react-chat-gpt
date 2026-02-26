@@ -1,5 +1,6 @@
 import { BaseProvider } from './base';
 import { WEBUI_API_BASE_URL } from '../../constants';
+import { handleSessionExpired } from '../../utils/session';
 
 // 走自建后端转发：真实 API Key 只存在服务端，浏览器完全接触不到；
 // 同时天然绕开各模型商的 CORS 限制（服务端对服务端请求不受同源策略约束）。
@@ -22,6 +23,8 @@ export class BackendProvider extends BaseProvider {
     });
 
     if (!response.ok) {
+      // 会话失效：清理本地登录态并跳登录页（流式请求走原生 fetch，不经 axios 拦截器）
+      if (response.status === 401) handleSessionExpired();
       let detail = '';
       try {
         detail = (await response.json())?.message || '';

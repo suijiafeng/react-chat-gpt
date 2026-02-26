@@ -98,6 +98,15 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
     return () => window.clearTimeout(timer);
   }, [isLoggedIn, navigate, t]);
 
+  // 会话过期被动跳转过来时（?expired=1）给出提示，并清掉 URL 参数避免刷新反复弹
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('expired') === '1') {
+      message.warning(t('sessionExpired') || '登录已过期，请重新登录');
+      window.history.replaceState(null, '', '/login');
+    }
+  }, [t]);
+
   return (
     <div className={`${classes.bg} ${classes.text} ${classes.themeTransition} min-h-screen w-full flex flex-col font-primary`}>
       {/* 顶部导航栏 */}
