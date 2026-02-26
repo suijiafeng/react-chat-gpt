@@ -5,5 +5,11 @@ import { WEBUI_API_BASE_URL } from '../constants';
 
 export const getBackendLlmConfig = () => request.get(`${WEBUI_API_BASE_URL}/llm/config`);
 
-export const saveBackendLlmConfig = ({ apiUrl, apiKey, model }) =>
-  request.put(`${WEBUI_API_BASE_URL}/llm/config`, { provider: 'custom', apiUrl, apiKey, model });
+// provider 区分上游接口类型：'custom'=OpenAI 兼容层，'ollama'=Ollama 原生 /api/chat。
+export const saveBackendLlmConfig = ({ apiUrl, apiKey, model, provider = 'custom' }) =>
+  request.put(`${WEBUI_API_BASE_URL}/llm/config`, { provider, apiUrl, apiKey, model });
+
+// 设置页"测试连接"：让后端用表单里的临时地址/密钥去拉上游模型列表，
+// 未填 apiKey 时后端回退到已保存的加密 Key。返回 { data: [{ id }] }。
+export const testBackendLlmConfig = ({ apiUrl, apiKey }) =>
+  request.get(`${WEBUI_API_BASE_URL}/llm/models`, { params: { apiUrl, apiKey } });

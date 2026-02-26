@@ -10,9 +10,31 @@ import { Router } from 'express';
 import { getLlmConfig, upsertLlmConfig } from '../db.js';
 import { encrypt, decrypt } from '../crypto.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { createRateLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 router.use(requireAuth);
+
+// 已登录用户共用同一份上游 API Key，转发即产生真金白银的调用成本，
+// 因此按用户 id 限流（每分钟 30 次）。可用环境变量覆盖。
+const chatRateLimiter = createRateLimiter({
+  windowMs: Number(process.env.LLM_RATE_WINDOW_MS) || 60 * 1000,
+  max: Number(process.env.LLM_RATE_MAX) || 30,
+  keyFn: (req) => req.session.userId,
+  message: '模型请求过于频繁',
+});
+
+// 上游错误响应优先按 JSON 解析出可读 message，拿不到再退回原始文本，
+// 避免把一大坨 HTML/JSON 直接抛给前端。
+const readUpstreamError = async (upstream) => {
+  const raw = await upstream.text().catch(() => '');
+  try {
+    const json = JSON.parse(raw);
+    return json?.error?.message || json?.message || raw;
+  } catch {
+    return raw;
+  }
+};
 
 // 读取当前用户保存的配置。出于安全考虑不回传明文 Key，只回传是否已配置。
 router.get('/config', (req, res) => {
@@ -42,10 +64,43 @@ router.put('/config', (req, res) => {
   res.json({ ok: true });
 });
 
-// 是否是本机/局域网 Ollama 默认端口。Ollama 的 OpenAI 兼容层（/v1/chat/completions）
+// 拉取当前用户配置的上游可用模型列表。
+// 由服务端发起请求：既能带上加密存储的 Key，又绕开浏览器直连各模型商 /models 的 CORS 限制。
+// 可选 query ?apiUrl=&apiKey= 用于设置页"测试连接"——此时用表单里的临时值而非已存配置，
+// 让用户保存前就能校验地址/密钥是否可用（apiKey 为空则回退到已保存的 Key）。
+router.get('/models', async (req, res) => {
+  const saved = getLlmConfig(req.session.userId);
+  const apiUrl = (req.query.apiUrl || saved?.api_url || '').trim();
+  if (!apiUrl) return res.status(400).json({ message: '尚未配置 API 接口地址' });
+
+  const apiKey = req.query.apiKey ? String(req.query.apiKey) : decrypt(saved?.api_key_encrypted || '');
+  const url = `${apiUrl.replace(/\/+$/, '')}/models`;
+
+  try {
+    const upstream = await fetch(url, {
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!upstream.ok) {
+      const detail = await readUpstreamError(upstream);
+      return res.status(upstream.status).json({ message: `上游返回错误 (${upstream.status}): ${detail}` });
+    }
+    const data = await upstream.json();
+    // 兼容 OpenAI（{ data:[{id}] }）与 Ollama（/v1/models 同样是该形状）
+    const ids = Array.isArray(data?.data) ? data.data.map((m) => m.id).filter(Boolean) : [];
+    res.json({ data: ids.map((id) => ({ id })) });
+  } catch (error) {
+    const msg = error.name === 'TimeoutError' ? '连接超时' : error.message;
+    res.status(502).json({ message: `无法获取模型列表：${msg}` });
+  }
+});
+
+// 是否走 Ollama 原生 /api/chat 接口。Ollama 的 OpenAI 兼容层（/v1/chat/completions）
 // 不支持 think 参数，思考型模型会把大段思维链堆在 reasoning 字段里拖慢首字节时间；
-// 原生 /api/chat 接口支持 think:false 直接跳过思考。命中该端口时改走原生接口。
-const isOllamaHost = (apiUrl) => /:11434\b/.test(apiUrl);
+// 原生接口支持 think:false 直接跳过思考。
+// 判定优先级：用户在设置里显式选择的 provided='ollama' > 端口号兜底猜测（:11434）。
+const useOllamaNative = (config) =>
+  config.provider === 'ollama' || /:11434\b/.test(config.api_url);
 
 // 把 Ollama 原生 /api/chat 的 NDJSON chunk 转成前端已经在解析的 OpenAI SSE 格式，
 // 这样协议差异完全在服务端吸收，前端 BaseProvider 不需要认识第二种格式。
@@ -71,8 +126,8 @@ async function proxyOpenAiCompat({ config, apiKey, messages, model, signal, res 
   });
 
   if (!upstream.ok || !upstream.body) {
-    const text = await upstream.text().catch(() => '');
-    res.status(upstream.status).json({ message: `上游返回错误 (${upstream.status}): ${text}` });
+    const detail = await readUpstreamError(upstream);
+    res.status(upstream.status).json({ message: `上游返回错误 (${upstream.status}): ${detail}` });
     return;
   }
 
@@ -112,8 +167,8 @@ async function proxyOllamaNative({ config, messages, model, think, signal, res }
   });
 
   if (!upstream.ok || !upstream.body) {
-    const text = await upstream.text().catch(() => '');
-    res.status(upstream.status).json({ message: `上游返回错误 (${upstream.status}): ${text}` });
+    const detail = await readUpstreamError(upstream);
+    res.status(upstream.status).json({ message: `上游返回错误 (${upstream.status}): ${detail}` });
     return;
   }
 
@@ -153,7 +208,7 @@ async function proxyOllamaNative({ config, messages, model, think, signal, res }
 }
 
 // 转发聊天补全请求，流式把上游响应中转给前端（统一成 OpenAI SSE 格式）。
-router.post('/chat/completions', async (req, res) => {
+router.post('/chat/completions', chatRateLimiter, async (req, res) => {
   const config = getLlmConfig(req.session.userId);
   if (!config?.api_url) {
     return res.status(400).json({ message: '尚未配置模型服务，请先在设置里保存 API 地址' });
@@ -170,7 +225,7 @@ router.post('/chat/completions', async (req, res) => {
   // 避免后端继续为一个没人接收的响应付费/占用连接
   req.on('close', () => upstreamController.abort());
 
-  const proxy = isOllamaHost(config.api_url) ? proxyOllamaNative : proxyOpenAiCompat;
+  const proxy = useOllamaNative(config) ? proxyOllamaNative : proxyOpenAiCompat;
 
   try {
     await proxy({ config, apiKey, messages, model, think, signal: upstreamController.signal, res });

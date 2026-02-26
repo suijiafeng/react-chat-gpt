@@ -4,7 +4,7 @@ import { Zap, CheckCircle2, XCircle, Loader2, ServerCog } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { getConfig, saveConfig } from '../store/llmConfig';
-import { getBackendLlmConfig, saveBackendLlmConfig } from '../apis/llm';
+import { getBackendLlmConfig, saveBackendLlmConfig, testBackendLlmConfig } from '../apis/llm';
 import { USE_LOCAL_DATA } from '../constants';
 
 // 常用平台预设：一键填入接口地址和推荐模型，降低配置门槛
@@ -36,9 +36,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [backendApiUrl, setBackendApiUrl] = useState('');
   const [backendApiKey, setBackendApiKey] = useState('');
   const [backendModel, setBackendModel] = useState('');
+  const [backendProvider, setBackendProvider] = useState('custom'); // custom=OpenAI 兼容 | ollama=原生
   const [backendHasApiKey, setBackendHasApiKey] = useState(false);
   const [backendLoading, setBackendLoading] = useState(false);
   const [backendLoadError, setBackendLoadError] = useState('');
+  // 后端模式连接测试状态：idle | testing | ok | fail
+  const [backendTestState, setBackendTestState] = useState('idle');
+  const [backendTestMessage, setBackendTestMessage] = useState('');
 
   // 打开弹窗时从配置中心加载当前值
   useEffect(() => {
@@ -60,10 +64,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
     // 服务器托管模式的配置存在后端，需要单独拉取（依赖登录 session）
     if (!USE_LOCAL_DATA) {
       setBackendLoading(true);
+      setBackendTestState('idle');
+      setBackendTestMessage('');
       getBackendLlmConfig()
         .then((res) => {
           setBackendApiUrl(res.data?.apiUrl || '');
           setBackendModel(res.data?.model || '');
+          setBackendProvider(res.data?.provider === 'ollama' ? 'ollama' : 'custom');
           setBackendHasApiKey(Boolean(res.data?.hasApiKey));
           setBackendApiKey('');
         })
@@ -115,6 +122,34 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   };
 
+  // 后端模式连接测试：让服务端用当前表单里的地址/密钥去拉模型列表（绕开浏览器 CORS）。
+  // apiKey 留空时后端回退到已保存的加密 Key，成功后把模型名自动填入。
+  const handleBackendTest = async () => {
+    if (!backendApiUrl.trim()) {
+      message.warning('请先填写 API 接口地址');
+      return;
+    }
+    setBackendTestState('testing');
+    setBackendTestMessage('');
+    try {
+      const res = await testBackendLlmConfig({
+        apiUrl: backendApiUrl.trim(),
+        apiKey: backendApiKey.trim(),
+      });
+      const ids = (res.data?.data || []).map((m) => m.id).filter(Boolean);
+      setBackendTestState('ok');
+      if (ids.length > 0) {
+        setBackendTestMessage(`连接成功，检测到 ${ids.length} 个可用模型`);
+        setBackendModel((prev) => (ids.includes(prev) ? prev : ids[0]));
+      } else {
+        setBackendTestMessage('连接成功');
+      }
+    } catch (error) {
+      setBackendTestState('fail');
+      setBackendTestMessage('连接失败：' + (error.response?.data?.message || error.message));
+    }
+  };
+
   const handleSave = async () => {
     if (provider === 'custom') {
       const cleanModels = models.map((m) => m.trim()).filter(Boolean);
@@ -152,6 +187,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
           apiUrl: backendApiUrl,
           apiKey: backendApiKey,
           model: backendModel,
+          provider: backendProvider,
         });
       } catch (error) {
         message.error('保存到服务器失败：' + (error.response?.data?.message || error.message));
@@ -402,11 +438,41 @@ const SettingsModal = ({ isOpen, onClose }) => {
               </div>
             )}
 
+            <div className={`${fieldGroupCls} space-y-3`}>
+              <label className={labelCls}>接口类型</label>
+              <Radio.Group
+                value={backendProvider}
+                onChange={(e) => { setBackendProvider(e.target.value); setBackendTestState('idle'); }}
+                disabled={backendLoading}
+                className="flex gap-3 w-full"
+              >
+                {[
+                  { value: 'custom', label: 'OpenAI 兼容' },
+                  { value: 'ollama', label: 'Ollama 原生' },
+                ].map((opt) => (
+                  <Radio.Button
+                    key={opt.value}
+                    value={opt.value}
+                    className={`flex-1 text-center py-1 h-auto rounded-xl ${classes.themeTransition} ${
+                      isDark
+                        ? 'bg-[#121212] text-zinc-200 border-white/10 hover:text-white hover:border-zinc-500'
+                        : 'bg-white text-slate-700 border-slate-200 hover:text-slate-950 hover:border-slate-300'
+                    }`}
+                  >
+                    {opt.label}
+                  </Radio.Button>
+                ))}
+              </Radio.Group>
+              <p className={helpTextCls}>
+                大多数平台选「OpenAI 兼容」；本机 Ollama 的思考型模型选「Ollama 原生」可支持 think 开关、避免思维链拖慢首字节。
+              </p>
+            </div>
+
             <div className={`${fieldGroupCls} space-y-2`}>
               <label className={labelCls}>{t('apiUrl') || 'API 接口地址 (Base URL)'}</label>
               <Input
                 value={backendApiUrl}
-                onChange={(e) => setBackendApiUrl(e.target.value)}
+                onChange={(e) => { setBackendApiUrl(e.target.value); setBackendTestState('idle'); }}
                 placeholder="例如: https://api.deepseek.com/v1"
                 disabled={backendLoading}
                 className={inputCls}
@@ -417,7 +483,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
               <label className={labelCls}>{t('apiKey') || 'API 密钥 (API Key)'}</label>
               <Input.Password
                 value={backendApiKey}
-                onChange={(e) => setBackendApiKey(e.target.value)}
+                onChange={(e) => { setBackendApiKey(e.target.value); setBackendTestState('idle'); }}
                 placeholder={backendHasApiKey ? '已在服务器保存，留空则不修改' : 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'}
                 disabled={backendLoading}
                 className={inputCls}
@@ -425,6 +491,30 @@ const SettingsModal = ({ isOpen, onClose }) => {
               <p className={helpTextCls}>
                 密钥经加密后保存在服务器数据库里，浏览器只知道&ldquo;已配置&rdquo;，不会拿到明文。
               </p>
+            </div>
+
+            {/* 连接测试：由服务端拉取上游模型列表验证地址/密钥（不受浏览器 CORS 限制） */}
+            <div className={`${fieldGroupCls} space-y-2`}>
+              <Button
+                onClick={handleBackendTest}
+                disabled={!backendApiUrl.trim() || backendLoading || backendTestState === 'testing'}
+                icon={
+                  backendTestState === 'testing' ? <Loader2 size={14} className="animate-spin inline" />
+                  : backendTestState === 'ok' ? <CheckCircle2 size={14} className="inline text-green-500" />
+                  : backendTestState === 'fail' ? <XCircle size={14} className="inline text-red-500" />
+                  : <Zap size={14} className="inline" />
+                }
+                className={`rounded-xl flex items-center gap-1.5 ${classes.themeTransition} ${
+                  isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
+                }`}
+              >
+                {backendTestState === 'testing' ? '测试中...' : '测试连接'}
+              </Button>
+              {backendTestMessage && (
+                <p className={`text-xs ${backendTestState === 'ok' ? 'text-green-500' : 'text-red-400'}`}>
+                  {backendTestMessage}
+                </p>
+              )}
             </div>
 
             <div className={`${fieldGroupCls} space-y-2`}>

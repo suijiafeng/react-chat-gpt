@@ -81,8 +81,9 @@ const ModelList = ({ providerName, currentModel, onSelect, isDark }) => {
   const config = useLlmConfig();
   const [remoteModels, setRemoteModels] = useState(null);
 
+  // ollama / backend（服务器托管）模式的模型列表来自后端，需异步拉取
   useEffect(() => {
-    if (providerName !== 'ollama') return;
+    if (providerName !== 'ollama' && providerName !== 'backend') return;
     let cancelled = false;
     import('../apis/models').then(({ getModels }) =>
       getModels()
@@ -101,7 +102,8 @@ const ModelList = ({ providerName, currentModel, onSelect, isDark }) => {
     providerName === 'demo'
       ? DEMO_MODELS
       : providerName === 'backend'
-      ? (config.model ? [config.model] : [])
+      ? // 优先后端返回的完整列表；拉取失败/未就绪时回退到账号已配置的那一个
+        remoteModels || (config.model ? [config.model] : [])
       : remoteModels || config.models;
 
   if (models.length === 0) {

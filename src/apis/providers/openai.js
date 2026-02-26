@@ -1,5 +1,5 @@
 import { BaseProvider } from './base';
-import { DEFAULT_LLM_MODEL } from '../../constants';
+import { getConfig } from '../../store/llmConfig';
 
 export class OpenAIProvider extends BaseProvider {
   async complete(params, callback, signal) {
@@ -47,16 +47,9 @@ export class OpenAIProvider extends BaseProvider {
       return output;
     };
 
-    let apiKey = localStorage.getItem('llm_api_key') || '';
-    if (apiKey.startsWith('b64:')) {
-      try {
-        apiKey = atob(apiKey.slice(4));
-      } catch {
-        // fallback
-      }
-    }
-    const apiUrl = localStorage.getItem('llm_api_url') || 'https://api.openai.com/v1';
-    const customModel = localStorage.getItem('llm_model') || DEFAULT_LLM_MODEL;
+    // 统一从配置中心读取（内部已处理 b64 解码、默认值），
+    // 不再直接摸 localStorage，避免 key 名 / 编码方式散落多处
+    const { apiKey, apiUrl, model: customModel } = getConfig();
 
     let url = apiUrl.replace(/\/+$/, '');
     if (!url.endsWith('/chat/completions')) {

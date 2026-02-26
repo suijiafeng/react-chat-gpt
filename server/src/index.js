@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
+import { SqliteSessionStore } from './sessionStore.js';
 import authRoutes from './routes/auth.js';
 import llmRoutes from './routes/llm.js';
 
@@ -24,14 +25,15 @@ app.use(
     secret: process.env.SESSION_SECRET || 'dev-only-insecure-secret',
     resave: false,
     saveUninitialized: false,
+    // 会话落到 SQLite（复用同一份 better-sqlite3 连接），服务重启后登录态不丢失，
+    // 替代默认 MemoryStore。单机场景足够；多实例部署可再换 Redis 等共享 store。
+    store: new SqliteSessionStore(),
     cookie: {
       httpOnly: true, // JS 读不到，防 XSS 窃取会话
       secure: process.env.COOKIE_SECURE === 'true',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 天
     },
-    // 注意：默认 MemoryStore 仅适合开发/演示，服务重启会清空所有会话，
-    // 也不支持多实例部署。生产环境请换成 connect-redis 等持久化 store。
   })
 );
 
