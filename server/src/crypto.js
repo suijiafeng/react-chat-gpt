@@ -6,10 +6,17 @@ import crypto from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 
+// .env.example 里的占位值（全 0）。长度合法但人尽皆知，用它加密等于没加密，
+// 必须拒绝，防止有人把 .env.example 直接拷成 .env 未改就上线。
+const PLACEHOLDER_KEY = '0'.repeat(64);
+
 const getKey = () => {
   const hex = process.env.ENCRYPTION_KEY;
-  if (!hex || hex.length !== 64) {
-    throw new Error('ENCRYPTION_KEY 未配置或长度不是 64 位十六进制（32 字节），请检查 .env');
+  if (!hex || !/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error('ENCRYPTION_KEY 未配置或不是 64 位十六进制（32 字节），请用 `openssl rand -hex 32` 生成');
+  }
+  if (hex === PLACEHOLDER_KEY) {
+    throw new Error('ENCRYPTION_KEY 仍是 .env.example 的占位值（全 0），请替换成真实随机密钥后再启动');
   }
   return Buffer.from(hex, 'hex');
 };

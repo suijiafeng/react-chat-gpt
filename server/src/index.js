@@ -8,6 +8,21 @@ import llmRoutes from './routes/llm.js';
 
 const app = express();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Session 签名密钥：绝不能在生产环境用代码里写死的兜底值，否则任何人都能用公开的
+// 密钥伪造会话 cookie 冒充其它用户（且会话已持久化到 SQLite，伪造后重启依旧有效）。
+// 生产环境未配置直接启动失败；开发环境允许临时密钥但打印告警。
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  if (isProduction) {
+    throw new Error(
+      'SESSION_SECRET 未配置：生产环境必须设置一个随机长字符串（如 `openssl rand -hex 32`），否则会话可被伪造'
+    );
+  }
+  console.warn('[warn] 未设置 SESSION_SECRET，使用临时开发密钥——仅限本地开发，切勿用于生产');
+}
+
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim());
@@ -22,7 +37,7 @@ app.use(express.json());
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'dev-only-insecure-secret',
+    secret: sessionSecret || 'dev-only-insecure-secret',
     resave: false,
     saveUninitialized: false,
     // 会话落到 SQLite（复用同一份 better-sqlite3 连接），服务重启后登录态不丢失，

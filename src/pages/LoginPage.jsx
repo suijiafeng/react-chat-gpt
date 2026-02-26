@@ -8,6 +8,12 @@ import { useLanguage, useAuth } from '../hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { userSignIn, userSignUp } from '../apis/auths';
 import { userStore } from '../store';
+import { USE_LOCAL_DATA } from '../constants';
+
+// 仅在本地演示构建里预填演示账号，方便一键体验；接了真实后端时不预填凭据，
+// 避免向用户暗示一组在真实环境里并不存在（或不该存在）的弱口令。
+const DEMO_EMAIL = USE_LOCAL_DATA ? 'demo@example.com' : '';
+const DEMO_PASSWORD = USE_LOCAL_DATA ? 'demo123' : '';
 
 // 带眼睛切换的密码输入框
 const PasswordInput = ({ value, onChange, placeholder, autoComplete, classes }) => {
@@ -41,8 +47,8 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
   const { t } = useLanguage();
   const [mode, setMode] = useState('signin');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('demo@example.com');
-  const [password, setPassword] = useState('demo123');
+  const [email, setEmail] = useState(DEMO_EMAIL);
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { isLoggedIn } = useAuth();
@@ -52,8 +58,8 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
     setName('');
     setConfirmPassword('');
     if (next === 'signin') {
-      setEmail('demo@example.com');
-      setPassword('demo123');
+      setEmail(DEMO_EMAIL);
+      setPassword(DEMO_PASSWORD);
     } else {
       setEmail('');
       setPassword('');
@@ -193,8 +199,8 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                   </button>
                 </div>
 
-                {/* 默认账号提示（仅登录页展示） */}
-                {mode === 'signin' && (
+                {/* 默认账号提示：仅本地演示构建展示，真实后端部署下不提示弱口令 */}
+                {mode === 'signin' && USE_LOCAL_DATA && (
                   <p className={`mt-5 text-center text-xs ${classes.mutedText}`}>
                     {t('demoCredentialsHint')}
                     <span className="font-mono ml-1">demo@example.com / demo123</span>
