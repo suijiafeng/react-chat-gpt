@@ -157,9 +157,11 @@ async function proxyOpenAiCompat({ config, apiKey, messages, model, signal, res 
       if (done) break;
       res.write(value); // 已经是目标 SSE 格式，原样透传
     }
+    // 只有正常走完才在这里收尾；上游中途断线时让异常带着未收尾的 res 冒泡，
+    // 由路由层补发错误块告知前端"回复不完整"（若在这 end 了就没法再写了）
+    res.end();
   } finally {
     reader.releaseLock();
-    res.end();
   }
 }
 
@@ -214,9 +216,10 @@ async function proxyOllamaNative({ config, messages, model, think, signal, res }
         }
       }
     }
+    // 同 proxyOpenAiCompat：正常走完才收尾，异常留给路由层补发错误块
+    res.end();
   } finally {
     reader.releaseLock();
-    res.end();
   }
 }
 
@@ -253,8 +256,21 @@ router.post('/chat/completions', chatRateLimiter, async (req, res) => {
     if (!res.headersSent) {
       res.status(502).json({ message: `无法连接模型服务：${error.message}` });
     } else {
+      // 流已经开始，上游中途断了：不能再改状态码，也不能悄悄 end 让前端误以为
+      // 回复正常结束。补发一个 OpenAI 流中错误的标准形态块（data: {"error":{...}}），
+      // 前端识别后以错误气泡提示"回复不完整"，已收到的部分内容正常保留。
       console.error('上游流转发出错:', error);
-      res.end();
+      if (!res.writableEnded) {
+        try {
+          res.write(
+            `data: ${JSON.stringify({ error: { message: `上游连接中断，回复不完整（${error.message}）` } })}\n\n`
+          );
+          res.write('data: [DONE]\n\n');
+        } catch {
+          // 写不进去说明连接也没了，无需处理
+        }
+        res.end();
+      }
     }
   }
 });

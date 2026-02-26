@@ -26,6 +26,10 @@ export class BaseProvider {
     const reader = streamBody.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
+    // 是否解析到过至少一行合法 data: ——用于识别"200 但响应体根本不是 SSE"
+    // （个别兼容平台把错误 JSON/HTML 用 200 直接返回），避免用户对着空白气泡困惑
+    let sawData = false;
+    let rawSample = ''; // 前几百字节原文，报错时帮助定位问题
 
     // dataParser 可返回单个块或块数组——同一个 delta 可能同时携带可见文本与
     // 思考文本（如 <think> 标签在 chunk 中间闭合），需要拆成两次回调
@@ -52,9 +56,11 @@ export class BaseProvider {
         const { value, done } = await reader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        const text = decoder.decode(value, { stream: true });
+        buffer += text;
+        if (rawSample.length < 500) rawSample += text.slice(0, 500 - rawSample.length);
         const lines = buffer.split('\n');
-        
+
         // Keep the last partial line
         buffer = lines.pop() || '';
 
@@ -62,20 +68,19 @@ export class BaseProvider {
           const cleanedLine = line.trim();
           if (!cleanedLine) continue;
 
-          if (cleanedLine === 'data: [DONE]') {
-            callback('[DONE]');
-            continue;
-          }
-
-          if (cleanedLine.startsWith('data: ')) {
-            const dataStr = cleanedLine.slice(6).trim();
+          // SSE 规范里 "data:" 后的空格是可选的——部分平台/网关发 data:{...}（无空格），
+          // 只认 "data: " 会把整条流静默忽略掉
+          if (cleanedLine.startsWith('data:')) {
+            const dataStr = cleanedLine.slice(5).trim();
             if (dataStr === '[DONE]') {
+              sawData = true;
               callback('[DONE]');
               continue;
             }
 
             try {
               const parsed = JSON.parse(dataStr);
+              sawData = true;
               emit(dataParser(parsed));
             } catch (e) {
               console.error('Error parsing SSE line:', e, cleanedLine);
@@ -87,17 +92,24 @@ export class BaseProvider {
       // Check remaining buffer
       if (buffer.trim()) {
         const cleanedLine = buffer.trim();
-        if (cleanedLine.startsWith('data: ')) {
-          const dataStr = cleanedLine.slice(6).trim();
+        if (cleanedLine.startsWith('data:')) {
+          const dataStr = cleanedLine.slice(5).trim();
           if (dataStr !== '[DONE]') {
             try {
               const parsed = JSON.parse(dataStr);
+              sawData = true;
               emit(dataParser(parsed));
             } catch {
               // ignore
             }
           }
         }
+      }
+
+      // 响应结束却没有任何合法 SSE 行：多半是平台把错误 JSON/HTML 用 200 返回了。
+      // 抛错交给上层展示为错误气泡，而不是留给用户一个悄无声息的空白回复。
+      if (!sawData && rawSample.trim()) {
+        throw new Error(`响应不是有效的流式格式：${rawSample.trim().slice(0, 200)}`);
       }
 
       // Finally signal termination

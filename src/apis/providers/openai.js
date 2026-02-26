@@ -66,6 +66,13 @@ export class OpenAIProvider extends BaseProvider {
       wrappedCallback,
       signal,
       (parsed) => {
+        // 流中错误对象（OpenAI 系平台在流中报错的标准形态是 data: {"error":{...}}，
+        // 自建代理上游中断时也会发同形态的错误块）——标记为错误交给 UI 红色气泡展示
+        if (parsed.error) {
+          const msg = parsed.error.message || JSON.stringify(parsed.error).slice(0, 200);
+          return { content: `上游返回错误：${msg}`, meta: { isError: true } };
+        }
+
         const delta = parsed.choices?.[0]?.delta;
         const chunks = [];
 

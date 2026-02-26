@@ -53,6 +53,12 @@ export class BackendProvider extends BaseProvider {
       wrappedCallback,
       signal,
       (parsed) => {
+        // 流中错误对象：上游平台流中报错、或自建代理在上游中断时补发的错误块
+        if (parsed.error) {
+          const msg = parsed.error.message || JSON.stringify(parsed.error).slice(0, 200);
+          return { content: `上游返回错误：${msg}`, meta: { isError: true } };
+        }
+
         const delta = parsed.choices?.[0]?.delta;
         const chunks = [];
 
