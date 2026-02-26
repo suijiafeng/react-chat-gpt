@@ -221,9 +221,15 @@ router.post('/chat/completions', chatRateLimiter, async (req, res) => {
   }
 
   const upstreamController = new AbortController();
-  // 客户端断开连接（用户点了停止 / 关闭页面）时，同步中止对上游的请求，
-  // 避免后端继续为一个没人接收的响应付费/占用连接
-  req.on('close', () => upstreamController.abort());
+  // 客户端断开连接（用户点了停止 / 关闭页面）时，中止对上游的请求，
+  // 避免后端继续为一个没人接收的响应付费/占用连接。
+  // 注意：必须监听 res 的 'close' 而不是 req 的——现代 Node 里 req 流在
+  // express.json() 读完请求体后会立即触发 'close'，若据此 abort 会把正常请求
+  // 误杀成 AbortError，导致响应永不 end、客户端一直挂起。res 'close' 才是真正的
+  // 连接关闭信号；且仅在响应尚未正常结束时才中止。
+  res.on('close', () => {
+    if (!res.writableEnded) upstreamController.abort();
+  });
 
   const proxy = useOllamaNative(config) ? proxyOllamaNative : proxyOpenAiCompat;
 

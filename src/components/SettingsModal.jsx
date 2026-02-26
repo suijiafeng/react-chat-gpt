@@ -10,7 +10,7 @@ import { USE_LOCAL_DATA } from '../constants';
 // 常用平台预设：一键填入接口地址和推荐模型，降低配置门槛
 const PLATFORM_PRESETS = [
   { name: 'OpenAI', apiUrl: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini'] },
-  { name: 'DeepSeek', apiUrl: 'https://api.deepseek.com/v1', models: ['deepseek-chat', 'deepseek-reasoner'] },
+  { name: 'DeepSeek', apiUrl: 'https://api.deepseek.com/v1', models: ['deepseek-v4-flash', 'deepseek-v4-pro'] },
   { name: '智谱 AI', apiUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4-plus', 'glm-4-flash'] },
   { name: 'Moonshot', apiUrl: 'https://api.moonshot.cn/v1', models: ['moonshot-v1-8k', 'moonshot-v1-32k'] },
   { name: '通义千问', apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', models: ['qwen-plus', 'qwen-turbo'] },
