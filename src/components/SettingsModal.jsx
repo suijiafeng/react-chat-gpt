@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message } from 'antd';
 import { Zap, CheckCircle2, XCircle, Loader2, ServerCog } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -7,15 +7,28 @@ import { getConfig, saveConfig } from '../store/llmConfig';
 import { getBackendLlmConfig, saveBackendLlmConfig, testBackendLlmConfig } from '../apis/llm';
 import { USE_LOCAL_DATA } from '../constants';
 
-// 常用平台预设：一键填入接口地址和推荐模型，降低配置门槛
+// 常用平台预设：只填入基本不会变的接口地址（Base URL）。
+// 模型名不再硬编码——填好地址/密钥后会自动从该平台 /models 接口拉取，避免预设过时。
+// fallbackModels 仅在自动拉取失败（如平台限制浏览器跨域访问 /models）时作为兜底提示。
 const PLATFORM_PRESETS = [
-  { name: 'OpenAI', apiUrl: 'https://api.openai.com/v1', models: ['gpt-4o', 'gpt-4o-mini'] },
-  { name: 'DeepSeek', apiUrl: 'https://api.deepseek.com/v1', models: ['deepseek-v4-flash', 'deepseek-v4-pro'] },
-  { name: '智谱 AI', apiUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4-plus', 'glm-4-flash'] },
-  { name: 'Moonshot', apiUrl: 'https://api.moonshot.cn/v1', models: ['moonshot-v1-8k', 'moonshot-v1-32k'] },
-  { name: '通义千问', apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', models: ['qwen-plus', 'qwen-turbo'] },
-  { name: 'Ollama 本地', apiUrl: 'http://localhost:11434/v1', models: ['llama3.1:latest', 'qwen2.5:latest'] },
+  { name: 'OpenAI', apiUrl: 'https://api.openai.com/v1', fallbackModels: ['gpt-4o', 'gpt-4o-mini'] },
+  { name: 'DeepSeek', apiUrl: 'https://api.deepseek.com/v1', fallbackModels: ['deepseek-v4-flash', 'deepseek-v4-pro'] },
+  { name: '智谱 AI', apiUrl: 'https://open.bigmodel.cn/api/paas/v4', fallbackModels: ['glm-4-plus', 'glm-4-flash'] },
+  { name: 'Moonshot', apiUrl: 'https://api.moonshot.cn/v1', fallbackModels: ['moonshot-v1-8k', 'moonshot-v1-32k'] },
+  { name: '通义千问', apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', fallbackModels: ['qwen-plus', 'qwen-turbo'] },
+  { name: 'Ollama 本地', apiUrl: 'http://localhost:11434/v1', fallbackModels: ['llama3.1:latest', 'qwen2.5:latest'] },
 ];
+
+// 从任意 OpenAI 兼容平台拉取模型 id 列表（浏览器直连，用于 custom 模式）。
+const fetchOpenAiModelIds = async (baseUrl, apiKey) => {
+  const base = baseUrl.trim().replace(/\/+$/, '');
+  const headers = {};
+  if (apiKey.trim()) headers['Authorization'] = `Bearer ${apiKey.trim()}`;
+  const res = await fetch(`${base}/models`, { headers, signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return (data?.data || []).map((m) => m.id).filter(Boolean);
+};
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const { isDark, classes } = useTheme();
@@ -31,6 +44,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
   // 连接测试状态：idle | testing | ok | fail
   const [testState, setTestState] = useState('idle');
   const [testMessage, setTestMessage] = useState('');
+  const [modelsAutoLoading, setModelsAutoLoading] = useState(false);
+  // 用户是否手动改过模型列表——改过就不再用自动拉取的结果覆盖，尊重手工维护
+  const modelsEditedRef = useRef(false);
+  // 记录上一次自动拉取用的「地址|密钥」签名，避免同样的值重复请求
+  const lastCustomFetchRef = useRef('');
 
   // "服务器托管"模式专用状态：配置存在后端账号下，不进 localStorage
   const [backendApiUrl, setBackendApiUrl] = useState('');
@@ -43,6 +61,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
   // 后端模式连接测试状态：idle | testing | ok | fail
   const [backendTestState, setBackendTestState] = useState('idle');
   const [backendTestMessage, setBackendTestMessage] = useState('');
+  const backendModelEditedRef = useRef(false);
+  const lastBackendFetchRef = useRef('');
 
   // 打开弹窗时从配置中心加载当前值
   useEffect(() => {
@@ -60,6 +80,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
     setTestState('idle');
     setTestMessage('');
     setBackendLoadError('');
+    // 已有多个模型 = 用户此前维护过，视为"已编辑"，不让自动拉取覆盖；
+    // 只有默认单个模型时才允许自动拉取填充。重置签名以便本次打开可触发一次拉取。
+    modelsEditedRef.current = config.models.length > 1;
+    lastCustomFetchRef.current = '';
+    backendModelEditedRef.current = false;
+    lastBackendFetchRef.current = '';
 
     // 服务器托管模式的配置存在后端，需要单独拉取（依赖登录 session）
     if (!USE_LOCAL_DATA) {
@@ -73,6 +99,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
           setBackendProvider(res.data?.provider === 'ollama' ? 'ollama' : 'custom');
           setBackendHasApiKey(Boolean(res.data?.hasApiKey));
           setBackendApiKey('');
+          // 后端已存过模型名 = 用户配置过，别用自动拉取覆盖
+          backendModelEditedRef.current = Boolean(res.data?.model);
         })
         .catch((error) => {
           setBackendLoadError(
@@ -85,33 +113,36 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // 应用平台预设：填入地址和推荐模型。
-  // 用户已维护过多个模型（>1 个）时保留其列表，只换地址
+  // 应用平台预设：填入接口地址，模型先用兜底列表占位，随后由自动拉取替换为真实列表。
+  // 用户已手动维护过模型列表时保留其列表，只换地址。
   const applyPreset = (preset) => {
     setApiUrl(preset.apiUrl);
-    setModels((prev) => (prev.filter((m) => m.trim()).length > 1 ? prev : preset.models));
-    setDefaultModel((prev) => (preset.models.includes(prev) ? prev : preset.models[0]));
+    if (!modelsEditedRef.current) {
+      setModels(preset.fallbackModels);
+      setDefaultModel(preset.fallbackModels[0]);
+      lastCustomFetchRef.current = ''; // 允许对新地址重新自动拉取
+    }
     setTestState('idle');
   };
 
-  // 连接测试：请求 {base}/models 验证地址和密钥是否可用，成功时可一键导入模型列表
+  // 把拉取到的模型 id 列表写入表单（最多 30 个，避免列表过长）
+  const applyFetchedModels = (ids) => {
+    setModels(ids.slice(0, 30));
+    setDefaultModel((prev) => (ids.includes(prev) ? prev : ids[0]));
+  };
+
+  // 手动"测试连接"：显式请求 {base}/models 验证地址/密钥，并导入模型列表
   const handleTest = async () => {
     setTestState('testing');
     setTestMessage('');
     try {
-      const base = apiUrl.trim().replace(/\/+$/, '');
-      const headers = {};
-      if (apiKey.trim()) headers['Authorization'] = `Bearer ${apiKey.trim()}`;
-      const res = await fetch(`${base}/models`, { headers, signal: AbortSignal.timeout(10000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const ids = (data?.data || []).map((m) => m.id).filter(Boolean);
+      const ids = await fetchOpenAiModelIds(apiUrl, apiKey);
       setTestState('ok');
       if (ids.length > 0) {
         setTestMessage(`连接成功，检测到 ${ids.length} 个可用模型`);
-        // 用户尚未手动维护模型列表时，直接导入检测到的模型（最多 20 个，避免列表过长）
-        setModels((prev) => (prev.length <= 1 ? ids.slice(0, 20) : prev));
-        setDefaultModel((prev) => (ids.includes(prev) ? prev : ids[0]));
+        applyFetchedModels(ids);
+        modelsEditedRef.current = false; // 这是拉取结果，仍允许后续自动刷新
+        lastCustomFetchRef.current = apiUrl.trim() + '|' + apiKey.trim();
       } else {
         setTestMessage('连接成功');
       }
@@ -121,6 +152,61 @@ const SettingsModal = ({ isOpen, onClose }) => {
       setTestMessage(`连接失败：${error.message}（部分平台限制浏览器直接访问，可忽略并直接保存试用）`);
     }
   };
+
+  // 自动拉取模型：custom 模式下填好地址（+密钥）后防抖自动请求 /models 生成模型列表，
+  // 让预设不会因为模型下线而过时。用户手动改过列表则不覆盖；失败静默（保留兜底预设）。
+  useEffect(() => {
+    if (provider !== 'custom') return;
+    const base = apiUrl.trim();
+    if (!base || modelsEditedRef.current) return;
+    const sig = base + '|' + apiKey.trim();
+    if (sig === lastCustomFetchRef.current) return;
+
+    const timer = setTimeout(async () => {
+      setModelsAutoLoading(true);
+      try {
+        const ids = await fetchOpenAiModelIds(apiUrl, apiKey);
+        lastCustomFetchRef.current = sig;
+        if (ids.length && !modelsEditedRef.current) {
+          applyFetchedModels(ids);
+          setTestState('ok');
+          setTestMessage(`已自动获取 ${ids.length} 个模型`);
+        }
+      } catch {
+        // 静默失败：多因平台限制浏览器跨域访问 /models，保留预设兜底，用户可手动"测试连接"
+        lastCustomFetchRef.current = sig;
+      } finally {
+        setModelsAutoLoading(false);
+      }
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [provider, apiUrl, apiKey]);
+
+  // 自动拉取模型：backend 模式下由服务端拉取（绕开浏览器 CORS），填好地址后防抖触发，
+  // 仅在用户还没填模型名时自动填充。
+  useEffect(() => {
+    if (provider !== 'backend' || USE_LOCAL_DATA) return;
+    const base = backendApiUrl.trim();
+    if (!base || backendLoading || backendModelEditedRef.current) return;
+    const sig = base + '|' + backendApiKey.trim();
+    if (sig === lastBackendFetchRef.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await testBackendLlmConfig({ apiUrl: base, apiKey: backendApiKey.trim() });
+        lastBackendFetchRef.current = sig;
+        const ids = (res.data?.data || []).map((m) => m.id).filter(Boolean);
+        if (ids.length && !backendModelEditedRef.current) {
+          setBackendModel((prev) => (ids.includes(prev) ? prev : ids[0]));
+          setBackendTestState('ok');
+          setBackendTestMessage(`已自动获取 ${ids.length} 个模型`);
+        }
+      } catch {
+        lastBackendFetchRef.current = sig; // 静默，用户可手动点"测试连接"看具体错误
+      }
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [provider, backendApiUrl, backendApiKey, backendLoading]);
 
   // 后端模式连接测试：让服务端用当前表单里的地址/密钥去拉模型列表（绕开浏览器 CORS）。
   // apiKey 留空时后端回退到已保存的加密 Key，成功后把模型名自动填入。
@@ -392,15 +478,23 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
             {/* 模型列表（可多选维护，顶部选择器里切换） */}
             <div className={`${fieldGroupCls} space-y-2`}>
-              <label className={labelCls}>{t('modelName') || '模型列表'}</label>
+              <label className={`${labelCls} flex items-center gap-2`}>
+                {t('modelName') || '模型列表'}
+                {modelsAutoLoading && (
+                  <span className="flex items-center gap-1 text-blue-400 normal-case tracking-normal font-normal">
+                    <Loader2 size={12} className="animate-spin" /> 自动获取中…
+                  </span>
+                )}
+              </label>
               <Select
                 mode="tags"
                 value={models}
                 onChange={(vals) => {
+                  modelsEditedRef.current = true; // 手动编辑后不再被自动拉取覆盖
                   setModels(vals);
                   if (!vals.includes(defaultModel)) setDefaultModel(vals[0] || '');
                 }}
-                placeholder="输入模型名后回车添加，例如 deepseek-chat"
+                placeholder="填好地址与密钥后自动获取；也可手动输入模型名后回车添加"
                 className="w-full"
                 popupClassName={isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown'}
                 open={false /* tags 模式下无候选项，关闭下拉避免空面板 */}
@@ -408,7 +502,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 tokenSeparators={[',', ' ']}
               />
               <p className={helpTextCls}>
-                这里维护的模型会出现在顶部的模型切换器中，支持逗号分隔批量粘贴。
+                填入接口地址和密钥后会自动拉取该平台的可用模型；也可手动增删，支持逗号分隔批量粘贴。
               </p>
             </div>
 
@@ -521,8 +615,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
               <label className={labelCls}>{t('modelName') || '模型名称'}</label>
               <Input
                 value={backendModel}
-                onChange={(e) => setBackendModel(e.target.value)}
-                placeholder="例如: deepseek-chat"
+                onChange={(e) => { backendModelEditedRef.current = true; setBackendModel(e.target.value); }}
+                placeholder="填好地址后自动获取，或手动输入，例如: deepseek-v4-flash"
                 disabled={backendLoading}
                 className={inputCls}
               />
