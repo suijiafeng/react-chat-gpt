@@ -27,6 +27,19 @@ export class BaseProvider {
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
 
+    // dataParser 可返回单个块或块数组——同一个 delta 可能同时携带可见文本与
+    // 思考文本（如 <think> 标签在 chunk 中间闭合），需要拆成两次回调
+    const emit = (parsedChunk) => {
+      for (const chunk of Array.isArray(parsedChunk) ? parsedChunk : [parsedChunk]) {
+        if (!chunk) continue;
+        if (typeof chunk === 'object' && 'content' in chunk) {
+          callback(chunk.content, chunk.meta);
+        } else {
+          callback(chunk);
+        }
+      }
+    };
+
     try {
       while (true) {
         if (signal?.aborted) {
@@ -63,14 +76,7 @@ export class BaseProvider {
 
             try {
               const parsed = JSON.parse(dataStr);
-              const parsedChunk = dataParser(parsed);
-              if (parsedChunk) {
-                if (typeof parsedChunk === 'object' && 'content' in parsedChunk) {
-                  callback(parsedChunk.content, parsedChunk.meta);
-                } else {
-                  callback(parsedChunk);
-                }
-              }
+              emit(dataParser(parsed));
             } catch (e) {
               console.error('Error parsing SSE line:', e, cleanedLine);
             }
@@ -86,14 +92,7 @@ export class BaseProvider {
           if (dataStr !== '[DONE]') {
             try {
               const parsed = JSON.parse(dataStr);
-              const parsedChunk = dataParser(parsed);
-              if (parsedChunk) {
-                if (typeof parsedChunk === 'object' && 'content' in parsedChunk) {
-                  callback(parsedChunk.content, parsedChunk.meta);
-                } else {
-                  callback(parsedChunk);
-                }
-              }
+              emit(dataParser(parsed));
             } catch {
               // ignore
             }

@@ -644,7 +644,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
           <div className="space-y-1">
             <label className={labelCls}>Think 模式</label>
             <p className={helpTextCls}>
-              开启后请求会携带 think: true，并在支持的 Ollama 模型中显示思考过程；关闭时携带 think: false。
+              开启后展示思考型模型的思考过程（自动兼容 DeepSeek/通义等的 reasoning_content、Ollama 的
+              reasoning 与内联 &lt;think&gt; 标签）；关闭则隐藏。Ollama 端点还会通过 think 参数控制是否生成思考。
             </p>
           </div>
           <Switch checked={think} onChange={setThink} />
