@@ -64,18 +64,10 @@ router.put('/config', (req, res) => {
   res.json({ ok: true });
 });
 
-// 拉取当前用户配置的上游可用模型列表。
+// 向上游请求可用模型列表并统一响应格式。
 // 由服务端发起请求：既能带上加密存储的 Key，又绕开浏览器直连各模型商 /models 的 CORS 限制。
-// 可选 query ?apiUrl=&apiKey= 用于设置页"测试连接"——此时用表单里的临时值而非已存配置，
-// 让用户保存前就能校验地址/密钥是否可用（apiKey 为空则回退到已保存的 Key）。
-router.get('/models', async (req, res) => {
-  const saved = getLlmConfig(req.session.userId);
-  const apiUrl = (req.query.apiUrl || saved?.api_url || '').trim();
-  if (!apiUrl) return res.status(400).json({ message: '尚未配置 API 接口地址' });
-
-  const apiKey = req.query.apiKey ? String(req.query.apiKey) : decrypt(saved?.api_key_encrypted || '');
+const fetchUpstreamModels = async (apiUrl, apiKey, res) => {
   const url = `${apiUrl.replace(/\/+$/, '')}/models`;
-
   try {
     const upstream = await fetch(url, {
       headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
@@ -93,6 +85,27 @@ router.get('/models', async (req, res) => {
     const msg = error.name === 'TimeoutError' ? '连接超时' : error.message;
     res.status(502).json({ message: `无法获取模型列表：${msg}` });
   }
+};
+
+// 拉取当前账号已保存配置对应的模型列表（模型选择器用），密钥从加密存储解出，不经浏览器。
+router.get('/models', async (req, res) => {
+  const saved = getLlmConfig(req.session.userId);
+  const apiUrl = (saved?.api_url || '').trim();
+  if (!apiUrl) return res.status(400).json({ message: '尚未配置 API 接口地址' });
+  await fetchUpstreamModels(apiUrl, decrypt(saved?.api_key_encrypted || ''), res);
+});
+
+// 设置页"测试连接"：用表单里的临时地址/密钥验证可用性（保存前即可校验）。
+// 密钥必须走 POST body——绝不能放 URL 查询串，否则会明文出现在反向代理访问日志、
+// 浏览器网络面板的 URL 一栏等处。apiKey 为空则回退到已保存的 Key（改地址不重输密钥的场景）。
+router.post('/models/test', async (req, res) => {
+  const { apiUrl = '', apiKey = '' } = req.body || {};
+  const url = apiUrl.trim();
+  if (!url) return res.status(400).json({ message: '请填写 API 接口地址' });
+
+  const saved = getLlmConfig(req.session.userId);
+  const key = apiKey.trim() || decrypt(saved?.api_key_encrypted || '');
+  await fetchUpstreamModels(url, key, res);
 });
 
 // 是否走 Ollama 原生 /api/chat 接口。Ollama 的 OpenAI 兼容层（/v1/chat/completions）
