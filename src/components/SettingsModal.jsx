@@ -1,23 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message } from 'antd';
-import { Zap, CheckCircle2, XCircle, Loader2, ServerCog } from 'lucide-react';
+import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message, Popconfirm } from 'antd';
+import { Zap, CheckCircle2, XCircle, Loader2, ServerCog, Trash2, Plus, ExternalLink } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
-import { getConfig, saveConfig } from '../store/llmConfig';
+import { getConfig, saveConfig, saveProfiles } from '../store/llmConfig';
 import { getBackendLlmConfig, saveBackendLlmConfig, testBackendLlmConfig } from '../apis/llm';
 import { USE_LOCAL_DATA } from '../constants';
-
-// 常用平台预设：只填入基本不会变的接口地址（Base URL）。
-// 模型名不再硬编码——填好地址/密钥后会自动从该平台 /models 接口拉取，避免预设过时。
-// fallbackModels 仅在自动拉取失败（如平台限制浏览器跨域访问 /models）时作为兜底提示。
-const PLATFORM_PRESETS = [
-  { name: 'OpenAI', apiUrl: 'https://api.openai.com/v1', fallbackModels: ['gpt-4o', 'gpt-4o-mini'] },
-  { name: 'DeepSeek', apiUrl: 'https://api.deepseek.com/v1', fallbackModels: ['deepseek-v4-flash', 'deepseek-v4-pro'] },
-  { name: '智谱 AI', apiUrl: 'https://open.bigmodel.cn/api/paas/v4', fallbackModels: ['glm-4-plus', 'glm-4-flash'] },
-  { name: 'Moonshot', apiUrl: 'https://api.moonshot.cn/v1', fallbackModels: ['moonshot-v1-8k', 'moonshot-v1-32k'] },
-  { name: '通义千问', apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', fallbackModels: ['qwen-plus', 'qwen-turbo'] },
-  { name: 'Ollama 本地', apiUrl: 'http://localhost:11434/v1', fallbackModels: ['llama3.1:latest', 'qwen2.5:latest'] },
-];
+import { PROVIDER_PRESETS } from '../constants/providerPresets';
 
 // 从任意 OpenAI 兼容平台拉取模型 id 列表（浏览器直连，用于 custom 模式）。
 const fetchOpenAiModelIds = async (baseUrl, apiKey) => {
@@ -52,25 +41,27 @@ const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes
   </>
 );
 
+let customSeq = 0;
+const newCustomId = () => `custom-${Date.now()}-${customSeq++}`;
+
 const SettingsModal = ({ isOpen, onClose }) => {
   const { isDark, classes } = useTheme();
   const { t } = useLanguage();
 
   const [provider, setProvider] = useState('demo');
-  const [apiUrl, setApiUrl] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [models, setModels] = useState([]);
-  const [defaultModel, setDefaultModel] = useState('');
+  // 多服务商 profile 列表（apiKey 为明文，保存时由配置中心统一编码）
+  const [profiles, setProfiles] = useState([]);
+  const [selectedId, setSelectedId] = useState('');
   const [contextTokens, setContextTokens] = useState(8000);
   const [think, setThink] = useState(false);
   // 连接测试状态：idle | testing | ok | fail
   const [testState, setTestState] = useState('idle');
   const [testMessage, setTestMessage] = useState('');
   const [modelsAutoLoading, setModelsAutoLoading] = useState(false);
-  // 用户是否手动改过模型列表——改过就不再用自动拉取的结果覆盖，尊重手工维护
-  const modelsEditedRef = useRef(false);
-  // 记录上一次自动拉取用的「地址|密钥」签名，避免同样的值重复请求
-  const lastCustomFetchRef = useRef('');
+  // 用户手动改过模型列表的 profile 集合——改过就不再用自动拉取的结果覆盖，尊重手工维护
+  const modelsEditedRef = useRef(new Set());
+  // 记录每个 profile 上一次自动拉取用的「地址|密钥」签名，避免同样的值重复请求
+  const lastFetchSigRef = useRef(new Map());
 
   // "服务器托管"模式专用状态：配置存在后端账号下，不进 localStorage
   const [backendApiUrl, setBackendApiUrl] = useState('');
@@ -80,11 +71,20 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [backendHasApiKey, setBackendHasApiKey] = useState(false);
   const [backendLoading, setBackendLoading] = useState(false);
   const [backendLoadError, setBackendLoadError] = useState('');
-  // 后端模式连接测试状态：idle | testing | ok | fail
   const [backendTestState, setBackendTestState] = useState('idle');
   const [backendTestMessage, setBackendTestMessage] = useState('');
   const backendModelEditedRef = useRef(false);
   const lastBackendFetchRef = useRef('');
+
+  const selected = profiles.find((p) => p.id === selectedId) || null;
+
+  // 表单里的 key（新输入）为空时，取配置中心内存缓存里的已存明文——
+  // 测试连接 / 自动拉模型需要真实 key，但它不进入表单、不渲染到 DOM
+  const effectiveKey = (profile) =>
+    (profile.apiKey || '').trim() ||
+    (profile.hasApiKey
+      ? getConfig().profiles.find((p) => p.id === profile.id)?.apiKey || ''
+      : '');
 
   // 打开弹窗时从配置中心加载当前值
   useEffect(() => {
@@ -93,19 +93,27 @@ const SettingsModal = ({ isOpen, onClose }) => {
     setProvider(
       config.provider === 'custom' || config.provider === 'backend' ? config.provider : 'demo'
     );
-    setApiUrl(config.apiUrl);
-    setApiKey(config.apiKey);
-    setModels(config.models);
-    setDefaultModel(config.model);
+    // 安全：表单不回填明文 key（避免暴露在 DOM/开发者工具里）。
+    // apiKey 置空 + hasApiKey 标记"已保存"；留空保存 = 沿用旧值
+    setProfiles(
+      config.profiles.map((p) => ({
+        ...p,
+        apiKey: '',
+        hasApiKey: Boolean(p.hasApiKey || p.apiKey),
+        models: [...p.models],
+      }))
+    );
+    setSelectedId(config.activeProfileId || config.profiles[0]?.id || '');
     setContextTokens(config.contextTokens);
     setThink(config.think);
     setTestState('idle');
     setTestMessage('');
     setBackendLoadError('');
-    // 已有多个模型 = 用户此前维护过，视为"已编辑"，不让自动拉取覆盖；
-    // 只有默认单个模型时才允许自动拉取填充。重置签名以便本次打开可触发一次拉取。
-    modelsEditedRef.current = config.models.length > 1;
-    lastCustomFetchRef.current = '';
+    // 已保存过的 profile 视为"用户维护过"，不让自动拉取覆盖其模型列表
+    modelsEditedRef.current = new Set(
+      config.profiles.filter((p) => p.models.length > 1).map((p) => p.id)
+    );
+    lastFetchSigRef.current = new Map();
     backendModelEditedRef.current = false;
     lastBackendFetchRef.current = '';
 
@@ -121,7 +129,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
           setBackendProvider(res.data?.provider === 'ollama' ? 'ollama' : 'custom');
           setBackendHasApiKey(Boolean(res.data?.hasApiKey));
           setBackendApiKey('');
-          // 后端已存过模型名 = 用户配置过，别用自动拉取覆盖
           backendModelEditedRef.current = Boolean(res.data?.model);
         })
         .catch((error) => {
@@ -135,36 +142,79 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // 应用平台预设：填入接口地址，模型先用兜底列表占位，随后由自动拉取替换为真实列表。
-  // 用户已手动维护过模型列表时保留其列表，只换地址。
-  const applyPreset = (preset) => {
-    setApiUrl(preset.apiUrl);
-    if (!modelsEditedRef.current) {
-      setModels(preset.fallbackModels);
-      setDefaultModel(preset.fallbackModels[0]);
-      lastCustomFetchRef.current = ''; // 允许对新地址重新自动拉取
-    }
-    setTestState('idle');
+  // 更新当前选中 profile 的字段
+  const updateSelected = (patch) => {
+    setProfiles((prev) => prev.map((p) => (p.id === selectedId ? { ...p, ...patch } : p)));
   };
 
-  // 把拉取到的模型 id 列表写入表单（最多 30 个，避免列表过长）
+  // 点击预设：已配置过该平台则切换过去，否则新建一个 profile
+  const applyPreset = (preset) => {
+    const existing = profiles.find((p) => p.id === preset.id);
+    if (existing) {
+      setSelectedId(existing.id);
+    } else {
+      const profile = {
+        id: preset.id,
+        name: preset.name,
+        apiUrl: preset.apiUrl,
+        apiKey: '',
+        models: [...preset.fallbackModels],
+        model: preset.fallbackModels[0],
+      };
+      setProfiles((prev) => [...prev, profile]);
+      setSelectedId(preset.id);
+    }
+    setTestState('idle');
+    setTestMessage('');
+  };
+
+  // 新建一个空白的自定义服务商
+  const addCustomProfile = () => {
+    const id = newCustomId();
+    setProfiles((prev) => [
+      ...prev,
+      { id, name: '自定义服务商', apiUrl: '', apiKey: '', models: [], model: '' },
+    ]);
+    setSelectedId(id);
+    setTestState('idle');
+    setTestMessage('');
+  };
+
+  const removeSelected = () => {
+    setProfiles((prev) => {
+      const next = prev.filter((p) => p.id !== selectedId);
+      setSelectedId(next[0]?.id || '');
+      return next;
+    });
+    setTestState('idle');
+    setTestMessage('');
+  };
+
+  // 把拉取到的模型 id 列表写入选中 profile（最多 60 个，避免列表过长）
   const applyFetchedModels = (ids) => {
-    setModels(ids.slice(0, 30));
-    setDefaultModel((prev) => (ids.includes(prev) ? prev : ids[0]));
+    const list = ids.slice(0, 60);
+    setProfiles((prev) =>
+      prev.map((p) =>
+        p.id === selectedId
+          ? { ...p, models: list, model: list.includes(p.model) ? p.model : list[0] }
+          : p
+      )
+    );
   };
 
   // 手动"测试连接"：显式请求 {base}/models 验证地址/密钥，并导入模型列表
   const handleTest = async () => {
+    if (!selected) return;
     setTestState('testing');
     setTestMessage('');
     try {
-      const ids = await fetchOpenAiModelIds(apiUrl, apiKey);
+      const ids = await fetchOpenAiModelIds(selected.apiUrl, effectiveKey(selected));
       setTestState('ok');
       if (ids.length > 0) {
         setTestMessage(`连接成功，检测到 ${ids.length} 个可用模型`);
         applyFetchedModels(ids);
-        modelsEditedRef.current = false; // 这是拉取结果，仍允许后续自动刷新
-        lastCustomFetchRef.current = apiUrl.trim() + '|' + apiKey.trim();
+        modelsEditedRef.current.delete(selected.id); // 拉取结果，仍允许后续自动刷新
+        lastFetchSigRef.current.set(selected.id, selected.apiUrl.trim() + '|' + selected.apiKey.trim());
       } else {
         setTestMessage('连接成功');
       }
@@ -175,34 +225,35 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // 自动拉取模型：custom 模式下填好地址（+密钥）后防抖自动请求 /models 生成模型列表，
+  // 自动拉取模型：填好地址（+密钥）后防抖自动请求 /models 生成模型列表，
   // 让预设不会因为模型下线而过时。用户手动改过列表则不覆盖；失败静默（保留兜底预设）。
   useEffect(() => {
-    if (provider !== 'custom') return;
-    const base = apiUrl.trim();
-    if (!base || modelsEditedRef.current) return;
-    const sig = base + '|' + apiKey.trim();
-    if (sig === lastCustomFetchRef.current) return;
+    if (provider !== 'custom' || !selected) return;
+    const base = selected.apiUrl?.trim();
+    if (!base || modelsEditedRef.current.has(selected.id)) return;
+    const sig = base + '|' + (selected.apiKey || '').trim();
+    if (sig === lastFetchSigRef.current.get(selected.id)) return;
 
     const timer = setTimeout(async () => {
       setModelsAutoLoading(true);
       try {
-        const ids = await fetchOpenAiModelIds(apiUrl, apiKey);
-        lastCustomFetchRef.current = sig;
-        if (ids.length && !modelsEditedRef.current) {
+        const ids = await fetchOpenAiModelIds(selected.apiUrl, effectiveKey(selected));
+        lastFetchSigRef.current.set(selected.id, sig);
+        if (ids.length && !modelsEditedRef.current.has(selected.id)) {
           applyFetchedModels(ids);
           setTestState('ok');
           setTestMessage(`已自动获取 ${ids.length} 个模型`);
         }
       } catch {
         // 静默失败：多因平台限制浏览器跨域访问 /models，保留预设兜底，用户可手动"测试连接"
-        lastCustomFetchRef.current = sig;
+        lastFetchSigRef.current.set(selected.id, sig);
       } finally {
         setModelsAutoLoading(false);
       }
     }, 900);
     return () => clearTimeout(timer);
-  }, [provider, apiUrl, apiKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, selectedId, selected?.apiUrl, selected?.apiKey]);
 
   // 自动拉取模型：backend 模式下由服务端拉取（绕开浏览器 CORS），填好地址后防抖触发，
   // 仅在用户还没填模型名时自动填充。
@@ -231,7 +282,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
   }, [provider, backendApiUrl, backendApiKey, backendLoading]);
 
   // 后端模式连接测试：让服务端用当前表单里的地址/密钥去拉模型列表（绕开浏览器 CORS）。
-  // apiKey 留空时后端回退到已保存的加密 Key，成功后把模型名自动填入。
   const handleBackendTest = async () => {
     if (!backendApiUrl.trim()) {
       message.warning('请先填写 API 接口地址');
@@ -260,23 +310,32 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
   const handleSave = async () => {
     if (provider === 'custom') {
-      const cleanModels = models.map((m) => m.trim()).filter(Boolean);
-      if (!apiUrl.trim()) {
-        message.warning('请填写 API 接口地址');
+      // 只保存填写了地址的 profile；当前选中的必须配置完整
+      const validProfiles = profiles
+        .map((p) => ({ ...p, models: (p.models || []).map((m) => m.trim()).filter(Boolean) }))
+        .filter((p) => p.apiUrl?.trim());
+      if (validProfiles.length === 0) {
+        message.warning('请至少配置一个服务商（填写 API 接口地址）');
         return;
       }
-      if (cleanModels.length === 0) {
-        message.warning('请至少添加一个模型');
+      const active =
+        validProfiles.find((p) => p.id === selectedId) || validProfiles[0];
+      if (active.models.length === 0) {
+        message.warning(`请为「${active.name}」至少添加一个模型`);
         return;
       }
-      const model = cleanModels.includes(defaultModel) ? defaultModel : cleanModels[0];
+      // 规范每个 profile 的默认模型；key 留空表示沿用已保存的旧值
+      const normalized = validProfiles.map((p) => ({
+        ...p,
+        apiKey: effectiveKey(p),
+        model: p.models.includes(p.model) ? p.model : p.models[0] || '',
+      }));
+      const activeNorm = normalized.find((p) => p.id === active.id);
+      await saveProfiles(normalized, active.id);
       saveConfig({
         provider: 'custom',
-        apiUrl,
-        apiKey,
-        models: cleanModels,
-        model,
-        currentModel: model,
+        model: activeNorm.model,
+        currentModel: activeNorm.model,
         contextTokens: contextTokens || 8000,
         think,
       });
@@ -336,6 +395,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const successTextCls = isDark ? 'text-emerald-300' : 'text-green-500';
   const errorTextCls = isDark ? 'text-rose-300' : 'text-red-400';
 
+  const selectedPreset = selected ? PROVIDER_PRESETS.find((p) => p.id === selected.id) : null;
+
   return (
     <Modal
       title={
@@ -350,7 +411,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
               {t('settings') || '模型与 API 配置'}
             </span>
             <span className={`block text-xs font-normal ${isDark ? 'text-zinc-500' : 'text-slate-500'}`}>
-              选择演示模式或接入兼容 OpenAI 的模型服务
+              可同时配置多家模型服务商，在聊天页顶部快速切换
             </span>
           </div>
         </div>
@@ -368,11 +429,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
       className={modalThemeClass}
       wrapClassName={isDark ? 'settings-modal-wrap settings-modal-wrap-dark' : 'settings-modal-wrap'}
       centered
-      width={720}
+      width={720} /* 小屏由 antd 默认 max-width: calc(100vw - 32px) 收窄 */
       styles={{
         body: {
           backgroundColor: isDark ? '#18181b' : '#ffffff',
           color: isDark ? '#f4f4f5' : '#0f172a',
+          maxHeight: '70vh',
+          overflowY: 'auto',
         },
         header: {
           backgroundColor: isDark ? '#18181b' : '#ffffff',
@@ -395,7 +458,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
           >
             {[
               { value: 'demo', label: `🚀 ${t('demoMockMode') || '前端演示模式'}` },
-              { value: 'custom', label: `🤖 ${t('customOpenAi') || '自定义 OpenAI 接口'}` },
+              { value: 'custom', label: `🤖 ${t('customOpenAi') || '模型服务商'}` },
               // 服务器托管模式依赖真实登录后端（USE_LOCAL_DATA=false 部署），
               // 演示/本地部署下没有意义，不展示这个选项，避免用户点了却因为没登录而困惑
               ...(!USE_LOCAL_DATA
@@ -421,118 +484,226 @@ const SettingsModal = ({ isOpen, onClose }) => {
               : provider === 'backend'
               ? t('backendHint') ||
                 '登录后台账号后，模型请求经服务端转发，API Key 只存在服务端，不经过浏览器，也不受各家模型商 CORS 限制。'
-              : t('customHint') || '支持任何兼容 OpenAI 格式的大模型 API。选择下方平台快速填入，或手动配置。'}
+              : t('customHint') ||
+                '支持任何兼容 OpenAI 格式的大模型 API（DeepSeek、Kimi、通义、智谱、OpenRouter、Claude、Gemini、本地 Ollama 等），可同时配置多家。'}
           </p>
         </div>
 
         {provider === 'custom' && (
           <div className="space-y-4 animate-fadeIn">
-            {/* 平台预设 */}
+            {/* 服务商预设 + 已配置列表 */}
             <div className={`${fieldGroupCls} space-y-3`}>
-              <label className={labelCls}>常用平台</label>
+              <label className={labelCls}>服务商（点击切换或添加）</label>
               <div className="flex flex-wrap gap-2">
-                {PLATFORM_PRESETS.map((preset) => (
-                  <button
-                    key={preset.name}
-                    type="button"
-                    onClick={() => applyPreset(preset)}
-                    className={`rounded-full border px-3 py-1.5 text-xs ${classes.themeTransition} ${
-                      apiUrl === preset.apiUrl
-                        ? isDark
-                          ? 'border-blue-400 bg-blue-500/10 text-blue-300'
-                          : 'border-blue-500 bg-blue-50 text-blue-600'
-                        : isDark
-                        ? 'border-white/10 bg-black/20 text-zinc-300 hover:border-zinc-500 hover:text-white'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
-                    }`}
-                  >
-                    {preset.name}
-                  </button>
-                ))}
+                {PROVIDER_PRESETS.map((preset) => {
+                  const configured = profiles.find((p) => p.id === preset.id);
+                  const isActive = selectedId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => applyPreset(preset)}
+                      className={`rounded-full border px-3 py-1.5 text-xs inline-flex items-center gap-1.5 ${classes.themeTransition} ${
+                        isActive
+                          ? isDark
+                            ? 'border-blue-400 bg-blue-500/10 text-blue-300'
+                            : 'border-blue-500 bg-blue-50 text-blue-600'
+                          : isDark
+                          ? 'border-white/10 bg-black/20 text-zinc-300 hover:border-zinc-500 hover:text-white'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
+                      }`}
+                    >
+                      {configured && (
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            configured.apiKey || configured.hasApiKey ? 'bg-emerald-400' : 'bg-amber-400'
+                          }`}
+                          title={configured.apiKey || configured.hasApiKey ? '已配置密钥' : '已添加，未填密钥'}
+                        />
+                      )}
+                      {preset.name}
+                    </button>
+                  );
+                })}
+                {/* 非预设的自定义 profile 也展示出来 */}
+                {profiles
+                  .filter((p) => !PROVIDER_PRESETS.some((preset) => preset.id === p.id))
+                  .map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedId(p.id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs inline-flex items-center gap-1.5 ${classes.themeTransition} ${
+                        selectedId === p.id
+                          ? isDark
+                            ? 'border-blue-400 bg-blue-500/10 text-blue-300'
+                            : 'border-blue-500 bg-blue-50 text-blue-600'
+                          : isDark
+                          ? 'border-white/10 bg-black/20 text-zinc-300 hover:border-zinc-500 hover:text-white'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${p.apiKey || p.hasApiKey ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                      {p.name}
+                    </button>
+                  ))}
+                <button
+                  type="button"
+                  onClick={addCustomProfile}
+                  className={`rounded-full border border-dashed px-3 py-1.5 text-xs inline-flex items-center gap-1 ${classes.themeTransition} ${
+                    isDark
+                      ? 'border-white/20 text-zinc-400 hover:border-zinc-400 hover:text-white'
+                      : 'border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-800'
+                  }`}
+                >
+                  <Plus size={12} /> 自定义
+                </button>
               </div>
-            </div>
-
-            {/* API 地址 */}
-            <div className={`${fieldGroupCls} space-y-2`}>
-              <label className={labelCls}>{t('apiUrl') || 'API 接口地址 (Base URL)'}</label>
-              <Input
-                value={apiUrl}
-                onChange={(e) => { setApiUrl(e.target.value); setTestState('idle'); }}
-                placeholder="例如: https://api.deepseek.com/v1"
-                className={inputCls}
-              />
-            </div>
-
-            {/* API 密钥 */}
-            <div className={`${fieldGroupCls} space-y-2`}>
-              <label className={labelCls}>{t('apiKey') || 'API 密钥 (API Key)'}</label>
-              <Input.Password
-                value={apiKey}
-                onChange={(e) => { setApiKey(e.target.value); setTestState('idle'); }}
-                placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-                className={inputCls}
-              />
               <p className={helpTextCls}>
-                密钥仅保存在你的浏览器本地（简单编码、非加密）。生产环境建议通过后端代理转发请求。
+                绿点 = 已配置密钥；黄点 = 已添加待配置。可同时保存多家，聊天页顶部的模型选择器按服务商分组切换。
               </p>
             </div>
 
-            {/* 连接测试 */}
-            <div className={`${fieldGroupCls} space-y-2`}>
-              <TestConnection
-                onTest={handleTest}
-                state={testState}
-                message={testMessage}
-                disabled={!apiUrl.trim()}
-                isDark={isDark}
-                classes={classes}
-                successCls={successTextCls}
-                errorCls={errorTextCls}
-              />
-            </div>
+            {selected && (
+              <>
+                {/* 当前服务商配置 */}
+                <div className={`${fieldGroupCls} space-y-2`}>
+                  <div className="flex items-center justify-between">
+                    <label className={labelCls}>
+                      {selected.name} · API 接口地址 (Base URL)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {selectedPreset?.docs && (
+                        <a
+                          href={selectedPreset.docs}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center gap-1 text-xs ${
+                            isDark ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-500'
+                          }`}
+                        >
+                          获取密钥 <ExternalLink size={11} />
+                        </a>
+                      )}
+                      <Popconfirm
+                        title={`删除「${selected.name}」的配置？`}
+                        onConfirm={removeSelected}
+                        okText="删除"
+                        cancelText="取消"
+                      >
+                        <button
+                          type="button"
+                          className={`inline-flex items-center gap-1 text-xs ${
+                            isDark ? 'text-rose-300 hover:text-rose-200' : 'text-rose-500 hover:text-rose-400'
+                          }`}
+                        >
+                          <Trash2 size={11} /> 删除
+                        </button>
+                      </Popconfirm>
+                    </div>
+                  </div>
+                  <Input
+                    value={selected.apiUrl}
+                    onChange={(e) => {
+                      updateSelected({ apiUrl: e.target.value });
+                      setTestState('idle');
+                    }}
+                    placeholder="例如: https://api.deepseek.com/v1"
+                    className={inputCls}
+                  />
+                  {/* 自定义 profile 允许改名 */}
+                  {!selectedPreset && (
+                    <Input
+                      value={selected.name}
+                      onChange={(e) => updateSelected({ name: e.target.value })}
+                      placeholder="服务商名称（用于模型选择器分组显示）"
+                      className={inputCls}
+                    />
+                  )}
+                </div>
 
-            {/* 模型列表（可多选维护，顶部选择器里切换） */}
-            <div className={`${fieldGroupCls} space-y-2`}>
-              <label className={`${labelCls} flex items-center gap-2`}>
-                {t('modelName') || '模型列表'}
-                {modelsAutoLoading && (
-                  <span className="flex items-center gap-1 text-blue-400 normal-case tracking-normal font-normal">
-                    <Loader2 size={12} className="animate-spin" /> 自动获取中…
-                  </span>
+                {/* API 密钥 */}
+                <div className={`${fieldGroupCls} space-y-2`}>
+                  <label className={labelCls}>{t('apiKey') || 'API 密钥 (API Key)'}</label>
+                  <Input.Password
+                    value={selected.apiKey}
+                    onChange={(e) => {
+                      updateSelected({ apiKey: e.target.value });
+                      setTestState('idle');
+                    }}
+                    placeholder={
+                      selected.hasApiKey
+                        ? '已加密保存（出于安全不回显），留空则沿用'
+                        : 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'
+                    }
+                    className={inputCls}
+                  />
+                  <p className={helpTextCls}>
+                    密钥经 AES-256-GCM 加密后存放在浏览器本地（主密钥不可导出），界面不回显明文。对安全要求高的部署请使用「服务器托管」模式。
+                  </p>
+                </div>
+
+                {/* 连接测试 */}
+                <div className={`${fieldGroupCls} space-y-2`}>
+                  <TestConnection
+                    onTest={handleTest}
+                    state={testState}
+                    message={testMessage}
+                    disabled={!selected.apiUrl?.trim()}
+                    isDark={isDark}
+                    classes={classes}
+                    successCls={successTextCls}
+                    errorCls={errorTextCls}
+                  />
+                </div>
+
+                {/* 模型列表（可多选维护，顶部选择器里切换） */}
+                <div className={`${fieldGroupCls} space-y-2`}>
+                  <label className={`${labelCls} flex items-center gap-2`}>
+                    {t('modelName') || '模型列表'}
+                    {modelsAutoLoading && (
+                      <span className="flex items-center gap-1 text-blue-400 normal-case tracking-normal font-normal">
+                        <Loader2 size={12} className="animate-spin" /> 自动获取中…
+                      </span>
+                    )}
+                  </label>
+                  <Select
+                    mode="tags"
+                    value={selected.models}
+                    onChange={(vals) => {
+                      modelsEditedRef.current.add(selected.id); // 手动编辑后不再被自动拉取覆盖
+                      updateSelected({
+                        models: vals,
+                        model: vals.includes(selected.model) ? selected.model : vals[0] || '',
+                      });
+                    }}
+                    placeholder="填好地址与密钥后自动获取；也可手动输入模型名后回车添加"
+                    className="w-full"
+                    classNames={{ popup: { root: dropdownPopupClass } }}
+                    open={false /* tags 模式下无候选项，关闭下拉避免空面板 */}
+                    suffixIcon={null}
+                    tokenSeparators={[',', ' ']}
+                  />
+                  <p className={helpTextCls}>
+                    填入接口地址和密钥后会自动拉取该平台的可用模型；也可手动增删，支持逗号分隔批量粘贴。
+                  </p>
+                </div>
+
+                {/* 默认模型 */}
+                {selected.models.length > 1 && (
+                  <div className={`${fieldGroupCls} space-y-2`}>
+                    <label className={labelCls}>默认模型</label>
+                    <Select
+                      value={selected.models.includes(selected.model) ? selected.model : selected.models[0]}
+                      onChange={(v) => updateSelected({ model: v })}
+                      options={selected.models.map((m) => ({ value: m, label: m }))}
+                      className="w-full"
+                      classNames={{ popup: { root: dropdownPopupClass } }}
+                      showSearch
+                    />
+                  </div>
                 )}
-              </label>
-              <Select
-                mode="tags"
-                value={models}
-                onChange={(vals) => {
-                  modelsEditedRef.current = true; // 手动编辑后不再被自动拉取覆盖
-                  setModels(vals);
-                  if (!vals.includes(defaultModel)) setDefaultModel(vals[0] || '');
-                }}
-                placeholder="填好地址与密钥后自动获取；也可手动输入模型名后回车添加"
-                className="w-full"
-                classNames={{ popup: { root: dropdownPopupClass } }}
-                open={false /* tags 模式下无候选项，关闭下拉避免空面板 */}
-                suffixIcon={null}
-                tokenSeparators={[',', ' ']}
-              />
-              <p className={helpTextCls}>
-                填入接口地址和密钥后会自动拉取该平台的可用模型；也可手动增删，支持逗号分隔批量粘贴。
-              </p>
-            </div>
-
-            {/* 默认模型 */}
-            {models.length > 1 && (
-              <div className={`${fieldGroupCls} space-y-2`}>
-                <label className={labelCls}>默认模型</label>
-                <Select
-                  value={models.includes(defaultModel) ? defaultModel : models[0]}
-                  onChange={setDefaultModel}
-                  options={models.map((m) => ({ value: m, label: m }))}
-                  className="w-full"
-                  classNames={{ popup: { root: dropdownPopupClass } }}
-                />
-              </div>
+              </>
             )}
           </div>
         )}

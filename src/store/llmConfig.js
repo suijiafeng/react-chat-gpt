@@ -1,20 +1,31 @@
 // LLM 运行配置中心：模型服务的唯一数据来源。
 //
 // 职责：
-// 1. 统一读写 localStorage 里的 LLM 相关配置（provider、地址、密钥、模型列表等）；
+// 1. 统一读写 localStorage 里的 LLM 相关配置（provider、多服务商 profile、模型等）；
 // 2. 提供订阅机制——设置弹窗保存后，模型选择器、聊天界面立即感知，无需刷新页面；
 // 3. 收敛"当前该用哪个 provider / 是否演示模式"的判断逻辑，
 //    演示代码（demo provider、mock 数据）与正式代码只在这里交汇，其余模块不再各自判断。
+//
+// 多服务商（profile）模型：
+// - llm_profiles 存一组 OpenAI 兼容服务商配置 {id,name,apiUrl,apiKey,models,model}，
+//   可同时配置多家（DeepSeek + OpenRouter + Ollama...），聊天页顶部选择器跨服务商切换；
+// - llm_active_profile 指向当前生效的一家；
+// - 旧版单配置（llm_api_url / llm_api_key / llm_model / llm_models）首次读取时自动迁移。
 
 import { useSyncExternalStore } from 'react';
 import { USE_LOCAL_DATA, DEFAULT_LLM_PROVIDER, DEFAULT_LLM_MODEL } from '../constants';
+import { PROVIDER_PRESETS } from '../constants/providerPresets';
+import { encryptString, decryptString, isEncrypted } from '../utils/keyVault';
 
 const KEYS = {
   provider: 'llm_provider',
+  profiles: 'llm_profiles',
+  activeProfile: 'llm_active_profile',
+  // 旧版单服务商配置键，仅作为迁移来源保留读取
   apiUrl: 'llm_api_url',
   apiKey: 'llm_api_key',
   model: 'llm_model',
-  models: 'llm_models', // JSON 数组：用户维护的可选模型列表
+  models: 'llm_models',
   contextTokens: 'llm_context_tokens',
   think: 'llm_think',
   currentModel: 'currentModel',
@@ -45,10 +56,8 @@ export const subscribe = (listener) => {
 // 读取
 // ──────────────────────────────────────────────
 
-// API Key 以 b64: 前缀做简单编码存储。
-// 注意：这只是避免明文裸露在 localStorage 里被一眼看到，不是加密——
-// 纯前端应用没有安全存放密钥的地方，生产环境应通过后端代理转发请求。
-const decodeKey = (stored) => {
+// 旧版 b64 编码的解码（仅用于向加密格式迁移；新数据一律走 keyVault 加密）
+const decodeLegacyKey = (stored) => {
   if (!stored) return '';
   if (stored.startsWith('b64:')) {
     try {
@@ -60,7 +69,52 @@ const decodeKey = (stored) => {
   return stored;
 };
 
-const readModels = () => {
+// ──────────────────────────────────────────────
+// API Key 内存缓存
+//
+// localStorage 里只存 AES-GCM 密文（keyVault），明文只存在于这份内存 Map；
+// getConfig() 是同步接口，从这里取值。应用启动时异步解密填充，
+// 完成后 notify() 让订阅方拿到真实 key。旧的 b64/明文存量在首次启动时自动迁移加密。
+// ──────────────────────────────────────────────
+
+const keyCache = new Map(); // profileId → 明文 key
+
+const initKeyCache = async () => {
+  let profiles;
+  try {
+    profiles = JSON.parse(localStorage.getItem(KEYS.profiles) || '[]');
+  } catch {
+    return;
+  }
+  if (!Array.isArray(profiles)) return;
+
+  let needRewrite = false;
+  for (const p of profiles) {
+    if (!p || !p.id) continue;
+    if (isEncrypted(p.apiKey)) {
+      keyCache.set(p.id, await decryptString(p.apiKey));
+    } else if (p.apiKey) {
+      // 旧版 b64 / 明文存量：解出后就地升级为加密格式
+      const plain = decodeLegacyKey(p.apiKey);
+      keyCache.set(p.id, plain);
+      p.apiKey = await encryptString(plain);
+      needRewrite = true;
+    } else {
+      keyCache.set(p.id, '');
+    }
+  }
+  if (needRewrite) {
+    localStorage.setItem(KEYS.profiles, JSON.stringify(profiles));
+  }
+  notify(); // 让已渲染的组件拿到解密后的 key
+};
+
+// 浏览器环境下启动即迁移/解密；测试等无 window 环境跳过
+if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+  initKeyCache().catch((e) => console.error('API Key 解密初始化失败：', e));
+}
+
+const readLegacyModels = () => {
   try {
     const parsed = JSON.parse(localStorage.getItem(KEYS.models) || '[]');
     return Array.isArray(parsed) ? parsed.filter((m) => typeof m === 'string' && m.trim()) : [];
@@ -69,17 +123,81 @@ const readModels = () => {
   }
 };
 
+// 读取 profiles（存储态，apiKey 保持编码），并在首次读取时做旧配置迁移
+const readStoredProfiles = () => {
+  const raw = localStorage.getItem(KEYS.profiles);
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (p) => p && typeof p === 'object' && typeof p.apiUrl === 'string'
+        );
+      }
+    } catch {
+      // 数据损坏时按空处理，下面走迁移/空列表逻辑
+    }
+    return [];
+  }
+
+  // llm_profiles 不存在：尝试从旧版单配置迁移
+  const legacyUrl = localStorage.getItem(KEYS.apiUrl);
+  if (!legacyUrl) return [];
+  const preset = PROVIDER_PRESETS.find((p) => p.apiUrl === legacyUrl);
+  const legacyModels = readLegacyModels();
+  const legacyModel = localStorage.getItem(KEYS.model) || DEFAULT_LLM_MODEL;
+  const migrated = [
+    {
+      id: preset?.id || 'custom-1',
+      name: preset?.name || '自定义服务商',
+      apiUrl: legacyUrl,
+      apiKey: localStorage.getItem(KEYS.apiKey) || '', // 保持原编码格式
+      models: legacyModels.length ? legacyModels : [legacyModel],
+      model: legacyModel,
+    },
+  ];
+  localStorage.setItem(KEYS.profiles, JSON.stringify(migrated));
+  if (!localStorage.getItem(KEYS.activeProfile)) {
+    localStorage.setItem(KEYS.activeProfile, migrated[0].id);
+  }
+  return migrated;
+};
+
 export const getConfig = () => {
   if (snapshot) return snapshot;
+
+  const storedProfiles = readStoredProfiles();
+  // 暴露给上层时换成内存缓存里的明文 key（加密态只留在 localStorage）。
+  // 缓存尚未就绪（启动解密中）时旧 b64 存量可同步解码兜底，加密存量暂为 ''，
+  // 解密完成后 notify 会触发重建。
+  const profiles = storedProfiles.map((p) => ({
+    ...p,
+    apiKey: keyCache.has(p.id)
+      ? keyCache.get(p.id)
+      : isEncrypted(p.apiKey)
+      ? ''
+      : decodeLegacyKey(p.apiKey),
+    hasApiKey: Boolean(p.apiKey),
+    models: Array.isArray(p.models) ? p.models.filter((m) => typeof m === 'string' && m.trim()) : [],
+  }));
+
+  const storedActiveId = localStorage.getItem(KEYS.activeProfile);
+  const active =
+    profiles.find((p) => p.id === storedActiveId) || profiles[0] || null;
+
   const provider = localStorage.getItem(KEYS.provider) || DEFAULT_LLM_PROVIDER;
-  const models = readModels();
-  const model = localStorage.getItem(KEYS.model) || DEFAULT_LLM_MODEL;
+  const model = active?.model || localStorage.getItem(KEYS.model) || DEFAULT_LLM_MODEL;
+  const models = active?.models?.length ? active.models : [model];
+
   snapshot = {
     provider,
-    apiUrl: localStorage.getItem(KEYS.apiUrl) || DEFAULT_API_URL,
-    apiKey: decodeKey(localStorage.getItem(KEYS.apiKey)),
+    profiles,
+    activeProfileId: active?.id || '',
+    // 以下四个字段镜像当前激活 profile，OpenAIProvider 等旧调用方直接使用
+    apiUrl: active?.apiUrl || localStorage.getItem(KEYS.apiUrl) || DEFAULT_API_URL,
+    apiKey: active ? active.apiKey : decodeLegacyKey(localStorage.getItem(KEYS.apiKey)),
     model,
-    models: models.length ? models : [model],
+    models,
     contextTokens: parseInt(localStorage.getItem(KEYS.contextTokens), 10) || 8000,
     think: localStorage.getItem(KEYS.think) === 'true',
     currentModel: localStorage.getItem(KEYS.currentModel) || '',
@@ -94,15 +212,7 @@ export const getConfig = () => {
 /** 保存配置（可部分更新），并通知所有订阅者 */
 export const saveConfig = (partial) => {
   if (partial.provider !== undefined) localStorage.setItem(KEYS.provider, partial.provider);
-  if (partial.apiUrl !== undefined) localStorage.setItem(KEYS.apiUrl, partial.apiUrl.trim());
-  if (partial.apiKey !== undefined) {
-    const key = partial.apiKey.trim();
-    localStorage.setItem(KEYS.apiKey, key ? 'b64:' + btoa(key) : '');
-  }
   if (partial.model !== undefined) localStorage.setItem(KEYS.model, partial.model.trim());
-  if (partial.models !== undefined) {
-    localStorage.setItem(KEYS.models, JSON.stringify(partial.models.filter((m) => m.trim())));
-  }
   if (partial.contextTokens !== undefined) {
     localStorage.setItem(KEYS.contextTokens, String(partial.contextTokens));
   }
@@ -115,15 +225,58 @@ export const saveConfig = (partial) => {
   notify();
 };
 
-/** 切换当前使用的模型（模型选择器调用） */
+/**
+ * 保存多服务商 profile 列表（apiKey 传入明文，这里 AES-GCM 加密后落盘）。
+ * 明文同步写入内存缓存（订阅方立即可用），密文异步写 localStorage。
+ * @param {Array} profiles - [{id,name,apiUrl,apiKey,models,model}]
+ * @param {string} activeId - 当前激活的 profile id
+ */
+export const saveProfiles = async (profiles, activeId) => {
+  const stored = await Promise.all(
+    profiles.map(async (p) => {
+      const plain = (p.apiKey || '').trim();
+      keyCache.set(p.id, plain);
+      return {
+        id: p.id,
+        name: p.name,
+        apiUrl: (p.apiUrl || '').trim(),
+        apiKey: plain ? await encryptString(plain) : '',
+        models: (p.models || []).map((m) => m.trim()).filter(Boolean),
+        model: (p.model || '').trim(),
+      };
+    })
+  );
+  localStorage.setItem(KEYS.profiles, JSON.stringify(stored));
+  if (activeId !== undefined) localStorage.setItem(KEYS.activeProfile, activeId);
+  notify();
+};
+
+/** 切换当前使用的模型（模型选择器调用，demo/backend 模式） */
 export const setCurrentModel = (model) => {
   const { provider } = getConfig();
   if (provider === 'custom') {
-    // custom 下 llm_model 是 OpenAIProvider 实际请求时读取的字段，两处同步写
-    saveConfig({ model, currentModel: model });
+    // custom 下同步写入激活 profile 的默认模型，OpenAIProvider 请求时读取
+    setCurrentSelection(getConfig().activeProfileId, model);
   } else {
     saveConfig({ currentModel: model });
   }
+};
+
+/**
+ * 跨服务商切换模型：激活指定 profile 并选中其中一个模型。
+ * 模型选择器里点击任意服务商分组下的模型时调用。
+ */
+export const setCurrentSelection = (profileId, model) => {
+  const { profiles } = getConfig();
+  const target = profiles.find((p) => p.id === profileId);
+  if (!target) return;
+  localStorage.setItem(KEYS.activeProfile, profileId);
+  // 把选中的模型写回该 profile 的默认模型，请求层直接读 getConfig().model
+  saveProfiles(
+    profiles.map((p) => (p.id === profileId ? { ...p, model } : p)),
+    profileId
+  );
+  saveConfig({ model, currentModel: model });
 };
 
 // ──────────────────────────────────────────────
@@ -161,7 +314,7 @@ export const resolveCurrentModel = () => {
     // 服务器托管模式：模型由后端账号配置决定，不走本地 models 列表
     return config.currentModel || config.model;
   }
-  // custom：优先当前选中的；不在列表里则回退到默认模型
+  // custom：优先当前选中的；不在激活 profile 列表里则回退到该 profile 默认模型
   return config.models.includes(config.currentModel) ? config.currentModel : config.model;
 };
 

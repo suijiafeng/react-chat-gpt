@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import {
   useLlmConfig,
   setCurrentModel,
+  setCurrentSelection,
   resolveProviderName,
   resolveCurrentModel,
   DEMO_MODELS,
@@ -26,6 +27,12 @@ const ModelSelector = React.memo(() => {
     setIsOpen(false);
   }, []);
 
+  // 跨服务商选择：切换激活 profile + 模型
+  const handleProfileModelSelect = useCallback((profileId, model) => {
+    setCurrentSelection(profileId, model);
+    setIsOpen(false);
+  }, []);
+
   // 点击组件外部时收起下拉
   useEffect(() => {
     if (!isOpen) return;
@@ -42,6 +49,8 @@ const ModelSelector = React.memo(() => {
     <div className="relative" ref={containerRef}>
       <button
         onClick={toggleOpen}
+        aria-label={`当前模型 ${currentModel}，点击切换`}
+        aria-expanded={isOpen}
         className={`flex items-center justify-between min-w-[120px] sm:min-w-[160px] px-2.5 sm:px-4 py-2 text-sm ${
           isDark ? 'bg-[#2a2a2a] text-white border-white/10 hover:bg-zinc-800' : 'bg-white text-black border-gray-300 hover:bg-gray-50'
         } border rounded-xl ${classes.themeTransition}`}
@@ -55,7 +64,7 @@ const ModelSelector = React.memo(() => {
 
       {isOpen && (
         <div
-          className={`absolute right-0 mt-2 min-w-[220px] max-h-[60vh] overflow-y-auto z-50 transition-colors duration-300 ${
+          className={`absolute right-0 mt-2 min-w-[240px] max-h-[60vh] overflow-y-auto z-50 transition-colors duration-300 ${
             isDark ? 'bg-[#1e1e1e] text-white border-zinc-800' : 'bg-white text-black border-gray-200'
           } border rounded-2xl shadow-xl ${classes.themeTransition}`}
         >
@@ -65,6 +74,7 @@ const ModelSelector = React.memo(() => {
               config={config}
               currentModel={currentModel}
               onSelect={handleModelSelect}
+              onProfileSelect={handleProfileModelSelect}
               isDark={isDark}
             />
           </div>
@@ -74,11 +84,24 @@ const ModelSelector = React.memo(() => {
   );
 });
 
+const ModelItem = ({ model, isActive, onClick, isDark }) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-sm ${
+      isDark ? 'hover:bg-zinc-800' : 'hover:bg-gray-50'
+    } ${isActive ? 'font-semibold text-blue-500' : ''}`}
+  >
+    <span className="truncate">{model}</span>
+    {isActive && <Check size={14} className="shrink-0 ml-2" />}
+  </button>
+);
+
 // 下拉里的模型列表：
-// demo → 固定演示模型；custom → 用户在设置里维护的列表；
-// backend（服务器托管）→ 后端账号配置的单一模型；
+// demo → 固定演示模型；
+// custom → 按已配置的服务商分组展示，点击任意模型即切换到该服务商；
+// backend（服务器托管）→ 后端账号配置的模型列表；
 // ollama（后端部署模式）→ 从后端接口拉取，失败时回退到用户配置的列表
-const ModelList = ({ providerName, config, currentModel, onSelect, isDark }) => {
+const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSelect, isDark }) => {
   const [remoteModels, setRemoteModels] = useState(null);
 
   // ollama / backend（服务器托管）模式的模型列表来自后端，需异步拉取
@@ -98,6 +121,38 @@ const ModelList = ({ providerName, config, currentModel, onSelect, isDark }) => 
     };
   }, [providerName]);
 
+  // custom：按服务商分组展示
+  if (providerName === 'custom') {
+    const groups = config.profiles.filter((p) => p.models.length > 0);
+    if (groups.length === 0) {
+      return (
+        <div className={`px-4 py-3 text-sm ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+          尚未配置模型，请先在设置里添加服务商
+        </div>
+      );
+    }
+    return groups.map((profile) => (
+      <div key={profile.id}>
+        <div
+          className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider select-none ${
+            isDark ? 'text-zinc-500' : 'text-gray-400'
+          }`}
+        >
+          {profile.name}
+        </div>
+        {profile.models.map((model) => (
+          <ModelItem
+            key={`${profile.id}:${model}`}
+            model={model}
+            isActive={profile.id === config.activeProfileId && currentModel === model}
+            onClick={() => onProfileSelect(profile.id, model)}
+            isDark={isDark}
+          />
+        ))}
+      </div>
+    ));
+  }
+
   const models =
     providerName === 'demo'
       ? DEMO_MODELS
@@ -115,16 +170,13 @@ const ModelList = ({ providerName, config, currentModel, onSelect, isDark }) => 
   }
 
   return models.map((model) => (
-    <button
+    <ModelItem
       key={model}
+      model={model}
+      isActive={currentModel === model}
       onClick={() => onSelect(model)}
-      className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-sm ${
-        isDark ? 'hover:bg-zinc-800' : 'hover:bg-gray-50'
-      } ${currentModel === model ? 'font-semibold text-blue-500' : ''}`}
-    >
-      <span className="truncate">{model}</span>
-      {currentModel === model && <Check size={14} className="shrink-0 ml-2" />}
-    </button>
+      isDark={isDark}
+    />
   ));
 };
 
