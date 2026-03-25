@@ -7,7 +7,8 @@ import ChatHeader from '../components/ChatHeader';
 import ChatInput from '../components/ChatInput';
 import { useTheme } from '../contexts/ThemeContext';
 import { createSession } from '../store/db';
-import { useLlmConfig, resolveCurrentModel } from '../store/llmConfig';
+import { useLlmConfig, resolveCurrentModel, resolveProviderName } from '../store/llmConfig';
+import { DEMO_PROMPTS } from '../constants/demoReplies';
 
 const ChatInterface = () => {
   const { chatId } = useParams(); // /c/:chatId 时有值，/new 时无值
@@ -58,14 +59,9 @@ const ChatInterface = () => {
     }
   }, [chatId]);
 
-  const handleSubmit = useCallback(
-    async (e) => {
-      e.preventDefault();
-      if (isStreaming) {
-        cancelChatCompletion();
-        return;
-      }
-      if (!input.trim()) return;
+  const sendMessage = useCallback(
+    async (text) => {
+      if (!text.trim()) return;
 
       // 如果是新对话，先在 DB 创建 session 再跳转
       let activeSessionId = sessionId;
@@ -84,13 +80,34 @@ const ChatInterface = () => {
           role: msg.isUser ? 'user' : 'assistant',
           content: msg.text,
         })),
-        { role: 'user', content: input },
+        { role: 'user', content: text },
       ];
 
       // 新建会话时直接传入 activeSessionId，绕过 state 异步更新避免竞态
-      handleChatCompletion(input, conversation, isNewSession ? activeSessionId : undefined);
+      handleChatCompletion(text, conversation, isNewSession ? activeSessionId : undefined);
     },
-    [input, isStreaming, messages, sessionId, currentModel, handleChatCompletion, cancelChatCompletion, navigate, setSidebarRefreshKey]
+    [messages, sessionId, currentModel, handleChatCompletion, navigate, setSidebarRefreshKey]
+  );
+
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (isStreaming) {
+        cancelChatCompletion();
+        return;
+      }
+      sendMessage(input);
+    },
+    [input, isStreaming, sendMessage, cancelChatCompletion]
+  );
+
+  // 点击默认提示词卡片：直接发送对应内容
+  const handlePromptClick = useCallback(
+    (prompt) => {
+      if (isStreaming) return;
+      sendMessage(prompt);
+    },
+    [isStreaming, sendMessage]
   );
 
   const memoizedMessages = useMemo(() => messages, [messages]);
@@ -232,6 +249,8 @@ const ChatInterface = () => {
             handleSubmit={handleSubmit}
             isStreaming={isStreaming}
             isEmpty={showEmptyState}
+            suggestions={resolveProviderName() === 'demo' ? DEMO_PROMPTS : []}
+            onSuggestionClick={handlePromptClick}
           />
         </div>
       </div>

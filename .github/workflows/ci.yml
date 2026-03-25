@@ -1,0 +1,39 @@
+# CI：lint + 前端单测 + 服务端测试 + 构建
+# push 到任意分支和 PR 都跑，保证主干始终可构建、测试常绿
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 安装服务端依赖
+        run: npm ci --prefix server
+
+      - name: Lint
+        run: npm run lint
+
+      - name: 前端单测（vitest）
+        run: npm test
+
+      - name: 服务端测试（node --test，含集成测试）
+        run: npm run test:server
+
+      - name: 构建
+        run: npm run build

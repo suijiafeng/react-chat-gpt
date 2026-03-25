@@ -3,7 +3,7 @@ import { Send, CircleStop, Plus, Mic } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 
-const ChatInput = ({ input, setInput, handleSubmit, isStreaming, isEmpty = false }) => {
+const ChatInput = ({ input, setInput, handleSubmit, isStreaming, isEmpty = false, suggestions = [], onSuggestionClick }) => {
   const { classes, isDark } = useTheme();
   const { t } = useLanguage();
   const textareaRef = useRef(null);
@@ -75,6 +75,25 @@ const ChatInput = ({ input, setInput, handleSubmit, isStreaming, isEmpty = false
             {isStreaming ? <CircleStop size={18} /> : <Send size={18} />}
           </button>
         </div>
+        {isEmpty && suggestions.length > 0 && (
+          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+            {suggestions.map((item) => (
+              <button
+                key={item.title}
+                type="button"
+                onClick={() => onSuggestionClick?.(item.prompt)}
+                className={`rounded-2xl border px-3 py-3 text-left text-sm ${classes.border} ${classes.themeTransition} ${
+                  isDark
+                    ? 'bg-white/[0.03] text-white/80 hover:bg-white/10'
+                    : 'bg-white text-gray-600 hover:bg-black/5'
+                }`}
+              >
+                <span className="mr-1.5">{item.icon}</span>
+                {item.title}
+              </button>
+            ))}
+          </div>
+        )}
         <div className={`mt-3 text-center text-xs ${classes.mutedText}`}>
           AI 回复仅供参考，重要信息请自行核实。
         </div>

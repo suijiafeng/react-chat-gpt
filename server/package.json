@@ -6,7 +6,8 @@
   "description": "登录注册 + LLM 请求代理后端，配套 react-chat-gpt 前端使用",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "node --test"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",

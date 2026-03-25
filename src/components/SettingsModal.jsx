@@ -300,6 +300,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
   };
 
   const modalThemeClass = isDark ? 'settings-modal settings-modal-dark' : 'settings-modal settings-modal-light';
+  const dropdownPopupClass = isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown';
   const labelCls = `block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`;
   const helpTextCls = `text-xs leading-relaxed ${isDark ? 'text-zinc-500' : 'text-slate-500'}`;
   const fieldGroupCls = `rounded-2xl border p-4 ${classes.themeTransition} ${
@@ -310,6 +311,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
       ? 'bg-[#121212] text-white border-white/10 focus:bg-[#121212] focus:border-zinc-500 focus:text-white placeholder:text-zinc-600'
       : 'bg-white text-slate-950 border-slate-200 placeholder:text-slate-400'
   }`;
+  const successTextCls = isDark ? 'text-emerald-300' : 'text-green-500';
+  const errorTextCls = isDark ? 'text-rose-300' : 'text-red-400';
 
   return (
     <Modal
@@ -470,7 +473,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 {testState === 'testing' ? '测试中...' : '测试连接'}
               </Button>
               {testMessage && (
-                <p className={`text-xs ${testState === 'ok' ? 'text-green-500' : 'text-red-400'}`}>
+                <p className={`text-xs ${testState === 'ok' ? successTextCls : errorTextCls}`}>
                   {testMessage}
                 </p>
               )}
@@ -496,7 +499,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 }}
                 placeholder="填好地址与密钥后自动获取；也可手动输入模型名后回车添加"
                 className="w-full"
-                popupClassName={isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown'}
+                classNames={{ popup: { root: dropdownPopupClass } }}
                 open={false /* tags 模式下无候选项，关闭下拉避免空面板 */}
                 suffixIcon={null}
                 tokenSeparators={[',', ' ']}
@@ -515,7 +518,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   onChange={setDefaultModel}
                   options={models.map((m) => ({ value: m, label: m }))}
                   className="w-full"
-                  popupClassName={isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown'}
+                  classNames={{ popup: { root: dropdownPopupClass } }}
                 />
               </div>
             )}
@@ -605,7 +608,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 {backendTestState === 'testing' ? '测试中...' : '测试连接'}
               </Button>
               {backendTestMessage && (
-                <p className={`text-xs ${backendTestState === 'ok' ? 'text-green-500' : 'text-red-400'}`}>
+                <p className={`text-xs ${backendTestState === 'ok' ? successTextCls : errorTextCls}`}>
                   {backendTestMessage}
                 </p>
               )}

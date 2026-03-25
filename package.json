@@ -5,8 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "npm --prefix server run dev",
+    "dev:all": "concurrently -n web,api -c blue,green \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:server": "npm --prefix server test",
+    "test:all": "npm run test && npm run test:server",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -45,11 +51,13 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^10.0.3",
     "eslint": "^9.10.0",
     "eslint-plugin-react": "^7.36.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "vitest": "^4.1.9"
   }
 }

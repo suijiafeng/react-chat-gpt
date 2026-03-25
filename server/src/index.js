@@ -59,6 +59,9 @@ app.use('/api/v1/llm', llmRoutes);
 app.get('/api/v1/health', (req, res) => res.json({ ok: true }));
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`react-chat-gpt server listening on http://localhost:${port}`);
+// 导出 server/app：集成测试用 PORT=0 起随机端口（server.address().port 取实际端口），
+// 测试结束 server.close() 干净退出
+export const server = app.listen(port, () => {
+  console.log(`react-chat-gpt server listening on http://localhost:${server.address().port}`);
 });
+export { app };
