@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 
 const ThemeContext = createContext();
 
@@ -29,13 +29,10 @@ export const ThemeProvider = ({ children }) => {
       themeTransition: 'transition-[background-color,border-color,color,fill,stroke,box-shadow] duration-200 ease-out',
       bg: isDark ? 'bg-[#212121]' : 'bg-[#f7f7f8]',
       panel: isDark ? 'bg-[#171717]' : 'bg-white',
-      panelAlt: isDark ? 'bg-[#2a2a2a]' : 'bg-[#f1f3f5]',
       text: isDark ? 'text-[#ececec]' : 'text-[#1f1f1f]',
       mutedText: isDark ? 'text-[#a1a1aa]' : 'text-[#6b7280]',
-      hoverText: isDark ? 'hover:text-white' : 'hover:text-gray-700',
       buttonText: isDark ? 'text-gray-300' : 'text-gray-500',
       buttonHover: isDark ? 'hover:bg-white/5 hover:text-white' : 'hover:bg-black/5 hover:text-gray-700',
-      themeIcon: isDark ? 'text-yellow-300 hover:text-yellow-100' : 'text-gray-500 hover:text-gray-700',
       input: isDark
         ? 'bg-[#2f2f2f] text-[#ececec] border-white/10 placeholder:text-[#8e8ea0]'
         : 'bg-white text-black border-gray-300 placeholder:text-gray-400',

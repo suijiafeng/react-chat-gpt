@@ -2,9 +2,7 @@
 // 长对话若把全部历史直接发给模型，必然超出上下文窗口报错，
 // 这里在发送前按 token 预算从最新往前保留消息。
 
-// 默认上下文预算（token 数）。可通过 localStorage 的 llm_context_tokens 覆盖，
-// 该值应小于所用模型的上下文窗口，并给回复留出余量。
-const DEFAULT_CONTEXT_TOKENS = 8000;
+import { getConfig } from '../store/llmConfig';
 
 // 每条消息除正文外的固定开销（role 等元信息的大致 token 数）
 const PER_MESSAGE_OVERHEAD = 4;
@@ -14,7 +12,7 @@ const PER_MESSAGE_OVERHEAD = 4;
  * 经验规则：CJK（中日韩）字符约 1 字 = 1 token，其他字符约 4 字符 = 1 token。
  * 不追求精确，偏保守即可——目的是避免超窗，而不是精确计费。
  */
-export function estimateTokens(text) {
+function estimateTokens(text) {
   if (!text) return 0;
   let cjk = 0;
   let other = 0;
@@ -34,12 +32,6 @@ export function estimateTokens(text) {
   return Math.ceil(cjk + other / 4);
 }
 
-/** 读取用户配置的上下文预算，未配置或非法时用默认值 */
-export function getMaxContextTokens() {
-  const raw = parseInt(localStorage.getItem('llm_context_tokens'), 10);
-  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_CONTEXT_TOKENS;
-}
-
 /**
  * 按 token 预算截断会话历史。
  * 策略：
@@ -50,10 +42,10 @@ export function getMaxContextTokens() {
  *    避免部分 API 拒绝"assistant 打头"的消息序列。
  *
  * @param {Array<{role: string, content: string}>} messages 完整会话
- * @param {number} [maxTokens] token 预算，默认读取用户配置
+ * @param {number} [maxTokens] token 预算，默认读取配置中心的用户设置（含默认值兜底）
  * @returns 截断后的会话
  */
-export function trimConversation(messages, maxTokens = getMaxContextTokens()) {
+export function trimConversation(messages, maxTokens = getConfig().contextTokens) {
   if (!Array.isArray(messages) || messages.length === 0) return [];
 
   // 拆出开头的 system 消息（一般只有一条）

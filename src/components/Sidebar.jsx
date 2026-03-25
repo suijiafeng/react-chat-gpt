@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import {
   MessageSquare,
@@ -14,7 +14,6 @@ import { useLanguage } from '../hooks';
 import { userStore } from '../store';
 import { getAllSessions, deleteSession } from '../store/db';
 import { userSignOut } from '../apis/auths';
-import { logoutDemo } from '../hooks';
 import { APP_NAME } from '../constants';
 
 const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
@@ -51,18 +50,6 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [isUserMenuOpen]);
 
-  const quickLinks = useMemo(
-    () => [
-      { icon: PenSquare, label: t('newChat') },
-      // { icon: Search, label: '搜索聊天' },
-      // { icon: ImageIcon, label: '图片' },
-      // { icon: FolderOpen, label: '库' },
-      // { icon: Blocks, label: '应用' },
-      // { icon: Compass, label: '深度研究' },
-    ],
-    [t]
-  );
-
   const handleNewChat = useCallback(() => {
     navigate('/new');
     if (window.innerWidth < 1024) onClose();
@@ -89,8 +76,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
 
   const handleSignOut = useCallback(() => {
     setIsUserMenuOpen(false);
-    userSignOut();
-    logoutDemo();
+    userSignOut(); // 内部已同时清理 demo_mode 快捷登录标记
     userStore.clearUser();
     navigate('/login', { replace: true });
   }, [navigate]);
@@ -113,17 +99,14 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
         </div>
 
         <div className="px-3 pt-4 flex-shrink-0 space-y-1">
-          {quickLinks.map(({ icon: Icon, label }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={handleNewChat}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${classes.themeTransition} ${classes.buttonHover}`}
-            >
-              <Icon size={18} className="shrink-0" />
-              <span>{label}</span>
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${classes.themeTransition} ${classes.buttonHover}`}
+          >
+            <PenSquare size={18} className="shrink-0" />
+            <span>{t('newChat')}</span>
+          </button>
         </div>
         <div className={`border-b h-[8px] ${isDark ? 'border-white/10' : 'border-black/10'}`}></div>
         <div className={`px-5 pt-5 pb-2 text-xs font-medium uppercase tracking-[0.2em] ${isDark

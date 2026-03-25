@@ -166,9 +166,8 @@ const components = {
   ),
 };
 
+// 空内容守卫在 MarkdownRenderer 里，这里只负责渲染
 const MarkdownContent = ({ content, isTyping }) => {
-  if (!content) return null;
-
   const remarkPlugins = isTyping
     ? [remarkGfm, remarkMath, remarkMarkLastParagraph]
     : [remarkGfm, remarkMath];

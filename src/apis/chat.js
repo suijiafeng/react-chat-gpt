@@ -1,30 +1,8 @@
 import request from "./config";
-import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '../constants';
+import { WEBUI_BASE_URL } from '../constants';
 import { providerRegistry } from './providers';
 // 演示/正式模式与 provider 的判断统一收敛在配置中心，这里只负责调用
 import { isDemoMode, resolveProviderName } from '../store/llmConfig';
-
-export const queryMemory = (params) => {
-  const { content, token } = params;
-  if (isDemoMode()) {
-    // 本地模式：返回空记忆列表
-    return Promise.resolve({ data: { documents: [], metadatas: [], distances: [] }, status: 200, statusText: 'OK' });
-  }
-  // 后端接口（USE_LOCAL_DATA = false 时生效）
-  return request.post(`${WEBUI_API_BASE_URL}/memories/query`, { content, token });
-};
-
-export const createNewChat = (params = {}) => {
-  if (isDemoMode()) {
-    // 本地模式：返回模拟的新建对话响应
-    return Promise.resolve({ data: { id: '', title: '新对话' }, status: 200, statusText: 'OK' });
-  }
-  // 后端接口（USE_LOCAL_DATA = false 时生效）
-  const chat = params.chat ?? {
-    id: '', title: '新对话', models: ['llama3.1:latest'], params: {}, messages: [], tags: [], timestamp: Date.now(),
-  };
-  return request.post(`${WEBUI_API_BASE_URL}/chats/new`, { chat });
-};
 
 export const generateChatCompletion = async (params, callback, signal) => {
   const provider = providerRegistry.getProvider(resolveProviderName());

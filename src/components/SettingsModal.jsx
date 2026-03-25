@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message } from 'antd';
 import { Zap, CheckCircle2, XCircle, Loader2, ServerCog } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -29,6 +29,28 @@ const fetchOpenAiModelIds = async (baseUrl, apiKey) => {
   const data = await res.json();
   return (data?.data || []).map((m) => m.id).filter(Boolean);
 };
+
+// "测试连接"按钮 + 结果文案（custom / backend 两个分区共用同一套外观与状态图标）
+const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes, successCls, errorCls }) => (
+  <>
+    <Button
+      onClick={onTest}
+      disabled={disabled || state === 'testing'}
+      icon={
+        state === 'testing' ? <Loader2 size={14} className="animate-spin inline" />
+        : state === 'ok' ? <CheckCircle2 size={14} className="inline text-green-500" />
+        : state === 'fail' ? <XCircle size={14} className="inline text-red-500" />
+        : <Zap size={14} className="inline" />
+      }
+      className={`rounded-xl flex items-center gap-1.5 ${classes.themeTransition} ${
+        isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
+      }`}
+    >
+      {state === 'testing' ? '测试中...' : '测试连接'}
+    </Button>
+    {msg && <p className={`text-xs ${state === 'ok' ? successCls : errorCls}`}>{msg}</p>}
+  </>
+);
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const { isDark, classes } = useTheme();
@@ -457,26 +479,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
             {/* 连接测试 */}
             <div className={`${fieldGroupCls} space-y-2`}>
-              <Button
-                onClick={handleTest}
-                disabled={!apiUrl.trim() || testState === 'testing'}
-                icon={
-                  testState === 'testing' ? <Loader2 size={14} className="animate-spin inline" />
-                  : testState === 'ok' ? <CheckCircle2 size={14} className="inline text-green-500" />
-                  : testState === 'fail' ? <XCircle size={14} className="inline text-red-500" />
-                  : <Zap size={14} className="inline" />
-                }
-                className={`rounded-xl flex items-center gap-1.5 ${classes.themeTransition} ${
-                  isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
-                }`}
-              >
-                {testState === 'testing' ? '测试中...' : '测试连接'}
-              </Button>
-              {testMessage && (
-                <p className={`text-xs ${testState === 'ok' ? successTextCls : errorTextCls}`}>
-                  {testMessage}
-                </p>
-              )}
+              <TestConnection
+                onTest={handleTest}
+                state={testState}
+                message={testMessage}
+                disabled={!apiUrl.trim()}
+                isDark={isDark}
+                classes={classes}
+                successCls={successTextCls}
+                errorCls={errorTextCls}
+              />
             </div>
 
             {/* 模型列表（可多选维护，顶部选择器里切换） */}
@@ -592,26 +604,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
             {/* 连接测试：由服务端拉取上游模型列表验证地址/密钥（不受浏览器 CORS 限制） */}
             <div className={`${fieldGroupCls} space-y-2`}>
-              <Button
-                onClick={handleBackendTest}
-                disabled={!backendApiUrl.trim() || backendLoading || backendTestState === 'testing'}
-                icon={
-                  backendTestState === 'testing' ? <Loader2 size={14} className="animate-spin inline" />
-                  : backendTestState === 'ok' ? <CheckCircle2 size={14} className="inline text-green-500" />
-                  : backendTestState === 'fail' ? <XCircle size={14} className="inline text-red-500" />
-                  : <Zap size={14} className="inline" />
-                }
-                className={`rounded-xl flex items-center gap-1.5 ${classes.themeTransition} ${
-                  isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
-                }`}
-              >
-                {backendTestState === 'testing' ? '测试中...' : '测试连接'}
-              </Button>
-              {backendTestMessage && (
-                <p className={`text-xs ${backendTestState === 'ok' ? successTextCls : errorTextCls}`}>
-                  {backendTestMessage}
-                </p>
-              )}
+              <TestConnection
+                onTest={handleBackendTest}
+                state={backendTestState}
+                message={backendTestMessage}
+                disabled={!backendApiUrl.trim() || backendLoading}
+                isDark={isDark}
+                classes={classes}
+                successCls={successTextCls}
+                errorCls={errorTextCls}
+              />
             </div>
 
             <div className={`${fieldGroupCls} space-y-2`}>

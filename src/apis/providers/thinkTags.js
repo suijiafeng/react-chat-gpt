@@ -80,3 +80,52 @@ export const createThinkSplitter = () => {
 // 从 OpenAI 兼容 SSE 的 delta 里取思考增量：不同平台字段名不同——
 // DeepSeek / 通义 / 智谱 / Moonshot 用 reasoning_content，Ollama 兼容层等用 reasoning
 export const deltaReasoning = (delta) => delta?.reasoning_content ?? delta?.reasoning ?? '';
+
+// OpenAI 兼容 SSE 流的统一适配器：把各平台 delta 的差异
+// （reasoning_content / reasoning 字段、内联 <think> 标签、流中错误对象）
+// 吸收成 { content, meta } 块。OpenAIProvider 与 BackendProvider 共用。
+export const createSseThinkAdapter = (callback, thinkEnabled) => {
+  const splitter = createThinkSplitter();
+
+  // 流结束时冲刷分流器缓冲，避免尾部字符丢失
+  const wrappedCallback = (content, meta) => {
+    if (content === '[DONE]') {
+      const rest = splitter.flush();
+      if (rest.visible) callback(rest.visible);
+      if (rest.reasoning && thinkEnabled) callback(rest.reasoning, { isReasoning: true });
+    }
+    callback(content, meta);
+  };
+
+  const dataParser = (parsed) => {
+    // 流中错误对象（OpenAI 系平台在流中报错的标准形态是 data: {"error":{...}}，
+    // 自建代理上游中断时也会发同形态的错误块）——标记为错误交给 UI 红色气泡展示
+    if (parsed.error) {
+      const msg = parsed.error.message || JSON.stringify(parsed.error).slice(0, 200);
+      return { content: `上游返回错误：${msg}`, meta: { isError: true } };
+    }
+
+    const delta = parsed.choices?.[0]?.delta;
+    const chunks = [];
+
+    // 独立思考字段：think 关闭时丢弃不展示（这类平台的思考生成不受请求参数控制，
+    // 只能在展示层过滤）
+    const reasoning = deltaReasoning(delta);
+    if (reasoning && thinkEnabled) {
+      chunks.push({ content: reasoning, meta: { isReasoning: true } });
+    }
+
+    // 可见文本：内联 <think> 标签拆出的思考部分按 think 开关决定展示或丢弃
+    if (delta?.content) {
+      const { visible, reasoning: tagReasoning } = splitter.push(delta.content);
+      if (tagReasoning && thinkEnabled) {
+        chunks.push({ content: tagReasoning, meta: { isReasoning: true } });
+      }
+      if (visible) chunks.push({ content: visible });
+    }
+
+    return chunks.length ? chunks : null;
+  };
+
+  return { wrappedCallback, dataParser };
+};

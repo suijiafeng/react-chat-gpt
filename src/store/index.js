@@ -14,10 +14,6 @@ class UserStore {
   clearUser() {
     this.userProfile = null;
   }
-
-  get isLoggedIn() {
-    return !!this.userProfile;
-  }
 }
 
 export const userStore = new UserStore();

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getSession, userSignOut } from '../apis/auths';
+import { getSession } from '../apis/auths';
 import { seedDemoUser } from '../store/db';
 import { userStore } from '../store';
 import { isDemoMode } from '../store/llmConfig';
@@ -22,14 +22,6 @@ export const useLanguage = () => {
     language: i18n.language,
     changeLanguage,
   };
-};
-
-// ──────────────────────────────────────────────
-// Demo 快捷登录（保留兼容性）
-// ──────────────────────────────────────────────
-
-export const logoutDemo = () => {
-  localStorage.removeItem('demo_mode');
 };
 
 // ──────────────────────────────────────────────
@@ -74,17 +66,5 @@ export const useAuth = () => {
     }
   }, []);
 
-  // isLoading 恒为 false：校验是同步的，保留字段只为兼容现有调用方
-  return { isLoggedIn, isLoading: false };
-};
-
-// ──────────────────────────────────────────────
-// useLogout
-// ──────────────────────────────────────────────
-
-export const useLogout = () => {
-  return () => {
-    userSignOut();
-    userStore.clearUser();
-  };
+  return { isLoggedIn };
 };

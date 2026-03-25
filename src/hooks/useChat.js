@@ -63,7 +63,7 @@ const messagesReducer = (state, action) => {
 };
 
 // 内存中的消息数组 → 发给模型的 role/content 会话格式
-const toConversation = (msgs) =>
+export const toConversation = (msgs) =>
   msgs.map((msg) => ({ role: msg.isUser ? 'user' : 'assistant', content: msg.text }));
 
 export const useChat = (currentModel, sessionId, onSessionTouched) => {
@@ -164,11 +164,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
         const PAGE_SIZE = 30;
         const history = await loadMessagesBySessionPaged(sessionId, PAGE_SIZE, 0);
         dispatchMessages({ type: 'SET_MESSAGES', payload: history });
-        if (history.length < PAGE_SIZE) {
-          setHasMore(false);
-        } else {
-          setHasMore(true);
-        }
+        setHasMore(history.length === PAGE_SIZE);
       } catch (error) {
         console.error('Error loading initial messages:', error);
       } finally {
@@ -187,11 +183,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     try {
       const PAGE_SIZE = 30;
       const olderMessages = await loadMessagesBySessionPaged(sessionId, PAGE_SIZE, messages.length);
-      if (olderMessages.length < PAGE_SIZE) {
-        setHasMore(false);
-      } else {
-        setHasMore(true);
-      }
+      setHasMore(olderMessages.length === PAGE_SIZE);
       if (olderMessages.length > 0) {
         skipScrollToBottomRef.current = true;
         dispatchMessages({ type: 'PREPEND_MESSAGES', payload: olderMessages });

@@ -151,12 +151,6 @@ export const saveMessageToDB = async (message, sessionId) => {
   });
 };
 
-export const loadMessagesBySession = async (sessionId) => {
-  const db = await initDB();
-  const messages = await db.getAllFromIndex(MESSAGES_STORE, 'sessionId', sessionId);
-  return messages.sort((a, b) => (a.timestamp > b.timestamp ? 1 : -1));
-};
-
 export const loadMessagesBySessionPaged = async (sessionId, limit = 30, offset = 0) => {
   const db = await initDB();
   const tx = db.transaction(MESSAGES_STORE, 'readonly');
@@ -193,13 +187,5 @@ export const deleteMessagesByIds = async (messageIds) => {
   const db = await initDB();
   const tx = db.transaction(MESSAGES_STORE, 'readwrite');
   await Promise.all(messageIds.map((id) => tx.store.delete(id)));
-  await tx.done;
-};
-
-export const clearSessionMessages = async (sessionId) => {
-  const db = await initDB();
-  const messages = await db.getAllFromIndex(MESSAGES_STORE, 'sessionId', sessionId);
-  const tx = db.transaction(MESSAGES_STORE, 'readwrite');
-  await Promise.all(messages.map((msg) => tx.store.delete(msg.id)));
   await tx.done;
 };

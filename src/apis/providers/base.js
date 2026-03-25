@@ -4,14 +4,9 @@
 export class BaseProvider {
   /**
    * Complete the chat conversation using streaming.
-   * @param {Object} params - completion options (messages, model, chat_id, options, stream, etc.)
-   * @param {Function} callback - stream chunk callback function
-   * @param {AbortSignal} signal - signal for aborting request
+   * Subclasses implement (params, callback, signal).
    */
-  async complete(params, callback, signal) {
-    if (!params || !callback || !signal) {
-      // Reference parameters to prevent eslint unused-vars
-    }
+  async complete() {
     throw new Error('complete() method must be implemented by subclasses');
   }
 
@@ -30,6 +25,9 @@ export class BaseProvider {
     // （个别兼容平台把错误 JSON/HTML 用 200 直接返回），避免用户对着空白气泡困惑
     let sawData = false;
     let rawSample = ''; // 前几百字节原文，报错时帮助定位问题
+    // [DONE] 只向下游发一次：数据行里的 [DONE] 与流关闭后的兜底不重复触发，
+    // 否则 useChat 的收尾逻辑（入库、touchSession、生成标题）会被执行两遍
+    let doneSent = false;
 
     // dataParser 可返回单个块或块数组——同一个 delta 可能同时携带可见文本与
     // 思考文本（如 <think> 标签在 chunk 中间闭合），需要拆成两次回调
@@ -41,6 +39,35 @@ export class BaseProvider {
         } else {
           callback(chunk);
         }
+      }
+    };
+
+    const sendDone = () => {
+      if (doneSent) return;
+      doneSent = true;
+      callback('[DONE]');
+    };
+
+    // 处理一行 SSE 数据（读循环与流关闭后的尾部缓冲共用同一套逻辑）。
+    // SSE 规范里 "data:" 后的空格是可选的——部分平台/网关发 data:{...}（无空格），
+    // 只认 "data: " 会把整条流静默忽略掉
+    const handleLine = (line) => {
+      const cleanedLine = line.trim();
+      if (!cleanedLine.startsWith('data:')) return;
+
+      const dataStr = cleanedLine.slice(5).trim();
+      if (dataStr === '[DONE]') {
+        sawData = true;
+        sendDone();
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(dataStr);
+        sawData = true;
+        emit(dataParser(parsed));
+      } catch (e) {
+        console.error('Error parsing SSE line:', e, cleanedLine);
       }
     };
 
@@ -63,47 +90,12 @@ export class BaseProvider {
 
         // Keep the last partial line
         buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const cleanedLine = line.trim();
-          if (!cleanedLine) continue;
-
-          // SSE 规范里 "data:" 后的空格是可选的——部分平台/网关发 data:{...}（无空格），
-          // 只认 "data: " 会把整条流静默忽略掉
-          if (cleanedLine.startsWith('data:')) {
-            const dataStr = cleanedLine.slice(5).trim();
-            if (dataStr === '[DONE]') {
-              sawData = true;
-              callback('[DONE]');
-              continue;
-            }
-
-            try {
-              const parsed = JSON.parse(dataStr);
-              sawData = true;
-              emit(dataParser(parsed));
-            } catch (e) {
-              console.error('Error parsing SSE line:', e, cleanedLine);
-            }
-          }
-        }
+        lines.forEach(handleLine);
       }
 
       // Check remaining buffer
       if (buffer.trim()) {
-        const cleanedLine = buffer.trim();
-        if (cleanedLine.startsWith('data:')) {
-          const dataStr = cleanedLine.slice(5).trim();
-          if (dataStr !== '[DONE]') {
-            try {
-              const parsed = JSON.parse(dataStr);
-              sawData = true;
-              emit(dataParser(parsed));
-            } catch {
-              // ignore
-            }
-          }
-        }
+        handleLine(buffer);
       }
 
       // 响应结束却没有任何合法 SSE 行：多半是平台把错误 JSON/HTML 用 200 返回了。
@@ -113,13 +105,7 @@ export class BaseProvider {
       }
 
       // Finally signal termination
-      callback('[DONE]');
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log('Stream aborted');
-        throw error;
-      }
-      throw error;
+      sendDone();
     } finally {
       reader.releaseLock();
     }

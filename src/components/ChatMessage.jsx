@@ -252,12 +252,13 @@ const ChatMessage = React.memo(
                   <Pencil size={14} />
                 </ActionButton>
               )}
-              {!isUser && isLast && !isStreaming && onRegenerate && (
+              {/* 外层守卫已排除 isStreaming && isLast，走到这里的 isLast 分支必然不在生成中 */}
+              {!isUser && isLast && onRegenerate && (
                 <ActionButton title="重新生成" onClick={onRegenerate} isDark={isDark}>
                   <RefreshCw size={14} />
                 </ActionButton>
               )}
-              {!isUser && isLast && !isStreaming && canContinue && onContinue && (
+              {!isUser && isLast && canContinue && onContinue && (
                 <ActionButton title="继续生成" onClick={onContinue} isDark={isDark}>
                   <StepForward size={14} />
                   <span>继续生成</span>

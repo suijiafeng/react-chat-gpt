@@ -9,9 +9,7 @@ const NotFound = lazy(() => import('../pages/NotFound'));
 const Login = lazy(() => import('../pages/LoginPage'));
 
 const ProtectedRoute = ({ children }) => {
-  const { isLoggedIn, isLoading } = useAuth();
-
-  if (isLoading) return <LoadingSpinner />;
+  const { isLoggedIn } = useAuth();
   return isLoggedIn ? children : <Navigate to="/login" replace />;
 };
 

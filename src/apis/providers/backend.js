@@ -1,7 +1,7 @@
 import { BaseProvider } from './base';
 import { WEBUI_API_BASE_URL } from '../../constants';
 import { handleSessionExpired } from '../../utils/session';
-import { createThinkSplitter, deltaReasoning } from './thinkTags';
+import { createSseThinkAdapter } from './thinkTags';
 
 // 走自建后端转发：真实 API Key 只存在服务端，浏览器完全接触不到；
 // 同时天然绕开各模型商的 CORS 限制（服务端对服务端请求不受同源策略约束）。
@@ -19,7 +19,7 @@ export class BackendProvider extends BaseProvider {
         model,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
         stream: true,
-        think: Boolean(think),
+        think: thinkEnabled,
       }),
       signal,
     });
@@ -37,46 +37,8 @@ export class BackendProvider extends BaseProvider {
     }
 
     // 代理是原样透传上游 SSE 的，字段差异（reasoning_content/reasoning/<think> 标签）
-    // 与 custom 模式一样在这里吸收；think 关闭时丢弃思考内容不展示
-    const splitter = createThinkSplitter();
-    const wrappedCallback = (content, meta) => {
-      if (content === '[DONE]') {
-        const rest = splitter.flush();
-        if (rest.visible) callback(rest.visible);
-        if (rest.reasoning && thinkEnabled) callback(rest.reasoning, { isReasoning: true });
-      }
-      callback(content, meta);
-    };
-
-    await this.parseStream(
-      response.body,
-      wrappedCallback,
-      signal,
-      (parsed) => {
-        // 流中错误对象：上游平台流中报错、或自建代理在上游中断时补发的错误块
-        if (parsed.error) {
-          const msg = parsed.error.message || JSON.stringify(parsed.error).slice(0, 200);
-          return { content: `上游返回错误：${msg}`, meta: { isError: true } };
-        }
-
-        const delta = parsed.choices?.[0]?.delta;
-        const chunks = [];
-
-        const reasoning = deltaReasoning(delta);
-        if (reasoning && thinkEnabled) {
-          chunks.push({ content: reasoning, meta: { isReasoning: true } });
-        }
-
-        if (delta?.content) {
-          const { visible, reasoning: tagReasoning } = splitter.push(delta.content);
-          if (tagReasoning && thinkEnabled) {
-            chunks.push({ content: tagReasoning, meta: { isReasoning: true } });
-          }
-          if (visible) chunks.push({ content: visible });
-        }
-
-        return chunks.length ? chunks : null;
-      }
-    );
+    // 与 custom 模式一样由共用适配器吸收；think 关闭时丢弃思考内容不展示
+    const { wrappedCallback, dataParser } = createSseThinkAdapter(callback, thinkEnabled);
+    await this.parseStream(response.body, wrappedCallback, signal, dataParser);
   }
 }

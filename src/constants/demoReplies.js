@@ -303,5 +303,3 @@ export const DEMO_PROMPTS = [
   { icon: '💻', title: '代码示例', prompt: '写一个 React 计数器组件' },
   { icon: '📝', title: 'Markdown 演示', prompt: '用表格和代码块演示一下 Markdown 渲染' },
 ];
-
-export default DEMO_REPLIES;

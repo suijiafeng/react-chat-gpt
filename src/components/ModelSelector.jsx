@@ -15,7 +15,7 @@ const ModelSelector = React.memo(() => {
   const containerRef = useRef(null);
 
   // 订阅配置中心：设置弹窗保存后，这里的 provider / 模型列表 / 当前模型即时更新
-  useLlmConfig();
+  const config = useLlmConfig();
   const providerName = resolveProviderName();
   const currentModel = resolveCurrentModel();
 
@@ -62,6 +62,7 @@ const ModelSelector = React.memo(() => {
           <div className="py-1">
             <ModelList
               providerName={providerName}
+              config={config}
               currentModel={currentModel}
               onSelect={handleModelSelect}
               isDark={isDark}
@@ -77,8 +78,7 @@ const ModelSelector = React.memo(() => {
 // demo → 固定演示模型；custom → 用户在设置里维护的列表；
 // backend（服务器托管）→ 后端账号配置的单一模型；
 // ollama（后端部署模式）→ 从后端接口拉取，失败时回退到用户配置的列表
-const ModelList = ({ providerName, currentModel, onSelect, isDark }) => {
-  const config = useLlmConfig();
+const ModelList = ({ providerName, config, currentModel, onSelect, isDark }) => {
   const [remoteModels, setRemoteModels] = useState(null);
 
   // ollama / backend（服务器托管）模式的模型列表来自后端，需异步拉取

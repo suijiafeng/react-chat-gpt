@@ -1,4 +1,3 @@
-import React from 'react';
 import { Menu } from 'lucide-react';
 import ModelSelector from '../components/ModelSelector';
 import NavHeader from './NavHeader';

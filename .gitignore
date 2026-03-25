@@ -34,3 +34,4 @@ Pipfile
 !/data
 data/*
 .webui_secret_key
+.claude

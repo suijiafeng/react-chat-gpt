@@ -1,6 +1,6 @@
-import React, { useCallback, useState, useMemo, useLayoutEffect, useEffect, useRef } from 'react';
+import { useCallback, useState, useLayoutEffect, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useChat } from '../hooks';
+import { useChat, toConversation } from '../hooks';
 import Sidebar from '../components/Sidebar';
 import ChatMessage from '../components/ChatMessage';
 import ChatHeader from '../components/ChatHeader';
@@ -13,9 +13,9 @@ import { DEMO_PROMPTS } from '../constants/demoReplies';
 const ChatInterface = () => {
   const { chatId } = useParams(); // /c/:chatId 时有值，/new 时无值
   const navigate = useNavigate();
-  // 直接用路由参数初始化，避免刷新时出现"sessionId 先是 null 再变成 chatId"的中间态——
+  // 直接从路由参数派生，天然避免"sessionId 先是 null 再变成 chatId"的中间态——
   // 那个中间态会让空会话欢迎页闪现一下再切回消息列表（页面抖动）
-  const [sessionId, setSessionId] = useState(chatId || null);
+  const sessionId = chatId || null;
   // 用于触发 Sidebar 重新加载会话列表
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
@@ -48,17 +48,6 @@ const ChatInterface = () => {
 
   const { classes } = useTheme();
 
-  // 路由变化时同步 sessionId
-  useEffect(() => {
-    if (chatId) {
-      // 加载已有会话
-      setSessionId(chatId);
-    } else {
-      // /new：清空，等待第一次发送时创建新会话
-      setSessionId(null);
-    }
-  }, [chatId]);
-
   const sendMessage = useCallback(
     async (text) => {
       if (!text.trim()) return;
@@ -75,13 +64,7 @@ const ChatInterface = () => {
         setSidebarRefreshKey((k) => k + 1);
       }
 
-      const conversation = [
-        ...messages.map((msg) => ({
-          role: msg.isUser ? 'user' : 'assistant',
-          content: msg.text,
-        })),
-        { role: 'user', content: text },
-      ];
+      const conversation = [...toConversation(messages), { role: 'user', content: text }];
 
       // 新建会话时直接传入 activeSessionId，绕过 state 异步更新避免竞态
       handleChatCompletion(text, conversation, isNewSession ? activeSessionId : undefined);
@@ -110,11 +93,10 @@ const ChatInterface = () => {
     [isStreaming, sendMessage]
   );
 
-  const memoizedMessages = useMemo(() => messages, [messages]);
   // 首屏加载完成（initialLoaded）之前不当作"空对话"处理，
   // 避免刷新会话页时欢迎页和居中输入框闪现后又跳回消息布局
   const showEmptyState =
-    initialLoaded && !isLoadingMore && memoizedMessages.length === 0 && !isStreaming;
+    initialLoaded && !isLoadingMore && messages.length === 0 && !isStreaming;
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
 
@@ -199,7 +181,7 @@ const ChatInterface = () => {
       top: container.scrollHeight,
       behavior: 'smooth',
     });
-  }, [memoizedMessages, isStreaming, isLoadingMore]);
+  }, [messages, isStreaming, isLoadingMore]);
 
   if (isSidebarOpen === null) return null;
 
@@ -214,6 +196,7 @@ const ChatInterface = () => {
             <div className="max-w-3xl mx-auto min-h-full pt-10 pb-44">
             {/* 加载更多的哨兵元素：只在首屏加载完成后渲染。
                 首屏加载期间它会在消息上方占位，加载完成后消失导致内容上移（抖动） */}
+            {initialLoaded && hasMore && <div ref={sentinelRef} className="h-px" />}
             {showEmptyState && (
               <div className="flex min-h-[50vh] items-center justify-center px-4">
                 <div className="text-center select-none">
@@ -223,7 +206,7 @@ const ChatInterface = () => {
                 </div>
               </div>
             )}
-            {memoizedMessages.map((message, index) => (
+            {messages.map((message, index) => (
               <ChatMessage
                 key={message.id}
                 messageId={message.id}

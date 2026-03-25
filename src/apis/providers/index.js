@@ -28,8 +28,3 @@ class ProviderRegistry {
 }
 
 export const providerRegistry = new ProviderRegistry();
-export { BaseProvider } from './base';
-export { DemoProvider } from './demo';
-export { OpenAIProvider } from './openai';
-export { OllamaProvider } from './ollama';
-export { BackendProvider } from './backend';

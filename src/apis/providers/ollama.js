@@ -7,11 +7,7 @@ export class OllamaProvider extends BaseProvider {
 
     const response = await fetch(`${OLLAMA_API_BASE_URL}/api/chat`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-vail': 'application/x-ndjson',
-        'Authorization': localStorage.getItem('token') || '',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id, id, messages, model, options, session_id, stream, think: Boolean(think) }),
       signal,
     });
@@ -23,6 +19,36 @@ export class OllamaProvider extends BaseProvider {
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
+    // [DONE] 只发一次：done 块与流关闭兜底不重复触发下游收尾逻辑
+    let doneSent = false;
+
+    const sendDone = () => {
+      if (doneSent) return;
+      doneSent = true;
+      callback('[DONE]');
+    };
+
+    // 处理一行 ndjson（读循环与流关闭后的尾部缓冲共用同一套逻辑）
+    const handleLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      try {
+        const chunk = JSON.parse(trimmed);
+        if (chunk.done) {
+          sendDone();
+          return;
+        }
+        if (chunk.message?.thinking) {
+          callback(chunk.message.thinking, { isReasoning: true });
+        }
+        if (chunk.message?.content) {
+          callback(chunk.message.content);
+        }
+      } catch (jsonError) {
+        console.error('Ollama JSON 解析错误：', jsonError, trimmed);
+      }
+    };
 
     try {
       while (true) {
@@ -36,54 +62,18 @@ export class OllamaProvider extends BaseProvider {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        
+
         // Ollama utilizes newline-delimited JSON (ndjson)
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          try {
-            const chunk = JSON.parse(trimmed);
-            if (chunk.done) {
-              callback('[DONE]');
-            } else {
-              if (chunk.message?.thinking) {
-                callback(chunk.message.thinking, { isReasoning: true });
-              }
-              if (chunk.message?.content) {
-                callback(chunk.message.content);
-              }
-            }
-          } catch (jsonError) {
-            console.error('Ollama JSON 解析错误：', jsonError, trimmed);
-          }
-        }
+        lines.forEach(handleLine);
       }
 
       // Check remaining buffer
-      if (buffer.trim()) {
-        try {
-          const chunk = JSON.parse(buffer.trim());
-          if (chunk.done) {
-            callback('[DONE]');
-          } else {
-            if (chunk.message?.thinking) {
-              callback(chunk.message.thinking, { isReasoning: true });
-            }
-            if (chunk.message?.content) {
-              callback(chunk.message.content);
-            }
-          }
-        } catch {
-          // ignore
-        }
-      }
+      handleLine(buffer);
 
       // Always end stream
-      callback('[DONE]');
+      sendDone();
     } finally {
       reader.releaseLock();
     }
