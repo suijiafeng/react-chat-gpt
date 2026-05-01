@@ -9,6 +9,8 @@
  * 回复内容使用 Markdown 编写，可以顺带展示消息渲染能力（表格、代码块、列表等）。
  */
 
+import { contentToText } from '../utils/attachments';
+
 // === 主题回复：关键词命中即返回对应内容 ===
 const TOPIC_REPLIES = [
   {
@@ -157,6 +159,26 @@ const TOPIC_REPLIES = [
 }
 \`\`\`
 
+## Mermaid 流程图
+
+\`\`\`mermaid
+flowchart LR
+  A[用户输入] --> B{有附件?}
+  B -- 是 --> C[组装 vision content]
+  B -- 否 --> D[纯文本消息]
+  C --> E[流式请求模型]
+  D --> E
+  E --> F[Markdown 渲染]
+\`\`\`
+
+## 数学公式
+
+行内公式 $E = mc^2$，块级公式：
+
+$$
+\\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}
+$$
+
 以上全部由消息组件实时渲染 ✅`,
     ],
   },
@@ -276,16 +298,58 @@ const DEMO_REPLIES = [
  * @param {Array} messages - 消息数组
  * @returns {string} 演示回复
  */
+// ──────────────────────────────────────────────
+// 关键词加权匹配：不再"首个命中即返回"，而是给所有主题打分取最高，
+// 模拟对句子内容的大致理解。
+//
+// 评分规则（可解释、无外部依赖）：
+// - 每命中一个关键词得基础分 1，另按关键词长度加分（长词更具体，权重更高，
+//   如命中「使用方法」应比只命中「用」更能代表句子意图）；
+// - 同一主题命中多个不同关键词有覆盖加成（命中面广 ≈ 主题相关性强）；
+// - 全部主题得分为 0 时才落入通用兜底回复。
+// ──────────────────────────────────────────────
+
+/** 计算一段文本对某主题的匹配得分 */
+const scoreTopic = (text, topic) => {
+  let score = 0;
+  let hits = 0;
+  for (const kw of topic.keywords) {
+    if (text.includes(kw.toLowerCase())) {
+      hits += 1;
+      score += 1 + kw.length * 0.5;
+    }
+  }
+  // 覆盖加成：命中 2 个词 +1 分，3 个词 +2 分……
+  if (hits > 1) score += hits - 1;
+  return score;
+};
+
+/**
+ * 在所有主题里选出与文本最匹配的一个（导出供单测使用）。
+ * @returns {{ topic: object, score: number } | null} 无任何命中时返回 null
+ */
+export const matchTopic = (rawText) => {
+  const text = (rawText || '').toLowerCase();
+  let best = null;
+  for (const topic of TOPIC_REPLIES) {
+    const score = scoreTopic(text, topic);
+    if (score > 0 && (!best || score > best.score)) {
+      best = { topic, score };
+    }
+  }
+  return best;
+};
+
 export const buildDemoReply = (messages = []) => {
   const lastUserMessage =
     [...messages].reverse().find((m) => m.role === 'user')?.content || '';
-  const text = lastUserMessage.toLowerCase();
+  // content 可能是 vision 数组（带图片的消息），只取其中的文本部分做关键词匹配
+  const text = contentToText(lastUserMessage);
 
-  for (const topic of TOPIC_REPLIES) {
-    if (topic.keywords.some((kw) => text.includes(kw))) {
-      const idx = Math.floor(Math.random() * topic.replies.length);
-      return topic.replies[idx];
-    }
+  const best = matchTopic(text);
+  if (best) {
+    const idx = Math.floor(Math.random() * best.topic.replies.length);
+    return best.topic.replies[idx];
   }
 
   const turn = messages.filter((m) => m.role === 'user').length;
