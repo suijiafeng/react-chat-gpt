@@ -124,6 +124,16 @@ export const createSseThinkAdapter = (callback, thinkEnabled) => {
       if (visible) chunks.push({ content: visible });
     }
 
+    // 风控/合规掐断：平台侧敏感内容拦截的标准形态是 finish_reason=content_filter，
+    // 给出优雅的降级提示，而不是让回复无声地戛然而止
+    const finishReason = parsed.choices?.[0]?.finish_reason;
+    if (finishReason === 'content_filter') {
+      chunks.push({
+        content: '本次回复因触发平台内容安全策略被中止，请调整提问后重试。',
+        meta: { isError: true },
+      });
+    }
+
     return chunks.length ? chunks : null;
   };
 

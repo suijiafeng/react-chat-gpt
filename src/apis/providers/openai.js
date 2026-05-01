@@ -46,7 +46,20 @@ export class OpenAIProvider extends BaseProvider {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API 响应错误 (${response.status}): ${errorText}`);
+      // 常见状态码翻译成用户能行动的提示，原始信息附在后面便于排查
+      const friendly =
+        response.status === 401
+          ? 'API Key 无效或已过期，请到设置里检查密钥'
+          : response.status === 403
+          ? '没有访问该模型的权限（Key 权限不足或余额受限）'
+          : response.status === 429
+          ? '请求过于频繁或配额已用尽，请稍后重试'
+          : response.status === 402
+          ? '账户余额不足，请前往平台充值'
+          : response.status >= 500
+          ? '模型服务暂时不可用，请稍后重试'
+          : 'API 响应错误';
+      throw new Error(`${friendly}（HTTP ${response.status}）：${errorText.slice(0, 300)}`);
     }
 
     // 思考流差异（reasoning_content / reasoning / 内联 <think> 标签）由共用适配器吸收
