@@ -12,6 +12,14 @@ RUN npm ci
 # Copy source files
 COPY . .
 
+# Vite 构建期环境变量（docker compose 里传入；默认为纯前端演示模式）
+ARG VITE_USE_LOCAL_DATA=true
+ARG VITE_WEBUI_BASE_URL=
+ARG VITE_APP_NAME=
+ENV VITE_USE_LOCAL_DATA=$VITE_USE_LOCAL_DATA \
+    VITE_WEBUI_BASE_URL=$VITE_WEBUI_BASE_URL \
+    VITE_APP_NAME=$VITE_APP_NAME
+
 # Build the application
 RUN npm run build
 

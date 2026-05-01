@@ -29,6 +29,17 @@
 - 支持无后端环境下的本地 Demo 演示
 - 支持后续接入 Open WebUI / Ollama 风格接口
 
+### 核心能力一览
+
+- **多服务商接入**：内置 OpenAI、DeepSeek、Anthropic (Claude)、Gemini、智谱、Kimi、通义、OpenRouter、Groq、硅基流动、xAI、本地 Ollama 等 OpenAI 兼容预设，可同时配置多家并在聊天页顶部按服务商分组一键切换
+- **图片多模态**：粘贴/选择图片发给视觉模型（vision content 格式），消息内展示图片，非视觉模型有软提醒
+- **文件上传**：txt/Markdown/代码文件直读文本，PDF 经 pdfjs 提取全文，注入上下文提问
+- **富内容渲染**：Markdown + GFM 表格 + KaTeX 公式 + 代码高亮（复制/语言标签/长代码折叠）+ Mermaid 流程图（图表/源码切换、暗色适配）
+- **思考链展示**：自动兼容 reasoning_content / reasoning / 内联 `<think>` 标签三种思考流
+- **消息级操作**：重新生成、编辑重发（分叉）、继续生成、复制、删除单条、会话导出 Markdown
+- **流式体验**：停止生成、断流看门狗、自动滚动跟随（上滚阅读时暂停、回底恢复）
+- **部署友好**：纯前端静态部署（Vercel/Netlify/nginx/Docker）或 `docker compose up -d` 一键起前后端
+
 ## 项目亮点
 
 ### 1. 聊天体验完整
@@ -143,6 +154,39 @@ npm run dev:all
 - 前端：http://localhost:5173
 - 后端：http://localhost:3000
 
+## 部署
+
+### 纯前端静态部署
+
+构建产物是纯静态文件（路由使用 HashRouter，无需服务端路由配置），任何静态托管均可：
+
+```bash
+npm run build           # 产物在 dist/
+```
+
+- **Vercel / Netlify / GitHub Pages**：直接指向构建命令 `npm run build`、输出目录 `dist` 即可
+- **Docker（nginx）**：
+
+```bash
+docker build -t react-chat-gpt .
+docker run -d -p 8080:80 react-chat-gpt
+# 打开 http://localhost:8080
+```
+
+纯前端模式下 API Key 保存在浏览器本地（简单编码），适合个人自用。
+
+### 前后端一体一键部署（docker compose）
+
+```bash
+cp .env.docker.example .env       # 修改其中的 SESSION_SECRET / ENCRYPTION_KEY
+docker compose up -d --build
+# 打开 http://localhost:8080
+```
+
+- 前端由 nginx 提供，`/api` 反向代理到 server 容器（同源，无 CORS 问题，流式已关闭代理缓冲）
+- API Key 由服务端 AES-256-GCM 加密后存 SQLite（数据卷 `server-data` 持久化）
+- 对外端口可用 `.env` 里的 `WEB_PORT` 修改
+
 ## 模型与 API 配置
 
 设置弹窗“模型与 API 配置”目前支持三种模式：
@@ -154,13 +198,14 @@ npm run dev:all
 - 会话和配置保存在浏览器 `IndexedDB` / `localStorage`
 - 适合演示 UI、交互、主题切换和多会话流程
 
-### 2. 自定义 OpenAI 接口（custom）
+### 2. 模型服务商（custom，支持多家共存）
 
-- 直接从浏览器请求兼容 OpenAI 的三方模型平台
-- 支持填写 `Base URL`、`API Key`、模型列表、默认模型、上下文预算、Think 开关
+- 直接从浏览器请求兼容 OpenAI 协议的模型平台
+- 内置 12 家常用服务商预设（OpenAI / DeepSeek / Anthropic / Gemini / 智谱 / Kimi / 通义 / OpenRouter / Groq / 硅基流动 / xAI / 本地 Ollama），也可添加任意自定义地址
+- **可同时配置多家**：每家独立保存 Base URL、API Key、模型列表与默认模型；聊天页顶部的模型选择器按服务商分组，点击即切换
 - 填好地址和密钥后，前端会尝试请求 `{baseUrl}/models` 自动拉取模型列表
 - 若平台限制浏览器跨域访问 `/models`，仍可手动填写模型名并直接保存使用
-- API Key 仅保存在浏览器本地，做了简单编码，不等同于安全加密
+- API Key 仅保存在浏览器本地，做了简单编码，不等同于安全加密；对安全有要求请用服务器托管模式
 
 ### 3. 服务器托管（backend）
 
