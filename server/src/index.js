@@ -35,6 +35,15 @@ app.use(
 );
 app.use(express.json());
 
+// 基础安全响应头（API 服务不渲染页面，给出保守默认值即可；
+// 页面侧的 CSP 由 nginx 配置负责）
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use(
   session({
     secret: sessionSecret || 'dev-only-insecure-secret',

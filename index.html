@@ -1,19 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <script>
-      // 在 React 挂载之前就把背景色定下来，避免刷新时先出现默认色，
-      // 再被 ThemeContext 的过渡动画"闪"一下切到真正的主题色。
-      (function () {
-        try {
-          var isDark = JSON.parse(localStorage.getItem('isDarkTheme') || 'false');
-          document.documentElement.style.background = isDark ? '#212121' : '#f7f7f8';
-          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-        } catch (e) {
-          // 读取失败按浅色主题处理，不影响后续 React 正常接管
-        }
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
