@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Popconfirm } from 'antd';
 import { useTheme } from '../contexts/ThemeContext';
-import { Loader, Copy, Check, RefreshCw, Pencil, StepForward, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Loader, Copy, Check, RefreshCw, Pencil, StepForward, AlertTriangle, ChevronDown, Trash2, FileText } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
+import { formatFileSize } from '../utils/attachments';
 
 // 还没收到第一个字符前展示的等待动画。
 const LoadingIndicator = ({ classes }) => (
@@ -35,9 +37,12 @@ const ChatMessage = React.memo(
     isLast = false,
     isStreaming = false,
     canContinue = false,
+    images,
+    attachments,
     onRegenerate,
     onContinue,
     onEdit,
+    onDelete,
   }) => {
     const { isDark, classes } = useTheme();
     const [copied, setCopied] = useState(false);
@@ -96,7 +101,8 @@ const ChatMessage = React.memo(
     };
 
     const containerClasses = `group flex mb-8 ${isUser ? 'justify-end' : 'justify-start'}`;
-    const contentContainerClasses = `flex flex-col max-w-[min(720px,82%)] ${
+    // 小屏给消息更宽的可读区域（90%），桌面维持 82% 的留白节奏
+    const contentContainerClasses = `flex flex-col max-w-[90%] sm:max-w-[min(720px,82%)] ${
       isUser ? 'items-end' : 'items-start'
     }`;
     const messageClasses = `
@@ -171,6 +177,38 @@ const ChatMessage = React.memo(
     return (
       <div className={containerClasses}>
         <div className={contentContainerClasses}>
+          {/* 用户消息的附件：图片缩略与文件卡片展示在气泡上方 */}
+          {isUser && images?.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-2 mb-2">
+              {images.map((img, i) => (
+                <a key={i} href={img.dataUrl} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={img.dataUrl}
+                    alt={img.name || `图片 ${i + 1}`}
+                    className="max-h-48 max-w-[240px] rounded-2xl object-cover border border-black/10 dark:border-white/10"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
+          {isUser && attachments?.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-2 mb-2">
+              {attachments.map((file, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 max-w-[240px] ${
+                    isDark ? 'border-white/10 bg-white/[0.04]' : 'border-black/10 bg-black/[0.03]'
+                  }`}
+                >
+                  <FileText size={16} className="shrink-0 opacity-60" />
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium">{file.name}</div>
+                    <div className="text-[10px] opacity-50">{formatFileSize(file.size)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className={messageClasses}>
             {isUser ? (
               <span className="message-text whitespace-pre-wrap break-words">{message}</span>
@@ -238,7 +276,7 @@ const ChatMessage = React.memo(
             )}
           </div>
           {/* 操作栏：AI 最后一条常驻，其余消息 hover 时显示；生成中不显示 */}
-          {!isTyping && !(isStreaming && isLast) && message && (
+          {!isTyping && !(isStreaming && isLast) && (message || images?.length > 0 || attachments?.length > 0) && (
             <div
               className={`flex items-center gap-0.5 mt-1 px-2 transition-opacity ${
                 !isUser && isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
@@ -263,6 +301,24 @@ const ChatMessage = React.memo(
                   <StepForward size={14} />
                   <span>继续生成</span>
                 </ActionButton>
+              )}
+              {onDelete && !isStreaming && (
+                <Popconfirm
+                  title="删除这条消息？"
+                  okText="删除"
+                  cancelText="取消"
+                  onConfirm={() => onDelete(messageId)}
+                >
+                  <button
+                    type="button"
+                    title="删除消息"
+                    className={`flex items-center gap-1 rounded-md p-1.5 text-xs transition-colors ${
+                      isDark ? 'text-white/50 hover:text-red-300 hover:bg-white/10' : 'text-black/40 hover:text-red-500 hover:bg-black/5'
+                    }`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </Popconfirm>
               )}
             </div>
           )}

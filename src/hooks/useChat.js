@@ -11,6 +11,7 @@ import {
 } from '../store/db';
 import { getConfig } from '../store/llmConfig';
 import { trimConversation } from '../utils/context';
+import { buildUserContent } from '../utils/attachments';
 
 const messagesReducer = (state, action) => {
   switch (action.type) {
@@ -62,9 +63,14 @@ const messagesReducer = (state, action) => {
   }
 };
 
-// 内存中的消息数组 → 发给模型的 role/content 会话格式
+// 内存中的消息数组 → 发给模型的 role/content 会话格式。
+// 用户消息若带图片/文件附件，组装成 OpenAI vision 兼容的 content（数组或注入文件文本）
 export const toConversation = (msgs) =>
-  msgs.map((msg) => ({ role: msg.isUser ? 'user' : 'assistant', content: msg.text }));
+  msgs.map((msg) =>
+    msg.isUser
+      ? { role: 'user', content: buildUserContent(msg.text, msg.images, msg.attachments) }
+      : { role: 'assistant', content: msg.text }
+  );
 
 export const useChat = (currentModel, sessionId, onSessionTouched) => {
   const [messages, dispatchMessages] = useReducer(messagesReducer, []);
@@ -108,12 +114,21 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     pending.controller?.abort();
     const partialText = pending.getContent();
     if (partialText) {
-      saveMessageToDB({ id: pending.messageId, text: partialText, isUser: false }, pending.sessionId)
+      // interrupted 标记：这条 AI 回复是被中断的半成品。
+      // 切回该会话/刷新页面加载历史时，据此恢复"继续生成"入口
+      saveMessageToDB(
+        { id: pending.messageId, text: partialText, isUser: false, interrupted: true },
+        pending.sessionId
+      )
         .then(() => touchSession(pending.sessionId))
         .then(() => onSessionTouchedRef.current?.())
         .catch((error) => console.error('Error saving partial message:', error));
     }
   }, []);
+
+  // 是否跟随滚动到底部：用户在生成中主动向上滚动阅读时置 false，
+  // 回到底部附近后恢复 true（由 ChatInterface 的滚动监听维护）
+  const autoFollowRef = useRef(true);
 
   // 自动滚动到最新消息
   useEffect(() => {
@@ -121,6 +136,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       skipScrollToBottomRef.current = false;
       return;
     }
+    if (!autoFollowRef.current) return;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -165,6 +181,11 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
         const history = await loadMessagesBySessionPaged(sessionId, PAGE_SIZE, 0);
         dispatchMessages({ type: 'SET_MESSAGES', payload: history });
         setHasMore(history.length === PAGE_SIZE);
+        // 最后一条是被中断的 AI 半成品回复 → 恢复"继续生成"入口
+        const last = history[history.length - 1];
+        if (last && !last.isUser && last.interrupted && last.text) {
+          setCanContinue(true);
+        }
       } catch (error) {
         console.error('Error loading initial messages:', error);
       } finally {
@@ -310,8 +331,15 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
                 streamingRef.current = null;
               }
 
+              // interrupted: false 显式覆盖——"继续生成"补完后清除中断标记
               await saveMessageToDB(
-                { id: aiMessageId, text: aiMessageContent, isUser: false, isError: hadError },
+                {
+                  id: aiMessageId,
+                  text: aiMessageContent,
+                  isUser: false,
+                  isError: hadError,
+                  interrupted: false,
+                },
                 activeSessionId
               );
               await touchSession(activeSessionId);
@@ -393,7 +421,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
   );
 
   const handleChatCompletion = useCallback(
-    async (input, conversation, directSessionId) => {
+    async (input, conversation, directSessionId, extras = {}) => {
       // directSessionId：新建会话时由外部直接传入，避免等待 React state 更新
       if (directSessionId) {
         skipNextLoadRef.current = true; // 告知 load effect 跳过本次 DB 重读
@@ -402,7 +430,14 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       const activeSessionId = directSessionId || sessionIdRef.current;
       if (!activeSessionId) return;
 
-      const userMessage = { id: uuidv4(), text: input, isUser: true };
+      // extras.images / extras.attachments：随消息持久化，展示与后续重发都用得到
+      const userMessage = {
+        id: uuidv4(),
+        text: input,
+        isUser: true,
+        ...(extras.images?.length ? { images: extras.images } : {}),
+        ...(extras.attachments?.length ? { attachments: extras.attachments } : {}),
+      };
       const aiMessage = { id: uuidv4(), text: '', isUser: false };
 
       dispatchMessages({ type: 'ADD_MESSAGE', payload: userMessage });
@@ -467,8 +502,12 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       const idsAfter = messages.slice(idx + 1).map((msg) => msg.id);
       await deleteMessagesByIds(idsAfter);
 
-      // 更新消息内容（保留原 id，时间戳刷新为当前，仍排在会话末尾）
-      await saveMessageToDB({ id: messageId, text: newText, isUser: true }, activeSessionId);
+      // 更新消息内容（保留原 id 与附件，时间戳刷新为当前，仍排在会话末尾）
+      const edited = messages[idx];
+      await saveMessageToDB(
+        { ...edited, text: newText, isUser: true },
+        activeSessionId
+      );
       dispatchMessages({ type: 'TRUNCATE_AFTER', id: messageId });
       dispatchMessages({ type: 'SET_TEXT', id: messageId, payload: newText });
 
@@ -477,7 +516,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
 
       const conversation = [
         ...toConversation(messages.slice(0, idx)),
-        { role: 'user', content: newText },
+        { role: 'user', content: buildUserContent(newText, edited.images, edited.attachments) },
       ];
       await runCompletion({
         conversation,
@@ -507,6 +546,16 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
       existingText: last.text,
     });
   }, [messages, isStreaming, runCompletion]);
+
+  // 删除单条消息（内存 + DB）。生成中不允许删除，避免与流式写入竞态
+  const deleteMessage = useCallback(
+    async (messageId) => {
+      if (isStreaming) return;
+      await deleteMessageFromDB(messageId);
+      dispatchMessages({ type: 'REMOVE_MESSAGE', id: messageId });
+    },
+    [isStreaming]
+  );
 
   const cancelChatCompletion = useCallback(() => {
     const pending = streamingRef.current;
@@ -541,5 +590,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
     regenerate,
     editAndResend,
     continueGeneration,
+    deleteMessage,
+    autoFollowRef,
   };
 };

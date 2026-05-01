@@ -32,6 +32,25 @@ function estimateTokens(text) {
   return Math.ceil(cjk + other / 4);
 }
 
+// 视觉消息里单张图片的估算 token 开销（各家计费不同，取保守值）
+const PER_IMAGE_TOKENS = 1000;
+
+/**
+ * 估算一条消息 content 的 token 数。
+ * content 可能是纯字符串，也可能是 vision 格式的数组（text + image_url 块）。
+ */
+function estimateContentTokens(content) {
+  if (typeof content === 'string') return estimateTokens(content);
+  if (Array.isArray(content)) {
+    return content.reduce((sum, part) => {
+      if (part?.type === 'text') return sum + estimateTokens(part.text);
+      if (part?.type === 'image_url') return sum + PER_IMAGE_TOKENS;
+      return sum;
+    }, 0);
+  }
+  return 0;
+}
+
 /**
  * 按 token 预算截断会话历史。
  * 策略：
@@ -57,13 +76,13 @@ export function trimConversation(messages, maxTokens = getConfig().contextTokens
   }
 
   let used = systemMessages.reduce(
-    (sum, m) => sum + estimateTokens(m.content) + PER_MESSAGE_OVERHEAD,
+    (sum, m) => sum + estimateContentTokens(m.content) + PER_MESSAGE_OVERHEAD,
     0
   );
 
   const kept = [];
   for (let i = rest.length - 1; i >= 0; i--) {
-    const cost = estimateTokens(rest[i].content) + PER_MESSAGE_OVERHEAD;
+    const cost = estimateContentTokens(rest[i].content) + PER_MESSAGE_OVERHEAD;
     // 至少保留最新一条，之后超预算即停
     if (kept.length > 0 && used + cost > maxTokens) break;
     kept.unshift(rest[i]);

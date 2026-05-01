@@ -1,6 +1,14 @@
 import { useCallback, useState, useLayoutEffect, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { message as antdMessage } from 'antd';
 import { useChat, toConversation } from '../hooks';
+import {
+  readImageFile,
+  readAttachmentFile,
+  buildUserContent,
+  isSupportedFile,
+} from '../utils/attachments';
+import { isLikelyVisionModel } from '../utils/modelCapabilities';
 import Sidebar from '../components/Sidebar';
 import ChatMessage from '../components/ChatMessage';
 import ChatHeader from '../components/ChatHeader';
@@ -44,13 +52,78 @@ const ChatInterface = () => {
     regenerate,
     editAndResend,
     continueGeneration,
+    deleteMessage,
+    autoFollowRef,
   } = useChat(currentModel, sessionId, handleSessionTouched);
 
   const { classes } = useTheme();
 
+  // 待发送附件：图片（vision 输入）与文件（文本提取注入上下文）
+  const [pendingImages, setPendingImages] = useState([]);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [isReadingFiles, setIsReadingFiles] = useState(false);
+
+  const addFiles = useCallback(async (fileList) => {
+    const MAX_IMAGES = 6;
+    const MAX_FILE_SIZE = 20 * 1024 * 1024;
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setIsReadingFiles(true);
+    try {
+      for (const file of files) {
+        // 拖拽/粘贴可绕过 <input accept>，这里统一做格式白名单拦截
+        if (!isSupportedFile(file)) {
+          antdMessage.warning(`「${file.name}」格式不支持，已跳过（支持图片、PDF 与常见文本/代码文件）`);
+          continue;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          antdMessage.warning(`「${file.name}」超过 20MB，已跳过`);
+          continue;
+        }
+        if (file.type.startsWith('image/')) {
+          const img = await readImageFile(file);
+          setPendingImages((prev) => {
+            if (prev.length >= MAX_IMAGES) {
+              antdMessage.warning(`最多附带 ${MAX_IMAGES} 张图片`);
+              return prev;
+            }
+            return [...prev, img];
+          });
+        } else {
+          const att = await readAttachmentFile(file);
+          setPendingFiles((prev) => [...prev, att]);
+        }
+      }
+    } catch (error) {
+      antdMessage.error(`附件解析失败：${error.message}`);
+    } finally {
+      setIsReadingFiles(false);
+    }
+  }, []);
+
+  const removePendingImage = useCallback(
+    (index) => setPendingImages((prev) => prev.filter((_, i) => i !== index)),
+    []
+  );
+  const removePendingFile = useCallback(
+    (index) => setPendingFiles((prev) => prev.filter((_, i) => i !== index)),
+    []
+  );
+
   const sendMessage = useCallback(
     async (text) => {
-      if (!text.trim()) return;
+      const hasAttachments = pendingImages.length > 0 || pendingFiles.length > 0;
+      if (!text.trim() && !hasAttachments) return;
+
+      // 超长输入前置拦截：十几万字的粘贴直接发出去只会浪费请求（多半被上游拒绝），
+      // 渲染超长用户气泡也可能卡住页面。提示用户改走文件上传（有截断保护）
+      const MAX_INPUT_CHARS = 60000;
+      if (text.length > MAX_INPUT_CHARS) {
+        antdMessage.warning(
+          `消息过长（${text.length.toLocaleString()} 字，上限 ${MAX_INPUT_CHARS.toLocaleString()}）。超长内容请保存为 .txt 用附件上传，或拆分后分次发送。`
+        );
+        return;
+      }
 
       // 如果是新对话，先在 DB 创建 session 再跳转
       let activeSessionId = sessionId;
@@ -64,12 +137,32 @@ const ChatInterface = () => {
         setSidebarRefreshKey((k) => k + 1);
       }
 
-      const conversation = [...toConversation(messages), { role: 'user', content: text }];
+      const conversation = [
+        ...toConversation(messages),
+        { role: 'user', content: buildUserContent(text, pendingImages, pendingFiles) },
+      ];
 
+      // 发送新消息时无条件恢复滚动跟随
+      autoFollowRef.current = true;
       // 新建会话时直接传入 activeSessionId，绕过 state 异步更新避免竞态
-      handleChatCompletion(text, conversation, isNewSession ? activeSessionId : undefined);
+      handleChatCompletion(text, conversation, isNewSession ? activeSessionId : undefined, {
+        images: pendingImages,
+        attachments: pendingFiles,
+      });
+      setPendingImages([]);
+      setPendingFiles([]);
     },
-    [messages, sessionId, currentModel, handleChatCompletion, navigate, setSidebarRefreshKey]
+    [
+      messages,
+      sessionId,
+      currentModel,
+      handleChatCompletion,
+      navigate,
+      setSidebarRefreshKey,
+      pendingImages,
+      pendingFiles,
+      autoFollowRef,
+    ]
   );
 
   const handleSubmit = useCallback(
@@ -99,6 +192,19 @@ const ChatInterface = () => {
     initialLoaded && !isLoadingMore && messages.length === 0 && !isStreaming;
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
+
+  // 屏幕阅读器播报：不给流式区域挂 aria-live（每个字符都会触发一次播报，
+  // 体验灾难），改为生成结束时在隐藏的 live region 播报一次完成事件
+  const [srAnnouncement, setSrAnnouncement] = useState('');
+  const prevStreamingRef = useRef(false);
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming) {
+      setSrAnnouncement('AI 回复已生成完毕');
+    } else if (!prevStreamingRef.current && isStreaming) {
+      setSrAnnouncement('AI 正在生成回复');
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   const toggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
@@ -171,9 +277,11 @@ const ChatInterface = () => {
     }
   }, [messages]);
 
-  // 流式生成期间，跟随外层聊天窗口滚动到底部（窗口滚动效果）
+  // 流式生成期间，跟随外层聊天窗口滚动到底部（窗口滚动效果）；
+  // 用户向上滚动阅读时暂停跟随，回到底部附近后恢复
   useEffect(() => {
     if (!isStreaming || isLoadingMore || shouldAdjustScrollRef.current) return;
+    if (!autoFollowRef.current) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -181,15 +289,61 @@ const ChatInterface = () => {
       top: container.scrollHeight,
       behavior: 'smooth',
     });
-  }, [messages, isStreaming, isLoadingMore]);
+  }, [messages, isStreaming, isLoadingMore, autoFollowRef]);
+
+  // 滚动跟随开关：
+  // - 用户滚轮向上 / 触摸拖动 → 视为主动离开底部，停止跟随；
+  // - 滚回底部附近（<48px）→ 恢复跟随。
+  // 用 wheel/touchmove 区分"用户操作"与"程序化平滑滚动"，避免自动滚动自己把跟随关掉
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const distanceToBottom = () =>
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+
+    const onWheel = (e) => {
+      if (e.deltaY < 0) autoFollowRef.current = false;
+    };
+    const onTouchMove = () => {
+      if (distanceToBottom() > 120) autoFollowRef.current = false;
+    };
+    const onScroll = () => {
+      if (distanceToBottom() < 48) autoFollowRef.current = true;
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: true });
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      container.removeEventListener('wheel', onWheel);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('scroll', onScroll);
+    };
+  }, [autoFollowRef]);
 
   if (isSidebarOpen === null) return null;
 
   return (
-    <div className={`flex h-screen ${classes.bg} ${classes.text} ${classes.themeTransition}`}>
+    <div className={`flex app-full-height ${classes.bg} ${classes.text} ${classes.themeTransition}`}>
+      {/* 移动端侧边栏遮罩：突出侧边栏本身，点击空白处收起（桌面端侧边栏为常驻布局，不需要） */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={toggleSidebar}
+          aria-hidden="true"
+        />
+      )}
       <Sidebar isOpen={isSidebarOpen} onClose={toggleSidebar} refreshKey={sidebarRefreshKey} />
+      <div aria-live="polite" role="status" className="sr-only">
+        {srAnnouncement}
+      </div>
       <div className="relative flex-1 flex flex-col overflow-hidden min-w-0">
-        <ChatHeader toggleSidebar={toggleSidebar} />
+        <ChatHeader
+          toggleSidebar={toggleSidebar}
+          sessionId={sessionId}
+          canExport={messages.length > 0}
+        />
         <div className="relative flex-1 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_28%)] pointer-events-none" />
           <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 md:px-8">
@@ -218,9 +372,12 @@ const ChatInterface = () => {
                 isTyping={!message.isUser && index === messages.length - 1 && isStreaming}
                 isLast={index === messages.length - 1}
                 canContinue={canContinue}
+                images={message.images}
+                attachments={message.attachments}
                 onRegenerate={regenerate}
                 onContinue={continueGeneration}
                 onEdit={editAndResend}
+                onDelete={deleteMessage}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -234,6 +391,13 @@ const ChatInterface = () => {
             isEmpty={showEmptyState}
             suggestions={resolveProviderName() === 'demo' ? DEMO_PROMPTS : []}
             onSuggestionClick={handlePromptClick}
+            pendingImages={pendingImages}
+            pendingFiles={pendingFiles}
+            onAddFiles={addFiles}
+            onRemoveImage={removePendingImage}
+            onRemoveFile={removePendingFile}
+            isReadingFiles={isReadingFiles}
+            visionWarning={pendingImages.length > 0 && !isLikelyVisionModel(currentModel)}
           />
         </div>
       </div>

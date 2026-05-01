@@ -1,5 +1,21 @@
 import { BaseProvider } from './base';
 import { OLLAMA_API_BASE_URL } from '../../constants';
+import { contentToText } from '../../utils/attachments';
+
+// OpenAI vision 数组 content → Ollama 原生格式：
+// content 只能是字符串，图片走独立的 images 字段（裸 base64，不带 data: 前缀）
+const toOllamaMessage = (msg) => {
+  if (typeof msg.content === 'string') return msg;
+  const images = (Array.isArray(msg.content) ? msg.content : [])
+    .filter((part) => part?.type === 'image_url')
+    .map((part) => part.image_url?.url?.replace(/^data:[^,]+,/, ''))
+    .filter(Boolean);
+  return {
+    role: msg.role,
+    content: contentToText(msg.content),
+    ...(images.length ? { images } : {}),
+  };
+};
 
 export class OllamaProvider extends BaseProvider {
   async complete(params, callback, signal) {
@@ -8,7 +24,16 @@ export class OllamaProvider extends BaseProvider {
     const response = await fetch(`${OLLAMA_API_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id, id, messages, model, options, session_id, stream, think: Boolean(think) }),
+      body: JSON.stringify({
+        chat_id,
+        id,
+        messages: messages.map(toOllamaMessage),
+        model,
+        options,
+        session_id,
+        stream,
+        think: Boolean(think),
+      }),
       signal,
     });
 
