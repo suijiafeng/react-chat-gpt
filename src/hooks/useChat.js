@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
+import { message as antdMessage } from 'antd';
 import { v4 as uuidv4 } from 'uuid';
 import { generateChatCompletion, generateTitle } from '../apis/chat';
 import {
@@ -12,6 +13,23 @@ import {
 import { getConfig } from '../store/llmConfig';
 import { trimConversation } from '../utils/context';
 import { buildUserContent } from '../utils/attachments';
+
+// 消息落库的兜底封装：写入失败（最常见是 base64 图片撑爆存储配额）时
+// 提示用户但不抛出——本地持久化失败不应该中断正在进行的对话流
+const persistMessage = async (msg, sessionId) => {
+  try {
+    await saveMessageToDB(msg, sessionId);
+    return true;
+  } catch (error) {
+    console.error('消息保存到本地失败：', error);
+    antdMessage.warning(
+      error?.name === 'QuotaExceededError'
+        ? '浏览器存储空间不足，本条消息不会保存到历史（可删除旧会话释放空间）'
+        : '消息保存到本地失败，刷新后可能丢失本条记录'
+    );
+    return false;
+  }
+};
 
 const messagesReducer = (state, action) => {
   switch (action.type) {
@@ -332,7 +350,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
               }
 
               // interrupted: false 显式覆盖——"继续生成"补完后清除中断标记
-              await saveMessageToDB(
+              await persistMessage(
                 {
                   id: aiMessageId,
                   text: aiMessageContent,
@@ -342,7 +360,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
                 },
                 activeSessionId
               );
-              await touchSession(activeSessionId);
+              await touchSession(activeSessionId).catch(() => {});
 
               // 首条对话结束后，自动生成标题
               if (titlePrompt) {
@@ -442,7 +460,7 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
 
       dispatchMessages({ type: 'ADD_MESSAGE', payload: userMessage });
       dispatchMessages({ type: 'ADD_MESSAGE', payload: aiMessage });
-      await saveMessageToDB(userMessage, activeSessionId);
+      await persistMessage(userMessage, activeSessionId);
 
       setInput('');
 

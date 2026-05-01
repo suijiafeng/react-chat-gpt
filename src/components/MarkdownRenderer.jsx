@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import ErrorBoundary from './ErrorBoundary';
 
 // 重量级渲染器（react-markdown + highlight.js + KaTeX）拆分为独立异步 chunk。
 // 本模块一加载就主动预取该 chunk，通常在第一条 AI 消息出现前就已就绪。
@@ -19,9 +20,16 @@ const MarkdownRenderer = ({ content, isTyping = false }) => {
   if (!content) return null;
 
   return (
-    <Suspense fallback={<PlainText content={content} isTyping={isTyping} />}>
-      <MarkdownContent content={content} isTyping={isTyping} />
-    </Suspense>
+    // 消息级错误边界：单条消息的 Markdown/公式/图表渲染崩溃时降级为纯文本，
+    // 不拖垮整个会话页；resetKey=content 让流式下一个 chunk 到达时自动重试
+    <ErrorBoundary
+      resetKey={content}
+      fallback={<PlainText content={content} isTyping={isTyping} />}
+    >
+      <Suspense fallback={<PlainText content={content} isTyping={isTyping} />}>
+        <MarkdownContent content={content} isTyping={isTyping} />
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 
