@@ -65,7 +65,12 @@ export default function rehypeHighlightLite() {
       const lang = classes.find((c) => c.startsWith('language-'))?.slice('language-'.length);
       if (!lang || !lowlight.registered(lang)) return;
 
-      const result = lowlight.highlight(lang, toText(parent));
+      const codeText = toText(parent);
+      // 超大代码块跳过高亮：lowlight 解析是同步的，几十万字符的代码
+      // 会长时间阻塞主线程；超阈值降级为纯文本展示，滚动/交互保持流畅
+      if (codeText.length > 50000) return;
+
+      const result = lowlight.highlight(lang, codeText);
       node.children = result.children;
       node.properties.className = [...classes, 'hljs'];
     });

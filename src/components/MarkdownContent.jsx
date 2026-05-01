@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlightLite from './markdown/rehypeHighlightLite';
+import MermaidBlock from './markdown/MermaidBlock';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github-dark.css';
 
@@ -27,9 +28,17 @@ const remarkMarkLastParagraph = () => (tree) => {
   }
 };
 
-// 带复制按钮的代码块组件
+// 长代码块默认折叠的行数阈值
+const CODE_COLLAPSE_LINES = 30;
+
+// 带复制按钮的代码块组件；超长代码默认折叠，可展开
 const CodeBlock = React.memo(({ lang, codeText, children }) => {
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const lineCount = codeText.split('\n').length;
+  const collapsible = lineCount > CODE_COLLAPSE_LINES;
+  const collapsed = collapsible && !expanded;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(codeText);
@@ -48,9 +57,19 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
           {copied ? 'Copied!' : 'Copy code'}
         </button>
       </div>
-      <div className="overflow-x-auto p-4 leading-6">
+      <div
+        className={`overflow-x-auto p-4 leading-6 ${collapsed ? 'max-h-[26rem] overflow-y-hidden' : ''}`}
+      >
         <pre className="!bg-transparent !p-0 !m-0">{children}</pre>
       </div>
+      {collapsible && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full px-4 py-1.5 bg-[#2d2d2d] text-xs text-gray-400 hover:text-white transition-colors text-center select-none"
+        >
+          {collapsed ? `展开全部 ${lineCount} 行 ▾` : '收起 ▴'}
+        </button>
+      )}
     </div>
   );
 });
@@ -66,18 +85,25 @@ function extractText(node) {
   return '';
 }
 
-const components = {
-  // 块级代码：<pre><code class="language-xx hljs">...</code></pre>
-  pre({ children }) {
+// pre 处理器需要感知 isTyping（mermaid 流式中先展示源码），
+// 但 components 对象的引用必须稳定——否则每次流式刷新都会导致代码块子树重挂载。
+// 因此用工厂函数生成 typing / static 两套稳定的组件映射。
+const buildPre = (isTyping) =>
+  function Pre({ children }) {
     const codeEl = Array.isArray(children) ? children[0] : children;
     const className = codeEl?.props?.className || '';
     const lang = /language-(\w+)/.exec(className)?.[1] || '';
+    if (lang === 'mermaid') {
+      return <MermaidBlock code={extractText(codeEl)} isTyping={isTyping} />;
+    }
     return (
       <CodeBlock lang={lang} codeText={extractText(codeEl)}>
         {children}
       </CodeBlock>
     );
-  },
+  };
+
+const components = {
   // 行内代码（块级代码由上面的 `pre` 处理，保留 hljs 高亮类名）
   code({ className, children, ...props }) {
     if (className?.includes('language-') || className?.includes('hljs')) {
@@ -166,6 +192,10 @@ const components = {
   ),
 };
 
+// typing / static 两套组件映射，模块级只创建一次，保证引用稳定
+const componentsTyping = { ...components, pre: buildPre(true) };
+const componentsStatic = { ...components, pre: buildPre(false) };
+
 // 空内容守卫在 MarkdownRenderer 里，这里只负责渲染
 const MarkdownContent = ({ content, isTyping }) => {
   const remarkPlugins = isTyping
@@ -179,7 +209,7 @@ const MarkdownContent = ({ content, isTyping }) => {
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={[rehypeKatex, rehypeHighlightLite]}
-        components={components}
+        components={isTyping ? componentsTyping : componentsStatic}
       >
         {content}
       </ReactMarkdown>
