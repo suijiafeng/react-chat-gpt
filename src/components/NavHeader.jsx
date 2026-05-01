@@ -24,6 +24,7 @@ const NavHeader = () => {
         </button>
         <button
           onClick={toggleTheme}
+          aria-label={isDark ? '切换到浅色主题' : '切换到深色主题'}
           className={`${isDark
             ? 'text-yellow-300 hover:bg-white/5 hover:text-yellow-100'
             : 'text-gray-500 hover:bg-black/5 hover:text-gray-700'

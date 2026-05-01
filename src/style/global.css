@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 整屏高度：移动端软键盘弹出时动态视口（dvh）会收缩，
+   输入框随之上移不被键盘遮挡；不支持 dvh 的浏览器回退 100vh */
+.app-full-height {
+  height: 100vh;
+  height: 100dvh;
+}
+
 html,
 body,
 #root {
