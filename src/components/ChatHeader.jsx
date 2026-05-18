@@ -1,20 +1,13 @@
-import { Menu, Download } from 'lucide-react';
-import { message as antdMessage } from 'antd';
+import { Menu, Settings } from 'lucide-react';
+import { useState } from 'react';
 import ModelSelector from '../components/ModelSelector';
 import NavHeader from './NavHeader';
+import SettingsModal from './SettingsModal';
 import { useTheme } from '../contexts/ThemeContext';
 
-const ChatHeader = ({ toggleSidebar, sessionId, canExport = false }) => {
+const ChatHeader = ({ toggleSidebar }) => {
   const { classes } = useTheme();
-
-  const handleExport = async () => {
-    try {
-      const { exportSessionAsMarkdown } = await import('../utils/exportMarkdown');
-      await exportSessionAsMarkdown(sessionId);
-    } catch (error) {
-      antdMessage.error(`导出失败：${error.message}`);
-    }
-  };
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
     <div
@@ -30,19 +23,18 @@ const ChatHeader = ({ toggleSidebar, sessionId, canExport = false }) => {
         </button>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
-        {canExport && sessionId && (
-          <button
-            onClick={handleExport}
-            title="导出当前会话为 Markdown"
-            aria-label="导出当前会话为 Markdown"
-            className={`${classes.buttonText} ${classes.buttonHover} rounded-lg p-2`}
-          >
-            <Download size={18} />
-          </button>
-        )}
         <ModelSelector />
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          title="模型与 API 配置"
+          aria-label="模型与 API 配置"
+          className={`${classes.buttonText} ${classes.buttonHover} rounded-lg p-2`}
+        >
+          <Settings size={18} />
+        </button>
         <NavHeader />
       </div>
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 };

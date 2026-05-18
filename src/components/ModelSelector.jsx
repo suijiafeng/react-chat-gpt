@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { ChevronDown, Check, Search } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   useLlmConfig,
@@ -9,6 +9,15 @@ import {
   resolveCurrentModel,
   DEMO_MODELS,
 } from '../store/llmConfig';
+
+// 服务商分组前的小圆点颜色：按服务商名字哈希出一个固定色相，
+// 同一服务商每次打开颜色都一致，纯视觉区分，不需要额外配置或存储
+const hueOf = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return Math.abs(hash) % 360;
+};
+const dotColor = (str) => `hsl(${hueOf(str)}, 62%, 58%)`;
 
 const ModelSelector = React.memo(() => {
   const { isDark, classes } = useTheme();
@@ -51,7 +60,7 @@ const ModelSelector = React.memo(() => {
         onClick={toggleOpen}
         aria-label={`当前模型 ${currentModel}，点击切换`}
         aria-expanded={isOpen}
-        className={`flex items-center justify-between min-w-[120px] sm:min-w-[160px] px-2.5 sm:px-4 py-2 text-sm ${
+        className={`flex items-center justify-between min-w-[128px] sm:min-w-[168px] px-3 sm:px-3.5 py-2 text-sm leading-5 ${
           isDark ? 'bg-[#2a2a2a] text-white border-white/10 hover:bg-zinc-800' : 'bg-white text-black border-gray-300 hover:bg-gray-50'
         } border rounded-xl ${classes.themeTransition}`}
       >
@@ -64,20 +73,18 @@ const ModelSelector = React.memo(() => {
 
       {isOpen && (
         <div
-          className={`absolute right-0 mt-2 w-[224px] max-h-[420px] overflow-y-auto z-50 transition-colors duration-300 ${
+          className={`absolute mt-2 w-[260px] max-h-[440px] flex flex-col z-50 transition-colors duration-300 ${
             isDark ? 'bg-[#1e1e1e] text-white border-zinc-800' : 'bg-white text-black border-gray-200'
-          } border rounded-2xl shadow-xl ${classes.themeTransition}`}
+          } border rounded-2xl shadow-xl overflow-hidden ${classes.themeTransition}`}
         >
-          <div className="py-1">
-            <ModelList
-              providerName={providerName}
-              config={config}
-              currentModel={currentModel}
-              onSelect={handleModelSelect}
-              onProfileSelect={handleProfileModelSelect}
-              isDark={isDark}
-            />
-          </div>
+          <ModelList
+            providerName={providerName}
+            config={config}
+            currentModel={currentModel}
+            onSelect={handleModelSelect}
+            onProfileSelect={handleProfileModelSelect}
+            isDark={isDark}
+          />
         </div>
       )}
     </div>
@@ -87,13 +94,43 @@ const ModelSelector = React.memo(() => {
 const ModelItem = ({ model, isActive, onClick, isDark }) => (
   <button
     onClick={onClick}
-    className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-sm ${
-      isDark ? 'hover:bg-zinc-800' : 'hover:bg-gray-50'
-    } ${isActive ? 'font-semibold text-blue-500' : ''}`}
+    className={`flex min-h-[36px] w-full items-center justify-between text-left px-3 py-2 mb-0.5 last:mb-0 text-sm leading-5 rounded-lg transition-colors duration-150 ${
+      isActive
+        ? isDark
+          ? 'bg-blue-500/15 text-blue-300 font-medium'
+          : 'bg-blue-50 text-blue-600 font-medium'
+        : isDark
+        ? 'text-zinc-200 hover:bg-white/5'
+        : 'text-gray-700 hover:bg-black/[0.035]'
+    }`}
   >
     <span className="truncate">{model}</span>
     {isActive && <Check size={14} className="shrink-0 ml-2" />}
   </button>
+);
+
+// 分组标题：服务商名 + 哈希色小圆点，组间用细分割线区隔，层次更清晰。
+// 每组是独立的 wrapper div，GroupLabel 在自己容器里恒为第一个子元素，
+// 不能靠 Tailwind 的 first: 伪类判断"是不是列表里第一组"，要靠显式 first 参数
+const GroupLabel = ({ name, isDark, first }) => (
+  <div
+    className={`px-1 pb-1.5 flex items-center gap-1.5 ${
+      first ? 'pt-0' : `pt-2.5 mt-1.5 border-t ${isDark ? 'border-white/[0.06]' : 'border-black/[0.05]'}`
+    }`}
+  >
+    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: dotColor(name) }} />
+    <span className={`text-[11px] font-semibold uppercase tracking-wider select-none truncate ${
+      isDark ? 'text-zinc-500' : 'text-gray-400'
+    }`}>
+      {name}
+    </span>
+  </div>
+);
+
+const EmptyHint = ({ isDark, children }) => (
+  <div className={`px-3 py-4 text-sm text-center ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+    {children}
+  </div>
 );
 
 // 下拉里的模型列表：
@@ -103,6 +140,7 @@ const ModelItem = ({ model, isActive, onClick, isDark }) => (
 // ollama（后端部署模式）→ 从后端接口拉取，失败时回退到用户配置的列表
 const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSelect, isDark }) => {
   const [remoteModels, setRemoteModels] = useState(null);
+  const [query, setQuery] = useState('');
 
   // ollama / backend（服务器托管）模式的模型列表来自后端，需异步拉取
   useEffect(() => {
@@ -121,69 +159,116 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
     };
   }, [providerName]);
 
-  // custom：按服务商分组展示。每组只列"启用的模型"（设置里勾选的子集，
-  // 未勾选 = 全部展示），避免聚合平台上百个模型撑爆下拉
-  if (providerName === 'custom') {
-    const groups = config.profiles
-      .map((p) => ({
-        ...p,
-        displayModels: p.enabledModels?.length ? p.enabledModels : p.models,
-      }))
+  // custom：按服务商分组展示。每组只列"启用的模型"（设置里勾选的子集）；
+  // 全部取消勾选的服务商整组隐藏，保持切换列表干净
+  const customGroups = useMemo(() => {
+    if (providerName !== 'custom') return null;
+    return config.profiles
+      .map((p) => ({ ...p, displayModels: p.enabledModels || [] }))
       .filter((p) => p.displayModels.length > 0);
-    if (groups.length === 0) {
-      return (
-        <div className={`px-4 py-3 text-sm ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
-          尚未配置模型，请先在设置里添加服务商
-        </div>
-      );
+  }, [providerName, config.profiles]);
+
+  const flatModels = useMemo(() => {
+    if (providerName === 'custom') return null;
+    if (providerName === 'demo') return DEMO_MODELS;
+    if (providerName === 'backend') {
+      // 优先后端返回的完整列表；拉取失败/未就绪时回退到账号已配置的那一个
+      return remoteModels || (config.model ? [config.model] : []);
     }
-    return groups.map((profile) => (
-      <div key={profile.id}>
+    return remoteModels || config.models;
+  }, [providerName, remoteModels, config.model, config.models]);
+
+  // 搜索框：条目总数较多时才展示，避免给简单场景（演示模式单模型等）徒增视觉噪音
+  const totalCount = customGroups
+    ? customGroups.reduce((sum, g) => sum + g.displayModels.length, 0)
+    : flatModels?.length || 0;
+  const showSearch = totalCount > 8;
+
+  const q = query.trim().toLowerCase();
+  const filteredGroups = customGroups
+    ?.map((g) => ({
+      ...g,
+      displayModels: q
+        ? g.displayModels.filter(
+            (m) => m.toLowerCase().includes(q) || g.name.toLowerCase().includes(q)
+          )
+        : g.displayModels,
+    }))
+    .filter((g) => g.displayModels.length > 0);
+  const filteredFlat = q
+    ? flatModels?.filter((m) => m.toLowerCase().includes(q))
+    : flatModels;
+
+  const body = (() => {
+    if (providerName === 'custom') {
+      if (!customGroups || customGroups.length === 0) {
+        return <EmptyHint isDark={isDark}>尚未配置模型，请先在设置里添加服务商</EmptyHint>;
+      }
+      if (!filteredGroups || filteredGroups.length === 0) {
+        return <EmptyHint isDark={isDark}>没有匹配的模型</EmptyHint>;
+      }
+      return filteredGroups.map((profile, idx) => (
+        <div key={profile.id}>
+          <GroupLabel name={profile.name} isDark={isDark} first={idx === 0} />
+          {profile.displayModels.map((model) => (
+            <ModelItem
+              key={`${profile.id}:${model}`}
+              model={model}
+              isActive={profile.id === config.activeProfileId && currentModel === model}
+              onClick={() => onProfileSelect(profile.id, model)}
+              isDark={isDark}
+            />
+          ))}
+        </div>
+      ));
+    }
+
+    if (!flatModels || flatModels.length === 0) {
+      return <EmptyHint isDark={isDark}>尚未配置模型，请先完成下方配置</EmptyHint>;
+    }
+    if (!filteredFlat || filteredFlat.length === 0) {
+      return <EmptyHint isDark={isDark}>没有匹配的模型</EmptyHint>;
+    }
+    return filteredFlat.map((model) => (
+      <ModelItem
+        key={model}
+        model={model}
+        isActive={currentModel === model}
+        onClick={() => onSelect(model)}
+        isDark={isDark}
+      />
+    ));
+  })();
+
+  return (
+    <>
+      {showSearch && (
         <div
-          className={`px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider select-none ${
-            isDark ? 'text-zinc-500' : 'text-gray-400'
+          className={`sticky top-0 z-10 px-2.5 py-2 border-b ${
+            isDark ? 'bg-[#1e1e1e] border-white/[0.06]' : 'bg-white border-black/[0.05]'
           }`}
         >
-          {profile.name}
+          <div
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${
+              isDark ? 'bg-white/5' : 'bg-black/[0.035]'
+            }`}
+          >
+            <Search size={13} className={isDark ? 'text-zinc-500' : 'text-gray-400'} />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索模型"
+              className={`w-full bg-transparent text-sm outline-none ${
+                isDark ? 'text-white placeholder:text-zinc-600' : 'text-black placeholder:text-gray-400'
+              }`}
+            />
+          </div>
         </div>
-        {profile.displayModels.map((model) => (
-          <ModelItem
-            key={`${profile.id}:${model}`}
-            model={model}
-            isActive={profile.id === config.activeProfileId && currentModel === model}
-            onClick={() => onProfileSelect(profile.id, model)}
-            isDark={isDark}
-          />
-        ))}
-      </div>
-    ));
-  }
-
-  const models =
-    providerName === 'demo'
-      ? DEMO_MODELS
-      : providerName === 'backend'
-      ? // 优先后端返回的完整列表；拉取失败/未就绪时回退到账号已配置的那一个
-        remoteModels || (config.model ? [config.model] : [])
-      : remoteModels || config.models;
-
-  if (models.length === 0) {
-    return (
-      <div className={`px-4 py-3 text-sm ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
-        尚未配置模型，请先完成下方配置
-      </div>
-    );
-  }
-
-  return models.map((model) => (
-    <ModelItem
-      key={model}
-      model={model}
-      isActive={currentModel === model}
-      onClick={() => onSelect(model)}
-      isDark={isDark}
-    />
-  ));
+      )}
+      <div className="px-1.5 py-1.5 overflow-y-auto">{body}</div>
+    </>
+  );
 };
 
 ModelSelector.displayName = 'ModelSelector';

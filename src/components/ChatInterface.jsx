@@ -18,6 +18,8 @@ import { createSession } from '../store/db';
 import { useLlmConfig, resolveCurrentModel, resolveProviderName } from '../store/llmConfig';
 import { DEMO_PROMPTS } from '../constants/demoReplies';
 
+const SIDEBAR_COLLAPSED_KEY = 'sidebar_collapsed';
+
 const ChatInterface = () => {
   const { chatId } = useParams(); // /c/:chatId 时有值，/new 时无值
   const navigate = useNavigate();
@@ -206,13 +208,32 @@ const ChatInterface = () => {
     prevStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
+  // 桌面端的收起/展开是用户的持久偏好，存 localStorage；
+  // 移动端始终是临时抽屉（关闭态默认），不与桌面偏好混用
   const toggleSidebar = useCallback(() => {
-    setIsSidebarOpen((prev) => !prev);
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      if (window.innerWidth >= 1024) {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(!next));
+      }
+      return next;
+    });
   }, []);
 
   useLayoutEffect(() => {
-    const handleResize = () => setIsSidebarOpen(window.innerWidth >= 1024);
-    handleResize();
+    // 按当前宽度决定初始/resize 后的展开态：桌面端读取用户上次的收起偏好，
+    // 移动端一律收起为抽屉。之前这里无条件按宽度回填 true，导致用户在桌面端
+    // 手动收起侧边栏后，只要触发一次 resize（比如拖动窗口边缘）就会被强制重新展开
+    const applyForWidth = (width) => {
+      if (width >= 1024) {
+        const collapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
+        setIsSidebarOpen(!collapsed);
+      } else {
+        setIsSidebarOpen(false);
+      }
+    };
+    applyForWidth(window.innerWidth);
+    const handleResize = () => applyForWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -339,11 +360,7 @@ const ChatInterface = () => {
         {srAnnouncement}
       </div>
       <div className="relative flex-1 flex flex-col overflow-hidden min-w-0">
-        <ChatHeader
-          toggleSidebar={toggleSidebar}
-          sessionId={sessionId}
-          canExport={messages.length > 0}
-        />
+        <ChatHeader toggleSidebar={toggleSidebar} />
         <div className="relative flex-1 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_28%)] pointer-events-none" />
           <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 md:px-8">

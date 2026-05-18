@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message, Popconfirm } from 'antd';
-import { Zap, CheckCircle2, XCircle, Loader2, ServerCog, Trash2, Plus, ExternalLink } from 'lucide-react';
+import { Zap, CheckCircle2, XCircle, Loader2, ServerCog, Server, Bot, Sparkles, Trash2, Plus, ExternalLink, GripVertical } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { getConfig, saveConfig, saveProfiles } from '../store/llmConfig';
@@ -44,6 +44,19 @@ const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes
 let customSeq = 0;
 const newCustomId = () => `custom-${Date.now()}-${customSeq++}`;
 
+// 服务商卡片的显示顺序是纯 UI 偏好，独立于 profiles 数据本身持久化，
+// 拖拽调整后立即写入，不需要走"保存"按钮
+const CHIP_ORDER_KEY = 'llm_provider_chip_order';
+const loadChipOrder = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CHIP_ORDER_KEY) || '[]');
+    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+const saveChipOrder = (order) => localStorage.setItem(CHIP_ORDER_KEY, JSON.stringify(order));
+
 const SettingsModal = ({ isOpen, onClose }) => {
   const { isDark, classes } = useTheme();
   const { t } = useLanguage();
@@ -58,10 +71,15 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [testState, setTestState] = useState('idle');
   const [testMessage, setTestMessage] = useState('');
   const [modelsAutoLoading, setModelsAutoLoading] = useState(false);
-  // 用户手动改过模型列表的 profile 集合——改过就不再用自动拉取的结果覆盖，尊重手工维护
-  const modelsEditedRef = useRef(new Set());
+  // 本次会话中用户主动清空过启用勾选的 profile——自动拉取不再替它默认补选
+  const clearedEnabledRef = useRef(new Set());
   // 记录每个 profile 上一次自动拉取用的「地址|密钥」签名，避免同样的值重复请求
   const lastFetchSigRef = useRef(new Map());
+
+  // 服务商卡片的拖拽显示顺序：id 列表，内置预设 + 自定义 profile 混排
+  const [chipOrder, setChipOrder] = useState(loadChipOrder);
+  const [dragOverId, setDragOverId] = useState(null);
+  const dragIdRef = useRef(null);
 
   // "服务器托管"模式专用状态：配置存在后端账号下，不进 localStorage
   const [backendApiUrl, setBackendApiUrl] = useState('');
@@ -110,10 +128,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
     setTestState('idle');
     setTestMessage('');
     setBackendLoadError('');
-    // 已保存过的 profile 视为"用户维护过"，不让自动拉取覆盖其模型列表
-    modelsEditedRef.current = new Set(
-      config.profiles.filter((p) => p.models.length > 1).map((p) => p.id)
-    );
     lastFetchSigRef.current = new Map();
     backendModelEditedRef.current = false;
     lastBackendFetchRef.current = '';
@@ -143,6 +157,33 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
+  // 服务商卡片显示顺序：内置预设 + 当前已配置的自定义 profile 的并集，
+  // 沿用上次拖拽保存的顺序，新出现的 id（新增自定义 profile）追加到末尾
+  useEffect(() => {
+    const allIds = [
+      ...PROVIDER_PRESETS.map((p) => p.id),
+      ...profiles
+        .filter((p) => !PROVIDER_PRESETS.some((preset) => preset.id === p.id))
+        .map((p) => p.id),
+    ];
+    setChipOrder((prev) => {
+      const known = prev.filter((id) => allIds.includes(id));
+      const missing = allIds.filter((id) => !known.includes(id));
+      return [...known, ...missing];
+    });
+  }, [profiles]);
+
+  const reorderChips = (fromId, toId) => {
+    if (!fromId || fromId === toId) return;
+    setChipOrder((prev) => {
+      const next = prev.filter((id) => id !== fromId);
+      const idx = next.indexOf(toId);
+      next.splice(idx === -1 ? next.length : idx, 0, fromId);
+      saveChipOrder(next);
+      return next;
+    });
+  };
+
   // 更新当前选中 profile 的字段
   const updateSelected = (patch) => {
     setProfiles((prev) => prev.map((p) => (p.id === selectedId ? { ...p, ...patch } : p)));
@@ -160,6 +201,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
         apiUrl: preset.apiUrl,
         apiKey: '',
         models: [...preset.fallbackModels],
+        // 默认勾选第一个（预设把最新/主打模型排在最前）
+        enabledModels: preset.fallbackModels.slice(0, 1),
         model: preset.fallbackModels[0],
       };
       setProfiles((prev) => [...prev, profile]);
@@ -169,8 +212,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
     setTestMessage('');
   };
 
-  // 新建一个空白的自定义服务商
+  // 新建一个空白的自定义服务商（最多 10 个自定义服务商）
   const addCustomProfile = () => {
+    const customCount = profiles.filter((p) => !PROVIDER_PRESETS.some((preset) => preset.id === p.id)).length;
+    if (customCount >= 10) {
+      message.warning('最多支持 10 个自定义服务商');
+      return;
+    }
     const id = newCustomId();
     setProfiles((prev) => [
       ...prev,
@@ -191,19 +239,21 @@ const SettingsModal = ({ isOpen, onClose }) => {
     setTestMessage('');
   };
 
-  // 把拉取到的模型 id 列表写入选中 profile（最多 200 个）。
-  // 已勾选的启用模型裁剪到仍然存在的 id；全部失效则回到"未勾选=全部启用"
-  const applyFetchedModels = (ids) => {
+  // 把拉取到的模型 id 列表写入选中 profile（最多 200 个，作为勾选候选项）。
+  // 用户手输的自定义模型名不在拉取结果里也保留；fillDefault=true（手动测试连接导入）
+  // 且勾选为空时默认补选第一个——自动防抖拉取不补，尊重用户显式清空
+  const applyFetchedModels = (ids, fillDefault = false) => {
     const list = ids.slice(0, 200);
     setProfiles((prev) =>
       prev.map((p) => {
         if (p.id !== selectedId) return p;
-        const enabled = (p.enabledModels || []).filter((m) => list.includes(m));
+        let enabled = p.enabledModels || [];
+        if (!enabled.length && fillDefault) enabled = list.slice(0, 1);
         return {
           ...p,
-          models: list,
+          models: [...new Set([...list, ...enabled])],
           enabledModels: enabled,
-          model: list.includes(p.model) ? p.model : list[0],
+          model: enabled.includes(p.model) ? p.model : enabled[0] || list[0],
         };
       })
     );
@@ -219,8 +269,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
       setTestState('ok');
       if (ids.length > 0) {
         setTestMessage(`连接成功，检测到 ${ids.length} 个可用模型`);
-        applyFetchedModels(ids);
-        modelsEditedRef.current.delete(selected.id); // 拉取结果，仍允许后续自动刷新
+        applyFetchedModels(ids, true);
         lastFetchSigRef.current.set(selected.id, selected.apiUrl.trim() + '|' + selected.apiKey.trim());
       } else {
         setTestMessage('连接成功');
@@ -232,12 +281,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // 自动拉取模型：填好地址（+密钥）后防抖自动请求 /models 生成模型列表，
-  // 让预设不会因为模型下线而过时。用户手动改过列表则不覆盖；失败静默（保留兜底预设）。
+  // 自动拉取模型：填好地址（+密钥）后防抖自动请求 /models 生成勾选候选，
+  // 让预设不会因为模型下线而过时；手输项通过并集保留，失败静默。
   useEffect(() => {
     if (provider !== 'custom' || !selected) return;
     const base = selected.apiUrl?.trim();
-    if (!base || modelsEditedRef.current.has(selected.id)) return;
+    if (!base) return;
     const sig = base + '|' + (selected.apiKey || '').trim();
     if (sig === lastFetchSigRef.current.get(selected.id)) return;
 
@@ -246,8 +295,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
       try {
         const ids = await fetchOpenAiModelIds(selected.apiUrl, effectiveKey(selected));
         lastFetchSigRef.current.set(selected.id, sig);
-        if (ids.length && !modelsEditedRef.current.has(selected.id)) {
-          applyFetchedModels(ids);
+        if (ids.length) {
+          // 用户没主动清空过勾选时，空勾选默认补选第一个（最新）
+          applyFetchedModels(ids, !clearedEnabledRef.current.has(selected.id));
           setTestState('ok');
           setTestMessage(`已自动获取 ${ids.length} 个模型`);
         }
@@ -396,8 +446,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const dropdownPopupClass = isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown';
   const labelCls = `block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`;
   const helpTextCls = `text-xs leading-relaxed ${isDark ? 'text-zinc-500' : 'text-slate-500'}`;
-  const fieldGroupCls = `rounded-2xl border p-4 ${classes.themeTransition} ${
-    isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'
+  // 扁平分区风格：不再用"卡片套卡片"的重边框方块，改成同一层级内用细分割线
+  // 区隔各区块，减少不必要的留白与视觉重量，弹窗内容更紧凑
+  const sectionCls = `pt-4 mt-4 border-t first:pt-0 first:mt-0 first:border-t-0 ${
+    isDark ? 'border-white/10' : 'border-slate-200'
   }`;
   const inputCls = `rounded-xl px-4 py-2.5 text-sm ${classes.themeTransition} ${
     isDark
@@ -408,6 +460,37 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const errorTextCls = isDark ? 'text-rose-300' : 'text-red-400';
 
   const selectedPreset = selected ? PROVIDER_PRESETS.find((p) => p.id === selected.id) : null;
+
+  // 服务商卡片：内置预设 + 自定义 profile 按 chipOrder 混排成一份统一列表
+  const chipItems = chipOrder
+    .map((id) => {
+      const preset = PROVIDER_PRESETS.find((p) => p.id === id);
+      if (preset) return { id, isPreset: true, name: preset.name, preset, configured: profiles.find((p) => p.id === id) };
+      const custom = profiles.find((p) => p.id === id);
+      return custom ? { id, isPreset: false, name: custom.name, configured: custom } : null;
+    })
+    .filter(Boolean);
+
+  // 通用参数（纵向排列）：custom 模式并入模型卡，demo/backend 模式单独成卡
+  const generalParams = (
+    <div className="space-y-3 pt-1">
+      <div className="space-y-1">
+        <p className={helpTextCls}>上下文预算 (Token)</p>
+        <InputNumber
+          value={contextTokens}
+          onChange={(v) => setContextTokens(v)}
+          min={1000}
+          max={200000}
+          step={1000}
+          className={`w-full ${isDark ? 'bg-[#121212] border-white/10' : ''}`}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className={helpTextCls}>Think 模式（展示思考过程）</p>
+        <Switch checked={think} onChange={setThink} />
+      </div>
+    </div>
+  );
 
   return (
     <Modal
@@ -459,9 +542,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
         },
       }}
     >
-      <div className="py-5 space-y-4">
+      <div className="py-5">
         {/* 服务提供商选择 */}
-        <div className={`${fieldGroupCls} space-y-3`}>
+        <div className={`${sectionCls} space-y-3`}>
           <label className={labelCls}>{t('apiProvider') || '接口服务提供商'}</label>
           <Radio.Group
             value={provider}
@@ -469,12 +552,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
             className="flex flex-col sm:flex-row gap-3 w-full"
           >
             {[
-              { value: 'demo', label: `🚀 ${t('demoMockMode') || '前端演示模式'}` },
-              { value: 'custom', label: `🤖 ${t('customOpenAi') || '模型服务商'}` },
+              { value: 'demo', icon: Sparkles, label: t('demoMockMode') || '前端演示模式' },
+              { value: 'custom', icon: Bot, label: t('customOpenAi') || '模型服务商' },
               // 服务器托管模式依赖真实登录后端（USE_LOCAL_DATA=false 部署），
               // 演示/本地部署下没有意义，不展示这个选项，避免用户点了却因为没登录而困惑
               ...(!USE_LOCAL_DATA
-                ? [{ value: 'backend', label: `🖥️ ${t('backendHosted') || '服务器托管'}` }]
+                ? [{ value: 'backend', icon: Server, label: t('backendHosted') || '服务器托管' }]
                 : []),
             ].map((opt) => (
               <Radio.Button
@@ -486,7 +569,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     : 'bg-white text-slate-700 border-slate-200 hover:text-slate-950 hover:border-slate-300'
                 }`}
               >
-                {opt.label}
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <opt.icon size={14} className="shrink-0" />
+                  {opt.label}
+                </span>
               </Radio.Button>
             ))}
           </Radio.Group>
@@ -502,20 +588,31 @@ const SettingsModal = ({ isOpen, onClose }) => {
         </div>
 
         {provider === 'custom' && (
-          <div className="space-y-4 animate-fadeIn">
+          <>
             {/* 服务商预设 + 已配置列表 */}
-            <div className={`${fieldGroupCls} space-y-3`}>
-              <label className={labelCls}>服务商（点击切换或添加）</label>
-              <div className="flex flex-wrap gap-2">
-                {PROVIDER_PRESETS.map((preset) => {
-                  const configured = profiles.find((p) => p.id === preset.id);
-                  const isActive = selectedId === preset.id;
+            <div className={`${sectionCls} space-y-2.5`}>
+              <label className={labelCls}>服务商（点击切换或添加，可拖拽排序）</label>
+              <div className="flex flex-wrap gap-1.5">
+                {chipItems.map((item) => {
+                  const isActive = selectedId === item.id;
+                  const isDragOver = dragOverId === item.id;
                   return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => applyPreset(preset)}
-                      className={`rounded-full border px-3 py-1.5 text-xs inline-flex items-center gap-1.5 ${classes.themeTransition} ${
+                    <div
+                      key={item.id}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragOverId !== item.id) setDragOverId(item.id);
+                      }}
+                      onDragLeave={() => setDragOverId((prev) => (prev === item.id ? null : prev))}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        reorderChips(dragIdRef.current, item.id);
+                        dragIdRef.current = null;
+                        setDragOverId(null);
+                      }}
+                      className={`group rounded-full border text-xs inline-flex items-center overflow-hidden ${classes.themeTransition} ${
+                        isDragOver ? (isDark ? 'ring-2 ring-blue-400/60' : 'ring-2 ring-blue-400') : ''
+                      } ${
                         isActive
                           ? isDark
                             ? 'border-blue-400 bg-blue-500/10 text-blue-300'
@@ -525,44 +622,44 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
                       }`}
                     >
-                      {configured && (
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            configured.apiKey || configured.hasApiKey ? 'bg-emerald-400' : 'bg-amber-400'
-                          }`}
-                          title={configured.apiKey || configured.hasApiKey ? '已配置密钥' : '已添加，未填密钥'}
-                        />
-                      )}
-                      {preset.name}
-                    </button>
+                      {/* 单独的小拖拽把手：整块可点击区域不带 draggable，
+                          避免"点击"和"拖拽"两种手势在同一元素上冲突（误触发拖拽/点击不生效） */}
+                      <span
+                        draggable
+                        onDragStart={() => {
+                          dragIdRef.current = item.id;
+                        }}
+                        onDragEnd={() => {
+                          dragIdRef.current = null;
+                          setDragOverId(null);
+                        }}
+                        title="拖拽调整顺序"
+                        className="pl-2 pr-0.5 py-1 flex items-center opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing"
+                      >
+                        <GripVertical size={10} />
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => (item.isPreset ? applyPreset(item.preset) : setSelectedId(item.id))}
+                        className="pl-0.5 pr-2.5 py-1 flex items-center gap-1"
+                      >
+                        {item.configured && (
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              item.configured.apiKey || item.configured.hasApiKey ? 'bg-emerald-400' : 'bg-stone-400'
+                            }`}
+                            title={item.configured.apiKey || item.configured.hasApiKey ? '已配置密钥' : '已添加，未填密钥'}
+                          />
+                        )}
+                        {item.name}
+                      </button>
+                    </div>
                   );
                 })}
-                {/* 非预设的自定义 profile 也展示出来 */}
-                {profiles
-                  .filter((p) => !PROVIDER_PRESETS.some((preset) => preset.id === p.id))
-                  .map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setSelectedId(p.id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs inline-flex items-center gap-1.5 ${classes.themeTransition} ${
-                        selectedId === p.id
-                          ? isDark
-                            ? 'border-blue-400 bg-blue-500/10 text-blue-300'
-                            : 'border-blue-500 bg-blue-50 text-blue-600'
-                          : isDark
-                          ? 'border-white/10 bg-black/20 text-zinc-300 hover:border-zinc-500 hover:text-white'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
-                      }`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${p.apiKey || p.hasApiKey ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                      {p.name}
-                    </button>
-                  ))}
                 <button
                   type="button"
                   onClick={addCustomProfile}
-                  className={`rounded-full border border-dashed px-3 py-1.5 text-xs inline-flex items-center gap-1 ${classes.themeTransition} ${
+                  className={`rounded-full border border-dashed px-2.5 py-1 text-xs inline-flex items-center gap-0.5 ${classes.themeTransition} ${
                     isDark
                       ? 'border-white/20 text-zinc-400 hover:border-zinc-400 hover:text-white'
                       : 'border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-800'
@@ -571,15 +668,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   <Plus size={12} /> 自定义
                 </button>
               </div>
-              <p className={helpTextCls}>
-                绿点 = 已配置密钥；黄点 = 已添加待配置。可同时保存多家，聊天页顶部的模型选择器按服务商分组切换。
-              </p>
+              <p className={helpTextCls}>绿点 = 已配置密钥；灰点 = 待配置。自定义服务商最多 10 个，内置服务商不可删除。</p>
             </div>
 
             {selected && (
               <>
                 {/* 连接：地址 + 密钥 + 测试合并为一张卡 */}
-                <div className={`${fieldGroupCls} space-y-2.5`}>
+                <div className={`${sectionCls} space-y-2.5`}>
                   <div className="flex items-center justify-between">
                     <label className={labelCls}>{selected.name} · 连接</label>
                     <div className="flex items-center gap-3">
@@ -595,21 +690,24 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           获取密钥 <ExternalLink size={11} />
                         </a>
                       )}
-                      <Popconfirm
-                        title={`删除「${selected.name}」的配置？`}
-                        onConfirm={removeSelected}
-                        okText="删除"
-                        cancelText="取消"
-                      >
-                        <button
-                          type="button"
-                          className={`inline-flex items-center gap-1 text-xs ${
-                            isDark ? 'text-rose-300 hover:text-rose-200' : 'text-rose-500 hover:text-rose-400'
-                          }`}
+                      {/* 内置预设不可删除，只有自定义服务商能删除 */}
+                      {!selectedPreset && (
+                        <Popconfirm
+                          title={`删除「${selected.name}」的配置？`}
+                          onConfirm={removeSelected}
+                          okText="删除"
+                          cancelText="取消"
                         >
-                          <Trash2 size={11} /> 删除
-                        </button>
-                      </Popconfirm>
+                          <button
+                            type="button"
+                            className={`inline-flex items-center gap-1 text-xs ${
+                              isDark ? 'text-rose-300 hover:text-rose-200' : 'text-rose-500 hover:text-rose-400'
+                            }`}
+                          >
+                            <Trash2 size={11} /> 删除
+                          </button>
+                        </Popconfirm>
+                      )}
                     </div>
                   </div>
                   {!selectedPreset && (
@@ -654,15 +752,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       errorCls={errorTextCls}
                     />
                   </div>
-                  <p className={helpTextCls}>
-                    密钥 AES-256-GCM 加密存于浏览器本地、不回显明文；高安全需求请用「服务器托管」。
-                  </p>
+                  <p className={helpTextCls}>密钥加密存于本地、不回显；高安全需求用「服务器托管」。</p>
                 </div>
 
-                {/* 模型：可用列表 + 启用勾选合并为一张卡 */}
-                <div className={`${fieldGroupCls} space-y-2.5`}>
+                {/* 模型与通用参数合并为一张卡 */}
+                <div className={`${sectionCls} space-y-2.5`}>
                   <label className={`${labelCls} flex items-center gap-2`}>
-                    模型
+                    启用的模型
                     {modelsAutoLoading && (
                       <span className="flex items-center gap-1 text-blue-400 normal-case tracking-normal font-normal">
                         <Loader2 size={12} className="animate-spin" /> 自动获取中…
@@ -671,65 +767,43 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   </label>
                   <Select
                     mode="tags"
-                    value={selected.models}
+                    value={selected.enabledModels || []}
                     onChange={(vals) => {
-                      modelsEditedRef.current.add(selected.id); // 手动编辑后不再被自动拉取覆盖
+                      if (vals.length === 0) clearedEnabledRef.current.add(selected.id);
+                      else clearedEnabledRef.current.delete(selected.id);
                       updateSelected({
-                        models: vals,
-                        model: vals.includes(selected.model) ? selected.model : vals[0] || '',
+                        enabledModels: vals,
+                        // 手输的新模型名并入候选，刷新拉取时也不会丢
+                        models: [...new Set([...selected.models, ...vals])],
+                        model: vals.includes(selected.model) ? selected.model : vals[0] || selected.models[0] || '',
                       });
                     }}
-                    placeholder="可用模型：填好地址与密钥后自动获取，也可手动输入回车添加"
+                    options={selected.models.map((m) => ({ value: m, label: m }))}
+                    placeholder="勾选或输入模型名；留空则该服务商不出现在顶部列表"
                     className="w-full"
                     classNames={{ popup: { root: dropdownPopupClass } }}
-                    open={false /* tags 模式下无候选项，关闭下拉避免空面板 */}
-                    suffixIcon={null}
-                    maxTagCount={8}
-                    tokenSeparators={[',', ' ']}
+                    showSearch
+                    maxTagCount="responsive"
+                    allowClear
+                    tokenSeparators={[',']}
                   />
-                  {selected.models.length > 1 && (
-                    <Select
-                      mode="multiple"
-                      value={
-                        selected.enabledModels?.length
-                          ? selected.enabledModels.filter((m) => selected.models.includes(m))
-                          : []
-                      }
-                      onChange={(vals) =>
-                        updateSelected({
-                          enabledModels: vals,
-                          model: vals.includes(selected.model) ? selected.model : vals[0] || selected.models[0],
-                        })
-                      }
-                      options={selected.models.map((m) => ({ value: m, label: m }))}
-                      placeholder="启用的模型（多选）：勾选的才出现在顶部切换列表，不勾选 = 全部"
-                      className="w-full"
-                      classNames={{ popup: { root: dropdownPopupClass } }}
-                      showSearch
-                      maxTagCount="responsive"
-                      allowClear
-                    />
-                  )}
-                  <p className={helpTextCls}>
-                    上排为该服务商的全部可用模型；下排勾选要在聊天页顶部展示的模型（第一个为默认）。
-                  </p>
+                  <p className={helpTextCls}>候选项自动来自平台，第一个为默认模型。</p>
+                  {generalParams}
                 </div>
               </>
             )}
-          </div>
+          </>
         )}
 
         {provider === 'backend' && (
-          <div className="space-y-4 animate-fadeIn">
+          <>
             {backendLoadError && (
-              <div
-                className={`${fieldGroupCls} text-sm ${isDark ? 'text-red-300' : 'text-red-600'}`}
-              >
+              <div className={`${sectionCls} text-sm ${isDark ? 'text-red-300' : 'text-red-600'}`}>
                 {backendLoadError}
               </div>
             )}
 
-            <div className={`${fieldGroupCls} space-y-3`}>
+            <div className={`${sectionCls} space-y-3`}>
               <label className={labelCls}>接口类型</label>
               <Radio.Group
                 value={backendProvider}
@@ -759,7 +833,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
               </p>
             </div>
 
-            <div className={`${fieldGroupCls} space-y-2`}>
+            <div className={`${sectionCls} space-y-2`}>
               <label className={labelCls}>{t('apiUrl') || 'API 接口地址 (Base URL)'}</label>
               <Input
                 value={backendApiUrl}
@@ -770,7 +844,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
               />
             </div>
 
-            <div className={`${fieldGroupCls} space-y-2`}>
+            <div className={`${sectionCls} space-y-2`}>
               <label className={labelCls}>{t('apiKey') || 'API 密钥 (API Key)'}</label>
               <Input.Password
                 value={backendApiKey}
@@ -785,7 +859,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             </div>
 
             {/* 连接测试：由服务端拉取上游模型列表验证地址/密钥（不受浏览器 CORS 限制） */}
-            <div className={`${fieldGroupCls} space-y-2`}>
+            <div className={`${sectionCls} space-y-2`}>
               <TestConnection
                 onTest={handleBackendTest}
                 state={backendTestState}
@@ -798,7 +872,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
               />
             </div>
 
-            <div className={`${fieldGroupCls} space-y-2`}>
+            <div className={`${sectionCls} space-y-2`}>
               <label className={labelCls}>{t('modelName') || '模型名称'}</label>
               <Input
                 value={backendModel}
@@ -808,30 +882,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 className={inputCls}
               />
             </div>
-          </div>
+          </>
         )}
 
-        {/* 通用参数：上下文预算 + Think 开关合并为一张卡 */}
-        <div className={`${fieldGroupCls} space-y-3`}>
-          <label className={labelCls}>通用参数</label>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex-1 space-y-1">
-              <p className={helpTextCls}>上下文预算 (Token)：发送前按此截断历史，需小于模型窗口</p>
-              <InputNumber
-                value={contextTokens}
-                onChange={(v) => setContextTokens(v)}
-                min={1000}
-                max={200000}
-                step={1000}
-                className={`w-full ${isDark ? 'bg-[#121212] border-white/10' : ''}`}
-              />
-            </div>
-            <div className="flex items-center justify-between sm:justify-start gap-3 sm:w-52">
-              <p className={helpTextCls}>Think 模式：展示思考型模型的思考过程</p>
-              <Switch checked={think} onChange={setThink} />
-            </div>
+        {/* demo / backend 模式下通用参数单独成卡（custom 已并入模型卡） */}
+        {provider !== 'custom' && (
+          <div className={`${sectionCls} space-y-3`}>
+            <label className={labelCls}>通用参数</label>
+            {generalParams}
           </div>
-        </div>
+        )}
       </div>
     </Modal>
   );

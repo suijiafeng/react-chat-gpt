@@ -60,7 +60,7 @@ const ChatInput = ({
       className={`inset-x-0 z-20 px-4 ${classes.themeTransition} ${
         isEmpty
           ? 'absolute top-1/2 -translate-y-1/2'
-          : `absolute bottom-0 pb-6 pt-10 bg-gradient-to-t ${
+          : `absolute bottom-0 pb-6 bg-gradient-to-t ${
                 isDark
                   ? 'from-[#212121] via-[#212121]/90 to-transparent'
                   : 'from-[#f7f7f8] via-[#f7f7f8]/90 to-transparent'
@@ -202,7 +202,7 @@ const ChatInput = ({
                     : 'bg-white text-gray-600 hover:bg-black/5'
                 }`}
               >
-                <span className="mr-1.5">{item.icon}</span>
+                <item.icon size={14} className="mr-1.5 inline-block align-[-2px]" />
                 {item.title}
               </button>
             ))}

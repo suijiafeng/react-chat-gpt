@@ -120,7 +120,28 @@ const useOllamaNative = (config) =>
 const toSseChunk = (delta) =>
   `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`;
 
-async function proxyOpenAiCompat({ config, apiKey, messages, model, signal, res }) {
+// 与前端 src/apis/providers/thinkTags.js 的 buildProviderThinkParams 保持一致——
+// 服务端转发（backend 模式）同样需要给这几家平台拼上各自的思考开关参数，
+// 两端各自独立维护是因为前后端是两套构建产物，没有共用模块的路径。
+const buildProviderThinkParams = (apiUrl, thinkEnabled) => {
+  if (/api\.anthropic\.com/.test(apiUrl)) {
+    return thinkEnabled
+      ? { thinking: { type: 'enabled', budget_tokens: 4096 } }
+      : { thinking: { type: 'disabled' } };
+  }
+  if (/generativelanguage\.googleapis\.com/.test(apiUrl)) {
+    return { reasoning_effort: thinkEnabled ? 'medium' : 'none' };
+  }
+  if (/dashscope\.aliyuncs\.com/.test(apiUrl)) {
+    return { enable_thinking: thinkEnabled };
+  }
+  if (/open\.bigmodel\.cn/.test(apiUrl)) {
+    return { thinking: { type: thinkEnabled ? 'enabled' : 'disabled' } };
+  }
+  return {};
+};
+
+async function proxyOpenAiCompat({ config, apiKey, messages, model, think, signal, res }) {
   let url = config.api_url.replace(/\/+$/, '');
   if (!url.endsWith('/chat/completions')) url = `${url}/chat/completions`;
 
@@ -134,6 +155,7 @@ async function proxyOpenAiCompat({ config, apiKey, messages, model, signal, res 
       model: model || config.model,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       stream: true,
+      ...buildProviderThinkParams(config.api_url, Boolean(think)),
     }),
     signal,
   });

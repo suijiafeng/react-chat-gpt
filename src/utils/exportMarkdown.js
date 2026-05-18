@@ -28,12 +28,12 @@ export const exportSessionAsMarkdown = async (sessionId) => {
 
   const lines = [`# ${title}`, '', `> 导出时间：${new Date().toLocaleString()}`, ''];
   for (const msg of messages) {
-    lines.push(`## ${msg.isUser ? '🙋 用户' : '🤖 助手'}`);
+    lines.push(`## ${msg.isUser ? '用户' : '助手'}`);
     if (msg.attachments?.length) {
-      msg.attachments.forEach((a) => lines.push(`> 📎 附件：${a.name}`));
+      msg.attachments.forEach((a) => lines.push(`> 附件：${a.name}`));
     }
     if (msg.images?.length) {
-      lines.push(`> 🖼️ 附带 ${msg.images.length} 张图片`);
+      lines.push(`> 附带 ${msg.images.length} 张图片`);
     }
     lines.push('', msg.text || '*（空消息）*', '');
   }

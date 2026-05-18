@@ -54,7 +54,7 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
           onClick={handleCopy}
           className="flex items-center gap-1 hover:text-white transition-colors"
         >
-          {copied ? 'Copied!' : 'Copy code'}
+          {copied ? 'Copied!' : 'Copy'}
         </button>
       </div>
       <div
@@ -103,6 +103,12 @@ const buildPre = (isTyping) =>
     );
   };
 
+// 整个文件的取色原则：一律用 text-inherit / border-current / bg-current 搭配
+// 透明度，不用 text-gray-xxx dark:text-gray-xxx 这类写死的灰度色。
+// 原因：本项目暗色模式是手动状态切换（ThemeContext 的 isDark 驱动 className），
+// 不是 Tailwind 默认的 prefers-color-scheme 媒体查询策略，dark: 前缀在这里
+// 不跟随应用内主题——固定灰度色在深浅主题下都可能撞色、对比度过低看不清。
+// currentColor 系方案则始终和消息气泡的真实文字颜色保持一致，天然跟随主题。
 const components = {
   // 行内代码（块级代码由上面的 `pre` 处理，保留 hljs 高亮类名）
   code({ className, children, ...props }) {
@@ -114,7 +120,7 @@ const components = {
       );
     }
     return (
-      <code className="bg-black/[0.06] dark:bg-white/[0.08] px-1.5 py-0.5 rounded text-sm font-mono text-[#e06c75] dark:text-[#f87171]">
+      <code className="bg-current/[0.09] px-1.5 py-0.5 rounded-md text-[13px] font-mono text-inherit">
         {children}
       </code>
     );
@@ -125,26 +131,30 @@ const components = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-blue-500 dark:text-blue-400 hover:underline"
+        className="text-[#3b82f6] hover:underline underline-offset-2 break-words"
       >
         {children}
       </a>
     );
   },
   h1: ({ children }) => (
-    <h1 className="text-3xl font-bold my-4 pb-2 border-b border-gray-200 dark:border-gray-800 text-inherit">
+    <h1 className="text-2xl font-bold mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-2xl font-bold my-3 pb-1 border-b border-gray-200/50 dark:border-gray-800/50 text-inherit">
+    <h2 className="text-xl font-bold mt-5 mb-2.5 pb-1.5 border-b border-current/10 text-inherit">
       {children}
     </h2>
   ),
-  h3: ({ children }) => <h3 className="text-xl font-bold my-2 text-inherit">{children}</h3>,
-  h4: ({ children }) => <h4 className="text-lg font-semibold my-2 text-inherit">{children}</h4>,
-  h5: ({ children }) => <h5 className="text-base font-semibold my-2 text-inherit">{children}</h5>,
-  h6: ({ children }) => <h6 className="text-sm font-semibold my-2 text-inherit">{children}</h6>,
+  h3: ({ children }) => <h3 className="text-lg font-bold mt-4 mb-2 text-inherit">{children}</h3>,
+  h4: ({ children }) => <h4 className="text-base font-semibold mt-3 mb-1.5 text-inherit">{children}</h4>,
+  h5: ({ children }) => <h5 className="text-[15px] font-semibold mt-3 mb-1.5 text-inherit">{children}</h5>,
+  h6: ({ children }) => (
+    <h6 className="text-[13px] font-semibold uppercase tracking-wide mt-3 mb-1.5 opacity-70 text-inherit">
+      {children}
+    </h6>
+  ),
   p: ({ children, node }) => {
     const showCursor = node?.properties?.['data-last-paragraph'] === 'true';
     return (
@@ -154,41 +164,46 @@ const components = {
       </p>
     );
   },
-  hr: () => <hr className="my-6 border-t border-gray-200 dark:border-gray-800" />,
+  hr: () => <hr className="my-6 border-t border-current/10" />,
   blockquote: ({ children }) => (
-    <blockquote className="border-l-4 border-gray-300 dark:border-gray-700 pl-4 py-1.5 my-3 bg-black/[0.02] dark:bg-white/[0.02] rounded-r italic text-gray-600 dark:text-gray-300 text-sm">
+    <blockquote className="border-l-4 border-current/25 pl-4 py-1.5 my-3 bg-current/[0.04] rounded-r italic text-inherit opacity-85 text-[15px]">
       {children}
     </blockquote>
   ),
-  ul: ({ children }) => <ul className="list-disc pl-6 space-y-1 my-2">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-6 space-y-1 my-2">{children}</ol>,
-  li: ({ children }) => <li className="leading-7">{children}</li>,
+  ul: ({ children }) => <ul className="list-disc pl-6 space-y-1 my-2 marker:text-current/40">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-6 space-y-1 my-2 marker:text-current/40">{children}</ol>,
+  li: ({ children }) => <li className="leading-7 pl-0.5">{children}</li>,
   table: ({ children }) => (
-    <div className="my-4 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
+    <div className="my-4 overflow-x-auto rounded-lg border border-current/10">
       <table className="w-full border-collapse text-left">{children}</table>
     </div>
   ),
-  thead: ({ children }) => (
-    <thead className="bg-black/[0.03] dark:bg-white/[0.03]">{children}</thead>
-  ),
+  thead: ({ children }) => <thead className="bg-current/[0.045]">{children}</thead>,
   tr: ({ children }) => (
-    <tr className="border-b border-gray-200 dark:border-gray-800 last:border-b-0 hover:bg-black/[0.01] dark:hover:bg-white/[0.01]">
+    <tr className="border-b border-current/10 last:border-b-0 hover:bg-current/[0.025]">
       {children}
     </tr>
   ),
   th: ({ children }) => (
-    <th className="px-4 py-2 text-sm font-bold border-r border-gray-200 dark:border-gray-800 last:border-r-0">
+    <th className="px-4 py-2 text-sm font-semibold border-r border-current/10 last:border-r-0">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="px-4 py-2 text-sm border-r border-gray-200 dark:border-gray-800 last:border-r-0">
+    <td className="px-4 py-2 text-sm border-r border-current/10 last:border-r-0 align-top">
       {children}
     </td>
   ),
-  del: ({ children }) => <del className="opacity-70">{children}</del>,
+  strong: ({ children }) => <strong className="font-semibold text-inherit">{children}</strong>,
+  em: ({ children }) => <em className="italic text-inherit">{children}</em>,
+  del: ({ children }) => <del className="opacity-60">{children}</del>,
   img: ({ src, alt }) => (
-    <img src={src} alt={alt} className="max-w-full rounded-lg my-2" loading="lazy" />
+    <img
+      src={src}
+      alt={alt}
+      className="max-w-full rounded-lg my-2 border border-current/10"
+      loading="lazy"
+    />
   ),
 };
 

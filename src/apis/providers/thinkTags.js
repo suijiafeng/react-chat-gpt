@@ -81,6 +81,33 @@ export const createThinkSplitter = () => {
 // DeepSeek / 通义 / 智谱 / Moonshot 用 reasoning_content，Ollama 兼容层等用 reasoning
 export const deltaReasoning = (delta) => delta?.reasoning_content ?? delta?.reasoning ?? '';
 
+// 部分平台提供了能真正控制模型是否思考的请求参数（而不仅是展示层过滤），
+// 但字段名/结构各不相同，按 apiUrl 特征匹配拼出对应字段。
+// 匹配不到的平台（OpenAI 官方、DeepSeek、Moonshot、Groq、硅基流动、xAI、OpenRouter 等）
+// 不携带任何思考相关参数——这些平台没有统一/公开的开关参数，
+// 且部分对未知字段严格校验会直接 400，不能无脑携带，只能停留在展示层过滤（见上方注释）。
+export const buildProviderThinkParams = (apiUrl, thinkEnabled) => {
+  if (/api\.anthropic\.com/.test(apiUrl)) {
+    // Anthropic：完整开关，关闭时不能带 budget_tokens
+    return thinkEnabled
+      ? { thinking: { type: 'enabled', budget_tokens: 4096 } }
+      : { thinking: { type: 'disabled' } };
+  }
+  if (/generativelanguage\.googleapis\.com/.test(apiUrl)) {
+    // Gemini OpenAI 兼容层：reasoning_effort='none' 关闭思考（2.5 pro 不支持完全关闭，会被平台忽略）
+    return { reasoning_effort: thinkEnabled ? 'medium' : 'none' };
+  }
+  if (/dashscope\.aliyuncs\.com/.test(apiUrl)) {
+    // 通义千问（Qwen3 系）：enable_thinking 布尔开关
+    return { enable_thinking: thinkEnabled };
+  }
+  if (/open\.bigmodel\.cn/.test(apiUrl)) {
+    // 智谱 GLM：结构同 Anthropic 但无需 budget_tokens
+    return { thinking: { type: thinkEnabled ? 'enabled' : 'disabled' } };
+  }
+  return {};
+};
+
 // OpenAI 兼容 SSE 流的统一适配器：把各平台 delta 的差异
 // （reasoning_content / reasoning 字段、内联 <think> 标签、流中错误对象）
 // 吸收成 { content, meta } 块。OpenAIProvider 与 BackendProvider 共用。

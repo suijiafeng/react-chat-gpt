@@ -174,11 +174,12 @@ export const getConfig = () => {
     const models = Array.isArray(p.models)
       ? p.models.filter((m) => typeof m === 'string' && m.trim())
       : [];
-    // enabledModels：用户勾选"在外部选择器展示"的模型子集；
-    // 未设置（旧数据）视为全部启用，向后兼容
+    // enabledModels：用户勾选"在外部选择器展示"的模型子集。
+    // - 从未设置（旧数据 undefined）→ 默认勾选列表第一个（平台通常把最新/主打模型排前）；
+    // - 显式空数组（用户主动全部取消）→ 尊重清空，该服务商不在外部列表展示
     const enabledModels = Array.isArray(p.enabledModels)
       ? p.enabledModels.filter((m) => models.includes(m))
-      : [];
+      : models.slice(0, 1);
     return {
       ...p,
       apiKey: keyCache.has(p.id)
@@ -198,8 +199,9 @@ export const getConfig = () => {
 
   const provider = localStorage.getItem(KEYS.provider) || DEFAULT_LLM_PROVIDER;
   const model = active?.model || localStorage.getItem(KEYS.model) || DEFAULT_LLM_MODEL;
-  // 顶层 models 镜像：优先启用子集（外部选择器与模型解析都以它为准）
-  const activeList = active?.enabledModels?.length ? active.enabledModels : active?.models;
+  // 顶层 models 镜像 = 激活 profile 的启用子集（外部选择器与模型解析以它为准）；
+  // 全部取消勾选时回退为当前模型单项，保证请求与头部展示仍可用
+  const activeList = active?.enabledModels;
   const models = activeList?.length ? activeList : [model];
 
   snapshot = {

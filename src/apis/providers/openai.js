@@ -1,6 +1,6 @@
 import { BaseProvider } from './base';
 import { getConfig } from '../../store/llmConfig';
-import { createSseThinkAdapter } from './thinkTags';
+import { createSseThinkAdapter, buildProviderThinkParams } from './thinkTags';
 
 // 是否 Ollama 端点（默认端口判断）。think 参数只有 Ollama 认；
 // OpenAI 官方等严格校验的平台会对未知参数直接 400，不能无脑携带。
@@ -37,9 +37,12 @@ export class OpenAIProvider extends BaseProvider {
           content: msg.content
         })),
         stream: true,
-        // think 参数只发给 Ollama（其兼容层支持）；其他平台不携带——
-        // OpenAI 官方 API 对未知参数严格校验会 400，DeepSeek 等平台则直接忽略
-        ...(isOllamaUrl(apiUrl) ? { think: thinkEnabled } : {}),
+        // think 参数只发给 Ollama（其兼容层支持）；其他有明确开关参数的平台
+        // （Anthropic / Gemini / 通义千问 / 智谱）按各自字段拼装，
+        // 其余平台不携带——OpenAI 官方 API 对未知参数严格校验会 400
+        ...(isOllamaUrl(apiUrl)
+          ? { think: thinkEnabled }
+          : buildProviderThinkParams(apiUrl, thinkEnabled)),
       }),
       signal,
     });
