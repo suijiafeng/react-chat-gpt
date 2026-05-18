@@ -11,6 +11,7 @@ import { getLlmConfig, upsertLlmConfig } from '../db.js';
 import { encrypt, decrypt } from '../crypto.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { createRateLimiter } from '../middleware/rateLimit.js';
+import { safeFetch, parseUpstreamUrl, UpstreamUrlError } from '../upstreamUrl.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -53,14 +54,23 @@ router.get('/config', (req, res) => {
 // 保存/更新配置。apiKey 为空字符串时表示"保留原有 Key 不变"（避免每次保存都要求重新输入）。
 router.put('/config', (req, res) => {
   const { provider = 'custom', apiUrl = '', apiKey, model = '' } = req.body || {};
-  if (!apiUrl.trim()) return res.status(400).json({ message: '请填写 API 接口地址' });
   if (!model.trim()) return res.status(400).json({ message: '请填写模型名称' });
+
+  // 在落库这一步就把地址挡住：存进去的都是已校验的地址，后续每个转发点仍会再校验一次
+  // （防止有人直接改数据库），但用户能在设置页立刻看到错误提示，而不是保存成功、发消息才报错。
+  let normalized;
+  try {
+    normalized = parseUpstreamUrl(apiUrl).toString();
+  } catch (error) {
+    if (error instanceof UpstreamUrlError) return res.status(400).json({ message: error.message });
+    throw error;
+  }
 
   const existing = getLlmConfig(req.session.userId);
   const apiKeyEncrypted =
     apiKey && apiKey.trim() ? encrypt(apiKey.trim()) : existing?.api_key_encrypted || '';
 
-  upsertLlmConfig(req.session.userId, { provider, apiUrl: apiUrl.trim(), apiKeyEncrypted, model: model.trim() });
+  upsertLlmConfig(req.session.userId, { provider, apiUrl: normalized, apiKeyEncrypted, model: model.trim() });
   res.json({ ok: true });
 });
 
@@ -69,7 +79,7 @@ router.put('/config', (req, res) => {
 const fetchUpstreamModels = async (apiUrl, apiKey, res) => {
   const url = `${apiUrl.replace(/\/+$/, '')}/models`;
   try {
-    const upstream = await fetch(url, {
+    const upstream = await safeFetch(url, {
       headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
       signal: AbortSignal.timeout(10000),
     });
@@ -82,6 +92,10 @@ const fetchUpstreamModels = async (apiUrl, apiKey, res) => {
     const ids = Array.isArray(data?.data) ? data.data.map((m) => m.id).filter(Boolean) : [];
     res.json({ data: ids.map((id) => ({ id })) });
   } catch (error) {
+    // 地址被安全策略拒绝属于「用户填错了」，是 400 不是 502——502 会让人以为是上游挂了
+    if (error instanceof UpstreamUrlError) {
+      return res.status(400).json({ message: error.message });
+    }
     const msg = error.name === 'TimeoutError' ? '连接超时' : error.message;
     res.status(502).json({ message: `无法获取模型列表：${msg}` });
   }
@@ -145,7 +159,9 @@ async function proxyOpenAiCompat({ config, apiKey, messages, model, think, signa
   let url = config.api_url.replace(/\/+$/, '');
   if (!url.endsWith('/chat/completions')) url = `${url}/chat/completions`;
 
-  const upstream = await fetch(url, {
+  // 必须走 safeFetch：这里会把解密出的 Authorization 一并发往用户可控的地址，
+  // 一旦地址指向内网，泄漏的不只是内网响应，还有上游 API Key。
+  const upstream = await safeFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -170,6 +186,9 @@ async function proxyOpenAiCompat({ config, apiKey, messages, model, think, signa
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    // 放在 nginx / 各类反代后面时，缺这个头会让整条 SSE 被缓冲成一次性返回，
+    // 流式效果在生产环境静默失效（本地直连时看不出来）。
+    'X-Accel-Buffering': 'no',
   });
 
   const reader = upstream.body.getReader();
@@ -191,7 +210,7 @@ async function proxyOllamaNative({ config, messages, model, think, signal, res }
   // apiUrl 通常配的是 OpenAI 兼容地址（.../v1），原生接口在同一 host 的 /api/chat 上
   const url = `${config.api_url.replace(/\/+$/, '').replace(/\/v1$/, '')}/api/chat`;
 
-  const upstream = await fetch(url, {
+  const upstream = await safeFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -213,6 +232,9 @@ async function proxyOllamaNative({ config, messages, model, think, signal, res }
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    // 放在 nginx / 各类反代后面时，缺这个头会让整条 SSE 被缓冲成一次性返回，
+    // 流式效果在生产环境静默失效（本地直连时看不出来）。
+    'X-Accel-Buffering': 'no',
   });
 
   const reader = upstream.body.getReader();
@@ -276,6 +298,11 @@ router.post('/chat/completions', chatRateLimiter, async (req, res) => {
   } catch (error) {
     if (error.name === 'AbortError') return; // 客户端已断开，无需再响应
     if (!res.headersSent) {
+      // 地址被安全策略拒绝是配置问题（400），与「上游连不上」（502）要分开，
+      // 否则用户看到 502 只会反复重试，不会想到去改设置里的地址。
+      if (error instanceof UpstreamUrlError) {
+        return res.status(400).json({ message: `模型服务地址不被允许：${error.message}` });
+      }
       res.status(502).json({ message: `无法连接模型服务：${error.message}` });
     } else {
       // 流已经开始，上游中途断了：不能再改状态码，也不能悄悄 end 让前端误以为
