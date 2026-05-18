@@ -578,13 +578,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
             {selected && (
               <>
-                {/* 当前服务商配置 */}
-                <div className={`${fieldGroupCls} space-y-2`}>
+                {/* 连接：地址 + 密钥 + 测试合并为一张卡 */}
+                <div className={`${fieldGroupCls} space-y-2.5`}>
                   <div className="flex items-center justify-between">
-                    <label className={labelCls}>
-                      {selected.name} · API 接口地址 (Base URL)
-                    </label>
-                    <div className="flex items-center gap-2">
+                    <label className={labelCls}>{selected.name} · 连接</label>
+                    <div className="flex items-center gap-3">
                       {selectedPreset?.docs && (
                         <a
                           href={selectedPreset.docs}
@@ -614,16 +612,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       </Popconfirm>
                     </div>
                   </div>
-                  <Input
-                    value={selected.apiUrl}
-                    onChange={(e) => {
-                      updateSelected({ apiUrl: e.target.value });
-                      setTestState('idle');
-                    }}
-                    placeholder="例如: https://api.deepseek.com/v1"
-                    className={inputCls}
-                  />
-                  {/* 自定义 profile 允许改名 */}
                   {!selectedPreset && (
                     <Input
                       value={selected.name}
@@ -632,11 +620,15 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       className={inputCls}
                     />
                   )}
-                </div>
-
-                {/* API 密钥 */}
-                <div className={`${fieldGroupCls} space-y-2`}>
-                  <label className={labelCls}>{t('apiKey') || 'API 密钥 (API Key)'}</label>
+                  <Input
+                    value={selected.apiUrl}
+                    onChange={(e) => {
+                      updateSelected({ apiUrl: e.target.value });
+                      setTestState('idle');
+                    }}
+                    placeholder="接口地址，例如 https://api.deepseek.com/v1"
+                    className={inputCls}
+                  />
                   <Input.Password
                     value={selected.apiKey}
                     onChange={(e) => {
@@ -645,34 +637,32 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     }}
                     placeholder={
                       selected.hasApiKey
-                        ? '已加密保存（出于安全不回显），留空则沿用'
-                        : 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'
+                        ? 'API Key 已加密保存（不回显），留空则沿用'
+                        : 'API Key，例如 sk-xxxxxxxxxxxxxxxx'
                     }
                     className={inputCls}
                   />
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <TestConnection
+                      onTest={handleTest}
+                      state={testState}
+                      message={testMessage}
+                      disabled={!selected.apiUrl?.trim()}
+                      isDark={isDark}
+                      classes={classes}
+                      successCls={successTextCls}
+                      errorCls={errorTextCls}
+                    />
+                  </div>
                   <p className={helpTextCls}>
-                    密钥经 AES-256-GCM 加密后存放在浏览器本地（主密钥不可导出），界面不回显明文。对安全要求高的部署请使用「服务器托管」模式。
+                    密钥 AES-256-GCM 加密存于浏览器本地、不回显明文；高安全需求请用「服务器托管」。
                   </p>
                 </div>
 
-                {/* 连接测试 */}
-                <div className={`${fieldGroupCls} space-y-2`}>
-                  <TestConnection
-                    onTest={handleTest}
-                    state={testState}
-                    message={testMessage}
-                    disabled={!selected.apiUrl?.trim()}
-                    isDark={isDark}
-                    classes={classes}
-                    successCls={successTextCls}
-                    errorCls={errorTextCls}
-                  />
-                </div>
-
-                {/* 模型列表（可多选维护，顶部选择器里切换） */}
-                <div className={`${fieldGroupCls} space-y-2`}>
+                {/* 模型：可用列表 + 启用勾选合并为一张卡 */}
+                <div className={`${fieldGroupCls} space-y-2.5`}>
                   <label className={`${labelCls} flex items-center gap-2`}>
-                    {t('modelName') || '模型列表'}
+                    模型
                     {modelsAutoLoading && (
                       <span className="flex items-center gap-1 text-blue-400 normal-case tracking-normal font-normal">
                         <Loader2 size={12} className="animate-spin" /> 自动获取中…
@@ -689,22 +679,15 @@ const SettingsModal = ({ isOpen, onClose }) => {
                         model: vals.includes(selected.model) ? selected.model : vals[0] || '',
                       });
                     }}
-                    placeholder="填好地址与密钥后自动获取；也可手动输入模型名后回车添加"
+                    placeholder="可用模型：填好地址与密钥后自动获取，也可手动输入回车添加"
                     className="w-full"
                     classNames={{ popup: { root: dropdownPopupClass } }}
                     open={false /* tags 模式下无候选项，关闭下拉避免空面板 */}
                     suffixIcon={null}
+                    maxTagCount={8}
                     tokenSeparators={[',', ' ']}
                   />
-                  <p className={helpTextCls}>
-                    填入接口地址和密钥后会自动拉取该平台的可用模型；也可手动增删，支持逗号分隔批量粘贴。
-                  </p>
-                </div>
-
-                {/* 启用的模型：多选，勾选的会出现在聊天页顶部的模型切换列表里 */}
-                {selected.models.length > 1 && (
-                  <div className={`${fieldGroupCls} space-y-2`}>
-                    <label className={labelCls}>启用的模型（可多选）</label>
+                  {selected.models.length > 1 && (
                     <Select
                       mode="multiple"
                       value={
@@ -719,18 +702,18 @@ const SettingsModal = ({ isOpen, onClose }) => {
                         })
                       }
                       options={selected.models.map((m) => ({ value: m, label: m }))}
-                      placeholder="不勾选 = 全部展示；勾选后仅展示所选模型"
+                      placeholder="启用的模型（多选）：勾选的才出现在顶部切换列表，不勾选 = 全部"
                       className="w-full"
                       classNames={{ popup: { root: dropdownPopupClass } }}
                       showSearch
                       maxTagCount="responsive"
                       allowClear
                     />
-                    <p className={helpTextCls}>
-                      勾选的模型会出现在聊天页顶部的切换列表里（第一个为默认）；不勾选则展示该服务商的全部模型。
-                    </p>
-                  </div>
-                )}
+                  )}
+                  <p className={helpTextCls}>
+                    上排为该服务商的全部可用模型；下排勾选要在聊天页顶部展示的模型（第一个为默认）。
+                  </p>
+                </div>
               </>
             )}
           </div>
@@ -828,31 +811,26 @@ const SettingsModal = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* 上下文预算：demo / custom 都展示 */}
-        <div className={`${fieldGroupCls} space-y-2`}>
-          <label className={labelCls}>上下文长度预算 (Token)</label>
-          <InputNumber
-            value={contextTokens}
-            onChange={(v) => setContextTokens(v)}
-            min={1000}
-            max={200000}
-            step={1000}
-            className={`w-full ${isDark ? 'bg-[#121212] border-white/10' : ''}`}
-          />
-          <p className={helpTextCls}>
-            发送前按此预算截断历史消息，避免长对话超出模型上下文窗口。应小于所用模型的窗口大小并留出回复余量。
-          </p>
-        </div>
-
-        <div className={`${fieldGroupCls} flex items-center justify-between gap-4`}>
-          <div className="space-y-1">
-            <label className={labelCls}>Think 模式</label>
-            <p className={helpTextCls}>
-              开启后展示思考型模型的思考过程（自动兼容 DeepSeek/通义等的 reasoning_content、Ollama 的
-              reasoning 与内联 &lt;think&gt; 标签）；关闭则隐藏。Ollama 端点还会通过 think 参数控制是否生成思考。
-            </p>
+        {/* 通用参数：上下文预算 + Think 开关合并为一张卡 */}
+        <div className={`${fieldGroupCls} space-y-3`}>
+          <label className={labelCls}>通用参数</label>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1 space-y-1">
+              <p className={helpTextCls}>上下文预算 (Token)：发送前按此截断历史，需小于模型窗口</p>
+              <InputNumber
+                value={contextTokens}
+                onChange={(v) => setContextTokens(v)}
+                min={1000}
+                max={200000}
+                step={1000}
+                className={`w-full ${isDark ? 'bg-[#121212] border-white/10' : ''}`}
+              />
+            </div>
+            <div className="flex items-center justify-between sm:justify-start gap-3 sm:w-52">
+              <p className={helpTextCls}>Think 模式：展示思考型模型的思考过程</p>
+              <Switch checked={think} onChange={setThink} />
+            </div>
           </div>
-          <Switch checked={think} onChange={setThink} />
         </div>
       </div>
     </Modal>

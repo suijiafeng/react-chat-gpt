@@ -5,12 +5,23 @@ import { Loader, Copy, Check, RefreshCw, Pencil, StepForward, AlertTriangle, Che
 import MarkdownRenderer from './MarkdownRenderer';
 import { formatFileSize } from '../utils/attachments';
 
-// 还没收到第一个字符前展示的等待动画。
-const LoadingIndicator = ({ classes }) => (
-  <div className="flex justify-center text-sm">
-    <Loader size={18} className={`${classes.text} animate-spin-slow`} />
+// 还没收到第一个字符前展示的等待动画；等待较久时升级为文字提示，
+// 让用户知道请求还活着、并提示可以随时停止（30 秒无任何数据会被看门狗自动中止）
+const SLOW_HINT_SECONDS = 8;
+
+const LoadingIndicator = ({ classes, elapsed }) => (
+  <div data-elapsed={elapsed} className={`flex items-center gap-2 text-sm ${classes.text}`}>
+    <Loader size={18} className="animate-spin-slow" />
+    {elapsed >= SLOW_HINT_SECONDS && (
+      <span className="text-xs opacity-60">
+        模型响应较慢，已等待 {elapsed} 秒…（可点右下角停止按钮取消）
+      </span>
+    )}
   </div>
 );
+
+// 秒数 → m′s″ 展示
+const formatSeconds = (s) => (s >= 60 ? `${Math.floor(s / 60)} 分 ${s % 60} 秒` : `${s} 秒`);
 
 // 操作栏里的小图标按钮
 const ActionButton = ({ title, onClick, isDark, children }) => (
@@ -51,6 +62,24 @@ const ChatMessage = React.memo(
     const [reasoningExpanded, setReasoningExpanded] = useState(false);
     const editRef = useRef(null);
     const reasoningScrollRef = useRef(null);
+
+    // 正文出现前的等待/思考计时：驱动"响应较慢"提示与思考耗时展示
+    const waiting = isTyping && !message;
+    const [elapsed, setElapsed] = useState(0);
+    useEffect(() => {
+      if (!waiting) {
+        setElapsed(0);
+        return;
+      }
+      const startedAt = Date.now();
+      // 500ms 一跳、按真实时间差计算：即便浏览器对后台/繁忙页面节流定时器，
+      // 显示的秒数也不会累积漂移
+      const timer = setInterval(
+        () => setElapsed(Math.floor((Date.now() - startedAt) / 1000)),
+        500
+      );
+      return () => clearInterval(timer);
+    }, [waiting]);
 
     // 进入编辑态时聚焦并自适应高度
     useEffect(() => {
@@ -241,7 +270,11 @@ const ChatMessage = React.memo(
                         isDark ? 'text-white/65 hover:text-white/90' : 'text-black/55 hover:text-black/80'
                       }`}
                     >
-                      <span>{isTyping && !message ? '思考中' : '思考过程'}</span>
+                      <span>
+                        {isTyping && !message
+                          ? `思考中（已 ${formatSeconds(elapsed)}）`
+                          : '思考过程'}
+                      </span>
                       {isTyping && !message && (
                         <span className="inline-flex items-center gap-1">
                           <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
@@ -254,6 +287,9 @@ const ChatMessage = React.memo(
                             style={{ animationDelay: '280ms' }}
                           />
                         </span>
+                      )}
+                      {isTyping && !message && elapsed >= 60 && (
+                        <span className="opacity-60">思考较长，可随时点停止按钮中断并保留已有内容</span>
                       )}
                       <ChevronDown
                         size={13}
@@ -274,7 +310,7 @@ const ChatMessage = React.memo(
                 {message && <MarkdownRenderer content={message} isTyping={isTyping} />}
               </>
             ) : (
-              isTyping && <LoadingIndicator classes={classes} />
+              isTyping && <LoadingIndicator classes={classes} elapsed={elapsed} />
             )}
           </div>
           {/* 操作栏：AI 最后一条常驻，其余消息 hover 时显示；生成中不显示 */}
