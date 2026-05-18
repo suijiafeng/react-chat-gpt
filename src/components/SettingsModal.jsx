@@ -101,6 +101,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         apiKey: '',
         hasApiKey: Boolean(p.hasApiKey || p.apiKey),
         models: [...p.models],
+        enabledModels: [...(p.enabledModels || [])],
       }))
     );
     setSelectedId(config.activeProfileId || config.profiles[0]?.id || '');
@@ -190,15 +191,21 @@ const SettingsModal = ({ isOpen, onClose }) => {
     setTestMessage('');
   };
 
-  // 把拉取到的模型 id 列表写入选中 profile（最多 60 个，避免列表过长）
+  // 把拉取到的模型 id 列表写入选中 profile（最多 200 个）。
+  // 已勾选的启用模型裁剪到仍然存在的 id；全部失效则回到"未勾选=全部启用"
   const applyFetchedModels = (ids) => {
-    const list = ids.slice(0, 60);
+    const list = ids.slice(0, 200);
     setProfiles((prev) =>
-      prev.map((p) =>
-        p.id === selectedId
-          ? { ...p, models: list, model: list.includes(p.model) ? p.model : list[0] }
-          : p
-      )
+      prev.map((p) => {
+        if (p.id !== selectedId) return p;
+        const enabled = (p.enabledModels || []).filter((m) => list.includes(m));
+        return {
+          ...p,
+          models: list,
+          enabledModels: enabled,
+          model: list.includes(p.model) ? p.model : list[0],
+        };
+      })
     );
   };
 
@@ -324,12 +331,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
         message.warning(`请为「${active.name}」至少添加一个模型`);
         return;
       }
-      // 规范每个 profile 的默认模型；key 留空表示沿用已保存的旧值
-      const normalized = validProfiles.map((p) => ({
-        ...p,
-        apiKey: effectiveKey(p),
-        model: p.models.includes(p.model) ? p.model : p.models[0] || '',
-      }));
+      // 规范每个 profile：key 留空沿用旧值；默认模型取启用列表第一个
+      const normalized = validProfiles.map((p) => {
+        const enabled = (p.enabledModels || []).filter((m) => p.models.includes(m));
+        const pool = enabled.length ? enabled : p.models;
+        return {
+          ...p,
+          apiKey: effectiveKey(p),
+          enabledModels: enabled,
+          model: pool.includes(p.model) ? p.model : pool[0] || '',
+        };
+      });
       const activeNorm = normalized.find((p) => p.id === active.id);
       await saveProfiles(normalized, active.id);
       saveConfig({
@@ -689,18 +701,34 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   </p>
                 </div>
 
-                {/* 默认模型 */}
+                {/* 启用的模型：多选，勾选的会出现在聊天页顶部的模型切换列表里 */}
                 {selected.models.length > 1 && (
                   <div className={`${fieldGroupCls} space-y-2`}>
-                    <label className={labelCls}>默认模型</label>
+                    <label className={labelCls}>启用的模型（可多选）</label>
                     <Select
-                      value={selected.models.includes(selected.model) ? selected.model : selected.models[0]}
-                      onChange={(v) => updateSelected({ model: v })}
+                      mode="multiple"
+                      value={
+                        selected.enabledModels?.length
+                          ? selected.enabledModels.filter((m) => selected.models.includes(m))
+                          : []
+                      }
+                      onChange={(vals) =>
+                        updateSelected({
+                          enabledModels: vals,
+                          model: vals.includes(selected.model) ? selected.model : vals[0] || selected.models[0],
+                        })
+                      }
                       options={selected.models.map((m) => ({ value: m, label: m }))}
+                      placeholder="不勾选 = 全部展示；勾选后仅展示所选模型"
                       className="w-full"
                       classNames={{ popup: { root: dropdownPopupClass } }}
                       showSearch
+                      maxTagCount="responsive"
+                      allowClear
                     />
+                    <p className={helpTextCls}>
+                      勾选的模型会出现在聊天页顶部的切换列表里（第一个为默认）；不勾选则展示该服务商的全部模型。
+                    </p>
                   </div>
                 )}
               </>

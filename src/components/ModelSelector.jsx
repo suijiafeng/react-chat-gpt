@@ -64,7 +64,7 @@ const ModelSelector = React.memo(() => {
 
       {isOpen && (
         <div
-          className={`absolute right-0 mt-2 min-w-[240px] max-h-[60vh] overflow-y-auto z-50 transition-colors duration-300 ${
+          className={`absolute right-0 mt-2 w-[224px] max-h-[420px] overflow-y-auto z-50 transition-colors duration-300 ${
             isDark ? 'bg-[#1e1e1e] text-white border-zinc-800' : 'bg-white text-black border-gray-200'
           } border rounded-2xl shadow-xl ${classes.themeTransition}`}
         >
@@ -121,9 +121,15 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
     };
   }, [providerName]);
 
-  // custom：按服务商分组展示
+  // custom：按服务商分组展示。每组只列"启用的模型"（设置里勾选的子集，
+  // 未勾选 = 全部展示），避免聚合平台上百个模型撑爆下拉
   if (providerName === 'custom') {
-    const groups = config.profiles.filter((p) => p.models.length > 0);
+    const groups = config.profiles
+      .map((p) => ({
+        ...p,
+        displayModels: p.enabledModels?.length ? p.enabledModels : p.models,
+      }))
+      .filter((p) => p.displayModels.length > 0);
     if (groups.length === 0) {
       return (
         <div className={`px-4 py-3 text-sm ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
@@ -140,7 +146,7 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
         >
           {profile.name}
         </div>
-        {profile.models.map((model) => (
+        {profile.displayModels.map((model) => (
           <ModelItem
             key={`${profile.id}:${model}`}
             model={model}

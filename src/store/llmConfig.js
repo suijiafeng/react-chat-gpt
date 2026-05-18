@@ -170,16 +170,27 @@ export const getConfig = () => {
   // 暴露给上层时换成内存缓存里的明文 key（加密态只留在 localStorage）。
   // 缓存尚未就绪（启动解密中）时旧 b64 存量可同步解码兜底，加密存量暂为 ''，
   // 解密完成后 notify 会触发重建。
-  const profiles = storedProfiles.map((p) => ({
-    ...p,
-    apiKey: keyCache.has(p.id)
-      ? keyCache.get(p.id)
-      : isEncrypted(p.apiKey)
-      ? ''
-      : decodeLegacyKey(p.apiKey),
-    hasApiKey: Boolean(p.apiKey),
-    models: Array.isArray(p.models) ? p.models.filter((m) => typeof m === 'string' && m.trim()) : [],
-  }));
+  const profiles = storedProfiles.map((p) => {
+    const models = Array.isArray(p.models)
+      ? p.models.filter((m) => typeof m === 'string' && m.trim())
+      : [];
+    // enabledModels：用户勾选"在外部选择器展示"的模型子集；
+    // 未设置（旧数据）视为全部启用，向后兼容
+    const enabledModels = Array.isArray(p.enabledModels)
+      ? p.enabledModels.filter((m) => models.includes(m))
+      : [];
+    return {
+      ...p,
+      apiKey: keyCache.has(p.id)
+        ? keyCache.get(p.id)
+        : isEncrypted(p.apiKey)
+        ? ''
+        : decodeLegacyKey(p.apiKey),
+      hasApiKey: Boolean(p.apiKey),
+      models,
+      enabledModels,
+    };
+  });
 
   const storedActiveId = localStorage.getItem(KEYS.activeProfile);
   const active =
@@ -187,7 +198,9 @@ export const getConfig = () => {
 
   const provider = localStorage.getItem(KEYS.provider) || DEFAULT_LLM_PROVIDER;
   const model = active?.model || localStorage.getItem(KEYS.model) || DEFAULT_LLM_MODEL;
-  const models = active?.models?.length ? active.models : [model];
+  // 顶层 models 镜像：优先启用子集（外部选择器与模型解析都以它为准）
+  const activeList = active?.enabledModels?.length ? active.enabledModels : active?.models;
+  const models = activeList?.length ? activeList : [model];
 
   snapshot = {
     provider,
@@ -236,12 +249,14 @@ export const saveProfiles = async (profiles, activeId) => {
     profiles.map(async (p) => {
       const plain = (p.apiKey || '').trim();
       keyCache.set(p.id, plain);
+      const models = (p.models || []).map((m) => m.trim()).filter(Boolean);
       return {
         id: p.id,
         name: p.name,
         apiUrl: (p.apiUrl || '').trim(),
         apiKey: plain ? await encryptString(plain) : '',
-        models: (p.models || []).map((m) => m.trim()).filter(Boolean),
+        models,
+        enabledModels: (p.enabledModels || []).filter((m) => models.includes(m)),
         model: (p.model || '').trim(),
       };
     })

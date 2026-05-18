@@ -6,7 +6,9 @@ import {
   LogOut,
   PenSquare,
   ChevronUp,
+  Settings,
 } from 'lucide-react';
+import SettingsModal from './SettingsModal';
 import AppLogo from './AppLogo';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
@@ -26,6 +28,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   // 避免刷新时占位文字先闪现、列表随后才顶上来的抖动
   const [sessions, setSessions] = useState(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const userMenuRef = useRef(null);
 
   const loadSessions = useCallback(async () => {
@@ -173,6 +176,21 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                 >
                   <button
                     type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setIsSettingsOpen(true);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm ${classes.themeTransition} ${
+                      isDark
+                        ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                        : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                    }`}
+                  >
+                    <Settings size={18} />
+                    <span>{t('settings') || '设置'}</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleSignOut}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm ${classes.themeTransition} ${
                       isDark
@@ -222,6 +240,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           </div>
         )}
       </div>
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 });
