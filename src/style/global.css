@@ -9,6 +9,13 @@
   height: 100dvh;
 }
 
+/* 长会话性能：屏外消息跳过渲染与布局（浏览器只在滚近时才真正渲染），
+   contain-intrinsic-size 提供占位估高，避免滚动条跳动；不支持的浏览器自动忽略 */
+.message-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
 html,
 body,
 #root {

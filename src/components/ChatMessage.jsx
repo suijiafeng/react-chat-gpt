@@ -100,7 +100,7 @@ const ChatMessage = React.memo(
       }
     };
 
-    const containerClasses = `group flex mb-8 ${isUser ? 'justify-end' : 'justify-start'}`;
+    const containerClasses = `group message-row flex mb-8 ${isUser ? 'justify-end' : 'justify-start'}`;
     // 小屏给消息更宽的可读区域（90%），桌面维持 82% 的留白节奏
     const contentContainerClasses = `flex flex-col max-w-[90%] sm:max-w-[min(720px,82%)] ${
       isUser ? 'items-end' : 'items-start'
@@ -185,6 +185,8 @@ const ChatMessage = React.memo(
                   <img
                     src={img.dataUrl}
                     alt={img.name || `图片 ${i + 1}`}
+                    loading="lazy"
+                    decoding="async"
                     className="max-h-48 max-w-[240px] rounded-2xl object-cover border border-black/10 dark:border-white/10"
                   />
                 </a>
