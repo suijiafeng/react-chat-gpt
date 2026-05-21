@@ -29,7 +29,7 @@ const ActionButton = ({ title, onClick, isDark, children }) => (
     type="button"
     title={title}
     onClick={onClick}
-    className={`flex items-center gap-1 rounded-md p-1.5 text-xs transition-colors ${
+    className={`flex items-center gap-1 rounded-md p-2 text-xs transition-colors ${
       isDark ? 'text-white/50 hover:text-white hover:bg-white/10' : 'text-black/40 hover:text-black hover:bg-black/5'
     }`}
   >
@@ -180,7 +180,7 @@ const ChatMessage = React.memo(
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className={`rounded-full px-4 py-1.5 text-sm ${
+                  className={`rounded-full px-4 py-2 text-sm ${
                     isDark ? 'text-white/70 hover:bg-white/10' : 'text-black/60 hover:bg-black/5'
                   }`}
                 >
@@ -190,7 +190,7 @@ const ChatMessage = React.memo(
                   type="button"
                   onClick={submitEdit}
                   disabled={!editText.trim()}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium disabled:opacity-40 ${
+                  className={`rounded-full px-4 py-2 text-sm font-medium disabled:opacity-40 ${
                     isDark ? 'bg-white text-[#212121]' : 'bg-[#1f1f1f] text-white'
                   }`}
                 >
@@ -246,7 +246,7 @@ const ChatMessage = React.memo(
             ) : message || reasoning ? (
               <>
                 {isError && (
-                  <div className="flex items-center gap-1.5 mb-1 text-xs font-medium uppercase tracking-wide">
+                  <div className="flex items-center gap-2 mb-1 text-xs font-medium uppercase tracking-wide">
                     <AlertTriangle size={13} />
                     <span>出错了</span>
                   </div>
@@ -266,7 +266,7 @@ const ChatMessage = React.memo(
                     <button
                       type="button"
                       onClick={() => setReasoningExpanded((v) => !v)}
-                      className={`inline-flex items-center gap-1.5 select-none ${
+                      className={`inline-flex items-center gap-2 select-none ${
                         isDark ? 'text-white/65 hover:text-white/90' : 'text-black/55 hover:text-black/80'
                       }`}
                     >
@@ -316,7 +316,7 @@ const ChatMessage = React.memo(
           {/* 操作栏：AI 最后一条常驻，其余消息 hover 时显示；生成中不显示 */}
           {!isTyping && !(isStreaming && isLast) && (message || images?.length > 0 || attachments?.length > 0) && (
             <div
-              className={`flex items-center gap-0.5 mt-1 px-2 transition-opacity ${
+              className={`flex items-center gap-1 mt-1 px-2 transition-opacity ${
                 !isUser && isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
               }`}
             >
@@ -350,7 +350,7 @@ const ChatMessage = React.memo(
                   <button
                     type="button"
                     title="删除消息"
-                    className={`flex items-center gap-1 rounded-md p-1.5 text-xs transition-colors ${
+                    className={`flex items-center gap-1 rounded-md p-2 text-xs transition-colors ${
                       isDark ? 'text-white/50 hover:text-red-300 hover:bg-white/10' : 'text-black/40 hover:text-red-500 hover:bg-black/5'
                     }`}
                   >

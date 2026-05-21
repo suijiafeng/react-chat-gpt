@@ -32,7 +32,7 @@ const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes
         : state === 'fail' ? <XCircle size={14} className="inline text-red-500" />
         : <Zap size={14} className="inline" />
       }
-      className={`rounded-xl flex items-center gap-1.5 ${classes.themeTransition} ${
+      className={`rounded-xl flex items-center gap-2 ${classes.themeTransition} ${
         isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
       }`}
     >

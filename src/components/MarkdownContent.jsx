@@ -65,7 +65,7 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
       {collapsible && (
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="w-full px-4 py-1.5 bg-[#2d2d2d] text-xs text-gray-400 hover:text-white transition-colors text-center select-none"
+          className="w-full px-4 py-2 bg-[#2d2d2d] text-xs text-gray-400 hover:text-white transition-colors text-center select-none"
         >
           {collapsed ? `展开全部 ${lineCount} 行 ▾` : '收起 ▴'}
         </button>
@@ -143,12 +143,12 @@ const components = {
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-xl font-bold mt-5 mb-2.5 pb-1.5 border-b border-current/10 text-inherit">
+    <h2 className="text-xl font-bold mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
       {children}
     </h2>
   ),
   h3: ({ children }) => <h3 className="text-lg font-bold mt-4 mb-2 text-inherit">{children}</h3>,
-  h4: ({ children }) => <h4 className="text-base font-semibold mt-3 mb-1.5 text-inherit">{children}</h4>,
+  h4: ({ children }) => <h4 className="text-base font-semibold mt-3 mb-2 text-inherit">{children}</h4>,
   h5: ({ children }) => <h5 className="text-sm font-bold mt-3 mb-2 text-inherit">{children}</h5>,
   h6: ({ children }) => (
     <h6 className="text-sm font-semibold uppercase tracking-wide mt-3 mb-2 opacity-70 text-inherit">
@@ -172,7 +172,7 @@ const components = {
   ),
   ul: ({ children }) => <ul className="list-disc pl-6 space-y-1 my-2 marker:text-current/40">{children}</ul>,
   ol: ({ children }) => <ol className="list-decimal pl-6 space-y-1 my-2 marker:text-current/40">{children}</ol>,
-  li: ({ children }) => <li className="leading-7 pl-0.5">{children}</li>,
+  li: ({ children }) => <li className="leading-7 pl-1">{children}</li>,
   table: ({ children }) => (
     <div className="my-4 overflow-x-auto rounded-lg border border-current/10">
       <table className="w-full border-collapse text-left">{children}</table>

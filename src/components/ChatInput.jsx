@@ -95,7 +95,7 @@ const ChatInput = ({
                   <button
                     type="button"
                     onClick={() => onRemoveImage?.(i)}
-                    className="absolute -top-1.5 -right-1.5 rounded-full bg-black/70 text-white p-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                    className="absolute -top-2 -right-2 rounded-full bg-black/70 text-white p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
                     title="移除图片"
                   >
                     <X size={12} />
@@ -120,7 +120,7 @@ const ChatInput = ({
                   <button
                     type="button"
                     onClick={() => onRemoveFile?.(i)}
-                    className="absolute -top-1.5 -right-1.5 rounded-full bg-black/70 text-white p-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                    className="absolute -top-2 -right-2 rounded-full bg-black/70 text-white p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
                     title="移除文件"
                   >
                     <X size={12} />
@@ -152,7 +152,7 @@ const ChatInput = ({
               onClick={() => fileInputRef.current?.click()}
               title="添加图片或文件（也可直接粘贴图片）"
               aria-label="添加图片或文件"
-              className={`rounded-full p-2 mb-0.5 ${isDark ? 'text-white/75 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}
+              className={`rounded-full p-2 mb-1 ${isDark ? 'text-white/75 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}
             >
               <Plus size={18} />
             </button>
@@ -202,7 +202,7 @@ const ChatInput = ({
                     : 'bg-white text-gray-600 hover:bg-black/5'
                 }`}
               >
-                <item.icon size={14} className="mr-1.5 inline-block align-[-2px]" />
+                <item.icon size={14} className="mr-2 inline-block align-[-2px]" />
                 {item.title}
               </button>
             ))}

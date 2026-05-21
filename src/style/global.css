@@ -49,7 +49,7 @@ body {
 
 .settings-modal .ant-modal-header {
   margin: 0;
-  padding: 22px 24px 16px;
+  padding: 24px 24px 16px;
 }
 
 .settings-modal .ant-modal-body {
@@ -60,7 +60,7 @@ body {
 
 .settings-modal .ant-modal-footer {
   margin-top: 0;
-  padding: 16px 24px 22px;
+  padding: 16px 24px 24px;
   border-top: 1px solid #e2e8f0;
 }
 
@@ -339,15 +339,15 @@ body {
   }
 
   .settings-modal .ant-modal-header {
-    padding: 18px 18px 14px;
+    padding: 16px 16px 12px;
   }
 
   .settings-modal .ant-modal-body {
-    padding: 0 18px;
+    padding: 0 16px;
   }
 
   .settings-modal .ant-modal-footer {
-    padding: 14px 18px 18px;
+    padding: 12px 16px 16px;
   }
 }
 

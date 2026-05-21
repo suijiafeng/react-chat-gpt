@@ -118,8 +118,8 @@ const ModelItem = ({ model, isActive, onClick, isDark }) => (
 // 不能靠 Tailwind 的 first: 伪类判断"是不是列表里第一组"，要靠显式 first 参数
 const GroupLabel = ({ name, isDark, first }) => (
   <div
-    className={`px-1 pb-1.5 flex items-center gap-1.5 ${
-      first ? 'pt-0' : `pt-2.5 mt-1.5 border-t ${isDark ? 'border-white/[0.06]' : 'border-black/[0.05]'}`
+    className={`px-1 pb-2 flex items-center gap-2 ${
+      first ? 'pt-0' : `pt-3 mt-2 border-t ${isDark ? 'border-white/[0.06]' : 'border-black/[0.05]'}`
     }`}
   >
     <span className={`text-sm font-semibold uppercase tracking-wider select-none truncate ${
@@ -247,12 +247,12 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
     <>
       {showSearch && (
         <div
-          className={`sticky top-0 z-10 px-2.5 py-2 border-b ${
+          className={`sticky top-0 z-10 px-3 py-2 border-b ${
             isDark ? 'bg-[#1e1e1e] border-white/[0.06]' : 'bg-white border-black/[0.05]'
           }`}
         >
           <div
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 ${
               isDark ? 'bg-white/5' : 'bg-black/[0.035]'
             }`}
           >
@@ -269,7 +269,7 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
           </div>
         </div>
       )}
-      <div className="px-1.5 py-1.5 overflow-y-auto">{body}</div>
+      <div className="px-2 py-2 overflow-y-auto">{body}</div>
     </>
   );
 };
