@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="AI Chat">
+  <!-- 说话气泡 + 内部四角星（AI spark）。几何与 PNG 版本同源生成，见 gen_icon.py -->
+  <g fill="#4f46e5">
+    <rect x="1.5" y="2.5" width="29.0" height="21.5" rx="7.5"/>
+    <polygon points="9,18 9,29 18.5,22.5"/>
+  </g>
+  <path d="M16 6.5 q1.92 5.18 7.40 7.00 q-5.48 1.82 -7.40 7.00 q-1.92 -5.18 -7.40 -7.00 q5.48 -1.82 7.40 -7.00Z" fill="#fff"/>
+</svg>
