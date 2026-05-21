@@ -102,3 +102,23 @@ export const decryptString = async (stored, key) => {
     return '';
   }
 };
+
+/**
+ * 加密任意可 JSON 序列化的值（聊天记录用：一条消息的正文 + 图片 + 附件打成一个包）。
+ * 打包加密而不是逐字段加密，是为了少几次 crypto 调用、也少存几份 IV。
+ */
+export const encryptJson = async (value, key) => encryptString(JSON.stringify(value), key);
+
+/**
+ * 解密 encryptJson 的产物。解不开（主密钥被清、数据损坏）时返回 null，
+ * 由调用方决定降级展示——绝不抛错，否则一条坏记录会让整个会话打不开。
+ */
+export const decryptJson = async (stored, key) => {
+  const plain = await decryptString(stored, key);
+  if (!plain) return null;
+  try {
+    return JSON.parse(plain);
+  } catch {
+    return null;
+  }
+};

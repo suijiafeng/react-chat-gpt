@@ -174,12 +174,11 @@ export const getConfig = () => {
     const models = Array.isArray(p.models)
       ? p.models.filter((m) => typeof m === 'string' && m.trim())
       : [];
-    // enabledModels：用户勾选"在外部选择器展示"的模型子集。
-    // - 从未设置（旧数据 undefined）→ 默认勾选列表第一个（平台通常把最新/主打模型排前）；
-    // - 显式空数组（用户主动全部取消）→ 尊重清空，该服务商不在外部列表展示
+    // enabledModels：用户勾选"在外部选择器展示"的模型子集，一律手动勾选，
+    // 不做任何默认补选；为空则该服务商不在外部列表展示
     const enabledModels = Array.isArray(p.enabledModels)
       ? p.enabledModels.filter((m) => models.includes(m))
-      : models.slice(0, 1);
+      : [];
     return {
       ...p,
       apiKey: keyCache.has(p.id)
@@ -270,7 +269,9 @@ export const saveProfiles = async (profiles, activeId) => {
 
 /** 切换当前使用的模型（模型选择器调用，demo/backend 模式） */
 export const setCurrentModel = (model) => {
-  const { provider } = getConfig();
+  // 用推导结果而不是 localStorage 里存的那个值：存的可能还是历史遗留的 'demo'，
+  // 而实际已经有可用服务商，此时必须走 custom 分支把模型写回激活 profile
+  const provider = resolveProviderName();
   if (provider === 'custom') {
     // custom 下同步写入激活 profile 的默认模型，OpenAIProvider 请求时读取
     setCurrentSelection(getConfig().activeProfileId, model);
@@ -306,15 +307,27 @@ export const isDemoMode = () =>
 
 /**
  * 解析当前应使用的 provider 名称。
- * 优先级：用户在设置里显式保存过的选择 > 演示模式默认 demo > 部署配置的默认值
+ *
+ * demo 是兜底，不是一种可选模式——设置里的「接口服务提供商」tab 移除后，用户不再能
+ * 主动"选择演示模式"，所以这里也不能把存下来的 'demo' 当成一次显式选择去尊重：
+ * 只要有一个配置可用的模型服务商，就该走真实请求；一个都没有，才回落 demo。
+ * 否则用户配好了 key 和模型，却因为历史上存过 provider='demo' 而始终收到预设回复。
+ *
+ * 优先级：服务器托管（显式保存过）> 有可用服务商则 custom > 兜底 demo。
  */
 export const resolveProviderName = () => {
   const stored = localStorage.getItem(KEYS.provider);
-  if (stored === 'custom' || stored === 'demo' || stored === 'backend') {
-    // 显式选择过，原样尊重（即使切换到了真实后端部署，'演示模式'也应继续返回 mock 回复）
-    return stored;
-  }
+  // 服务器托管仍是一次显式配置行为（配置存在服务端账号下），保持尊重
+  if (stored === 'backend') return 'backend';
+
+  // "可用"= 填了接口地址且勾选了至少一个启用模型，两者缺一都发不出请求
+  const usable = getConfig().profiles.some(
+    (p) => p.apiUrl?.trim() && (p.enabledModels?.length || p.model)
+  );
+  if (usable) return 'custom';
+
   if (isDemoMode()) return 'demo';
+  // 没有可用服务商、也不在演示环境：交给部署方配置的默认值（如自建 Ollama）
   return DEFAULT_LLM_PROVIDER === 'custom' || DEFAULT_LLM_PROVIDER === 'demo'
     ? DEFAULT_LLM_PROVIDER
     : 'ollama';

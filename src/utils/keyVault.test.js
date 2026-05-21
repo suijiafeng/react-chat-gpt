@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encryptString, decryptString, isEncrypted } from './keyVault';
+import { encryptString, decryptString, encryptJson, decryptJson, isEncrypted } from './keyVault';
 
 // node 环境没有 IndexedDB，直接生成密钥注入（与浏览器主密钥同参数）
 const genKey = () =>
@@ -38,5 +38,28 @@ describe('keyVault AES-GCM 加解密', () => {
     expect(await decryptString('b64:c2s=', key)).toBe('');
     expect(await decryptString('', key)).toBe('');
     expect(isEncrypted('b64:xx')).toBe(false);
+  });
+});
+
+describe('encryptJson / decryptJson（聊天记录落盘用）', () => {
+  it('消息正文与附件打包加密后可完整还原，密文不含原文', async () => {
+    const key = await genKey();
+    const secret = {
+      text: '我的身份证号是 123456，请帮我保密',
+      images: ['data:image/png;base64,AAAA'],
+      attachments: [{ name: '工资单.pdf', content: '月薪 42000' }],
+    };
+    const stored = await encryptJson(secret, key);
+    expect(isEncrypted(stored)).toBe(true);
+    expect(stored).not.toContain('123456');
+    expect(stored).not.toContain('工资单');
+    expect(await decryptJson(stored, key)).toEqual(secret);
+  });
+
+  it('密钥不对 / 数据损坏时返回 null，交由调用方降级而不是抛错', async () => {
+    const stored = await encryptJson({ text: 'hi' }, await genKey());
+    expect(await decryptJson(stored, await genKey())).toBeNull();
+    expect(await decryptJson('enc:zz:zz', await genKey())).toBeNull();
+    expect(await decryptJson('', await genKey())).toBeNull();
   });
 });

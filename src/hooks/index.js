@@ -5,7 +5,7 @@ import { seedDemoUser } from '../store/db';
 import { userStore } from '../store';
 import { isDemoMode } from '../store/llmConfig';
 import { handleSessionExpired } from '../utils/session';
-import { WEBUI_API_BASE_URL } from '../constants';
+import { WEBUI_API_BASE_URL, DEMO_ACCOUNT } from '../constants';
 import request from '../apis/config';
 export * from './useChat';
 
@@ -34,7 +34,11 @@ export const useLanguage = () => {
 const resolveAuthState = () => {
   // Demo 快捷模式
   if (localStorage.getItem('demo_mode') === 'true') {
-    userStore.setUser({ email: 'demo@example.com', name: 'Demo User', profile_image_url: '' });
+    userStore.setUser({
+      email: DEMO_ACCOUNT.email,
+      name: DEMO_ACCOUNT.name,
+      profile_image_url: '',
+    });
     return true;
   }
   // 本地 session 校验

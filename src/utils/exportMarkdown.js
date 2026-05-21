@@ -1,20 +1,32 @@
 // 会话导出：把当前会话的全部消息导出为 Markdown 文件下载。
 
 import { initDB } from '../store/db';
+import { decryptString, decryptJson } from './keyVault';
 
-// 读取会话的全部消息（导出用，不分页）
+// 读取会话的全部消息（导出用，不分页）。
+// 落盘的正文是密文（见 store/db.js 的加密说明），导出前要还原；
+// 加密上线前的明文存量原样返回。
 const loadAllMessages = async (sessionId) => {
   const db = await initDB();
   const tx = db.transaction('chatMessages', 'readonly');
   const index = tx.store.index('sessionId_timestamp');
   const range = IDBKeyRange.bound([sessionId, ''], [sessionId, '￿']);
-  return index.getAll(range);
+  const records = await index.getAll(range);
+  return Promise.all(
+    records.map(async (record) => {
+      if (!record?.enc) return record;
+      const { enc, ...meta } = record;
+      return { ...meta, ...((await decryptJson(enc)) || { text: '（无法解密）' }) };
+    })
+  );
 };
 
 const getSessionTitle = async (sessionId) => {
   const db = await initDB();
   const session = await db.get('chatSessions', sessionId);
-  return session?.title || '对话记录';
+  if (!session) return '对话记录';
+  const title = session.titleEnc ? await decryptString(session.titleEnc) : session.title;
+  return title || '对话记录';
 };
 
 const sanitizeFilename = (name) => name.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 60) || 'chat';

@@ -1,6 +1,10 @@
 import { openDB } from 'idb';
 import { v4 as uuidv4 } from 'uuid';
 import { generateSalt, hashPassword } from '../utils/crypto';
+import { encryptString, decryptString, encryptJson, decryptJson } from '../utils/keyVault';
+import { DEMO_ACCOUNT } from '../constants';
+
+const DEMO_USER_ID = 'demo-user-fixed-id';
 
 const DB_NAME = 'chatDB';
 const DB_VERSION = 4;
@@ -54,18 +58,20 @@ export const initDB = async () => {
   });
 };
 
-// 预置演示账号（首次启动时写入）
+// 预置演示账号（首次启动时写入）。
+// 账号固定 id，改邮箱/密码时按 id 覆盖写入即可完成升级——老用户库里那条
+// demo@example.com 记录会被同一条 id 直接替换，不会残留一个还能用的弱口令账号。
 export const seedDemoUser = async () => {
   const db = await initDB();
-  const existing = await db.getFromIndex(USERS_STORE, 'email', 'demo@example.com');
-  if (existing) return; // 已存在，跳过
+  const existing = await db.get(USERS_STORE, DEMO_USER_ID);
+  if (existing?.email === DEMO_ACCOUNT.email) return; // 已是最新的演示账号，跳过
 
   const salt = generateSalt();
-  const passwordHash = await hashPassword('demo123', salt);
+  const passwordHash = await hashPassword(DEMO_ACCOUNT.password, salt);
   await db.put(USERS_STORE, {
-    id: 'demo-user-fixed-id',
-    name: 'Demo User',
-    email: 'demo@example.com',
+    id: DEMO_USER_ID,
+    name: DEMO_ACCOUNT.name,
+    email: DEMO_ACCOUNT.email,
     passwordHash,
     salt,
     profile_image_url: '',
@@ -98,28 +104,110 @@ export const createUser = async ({ name, email, passwordHash, salt, profile_imag
 };
 
 // ──────────────────────────────────────────────
+// 聊天内容的落盘加密
+//
+// 会话标题、消息正文、图片与附件都属于用户的私密内容，此前是明文躺在 IndexedDB 里——
+// 打开 DevTools 的 Application 面板、或任何能读到同源 IDB 的工具都能直接翻阅。
+// 现在这些字段统一用 keyVault 的主密钥（AES-256-GCM，不可导出的 CryptoKey）加密后再落盘。
+//
+// 刻意保持明文的字段：id / sessionId / timestamp / isUser / createdAt / updatedAt / model。
+// 它们是索引和排序的依据（加密后 sessionId_timestamp 索引就没法用了），且本身不含对话内容，
+// 泄露的只是"某时刻有过一条消息"这种元数据。
+//
+// 老实说：和 keyVault 一样，这是"不落明文 + 纵深防御"，不是对抗同源 XSS 的护城河——
+// 页面里跑起来的恶意代码同样能调用这里的解密函数。
+// ──────────────────────────────────────────────
+
+// 消息里需要加密的内容字段；其余字段是元数据，原样保留
+const MESSAGE_SECRET_FIELDS = ['text', 'images', 'attachments'];
+
+const encryptMessageRecord = async (message, sessionId) => {
+  const { id, isUser, timestamp, ...rest } = message;
+  const secret = {};
+  const meta = {};
+  for (const [k, v] of Object.entries(rest)) {
+    if (MESSAGE_SECRET_FIELDS.includes(k)) secret[k] = v;
+    else meta[k] = v;
+  }
+  return {
+    ...meta,
+    id,
+    sessionId,
+    isUser,
+    timestamp: timestamp || new Date().toISOString(),
+    enc: await encryptJson(secret),
+  };
+};
+
+// 读出的记录还原成组件直接可用的形状。
+// 兼容三种情况：新的密文记录、加密上线前写入的明文存量、以及解不开的坏记录
+// （主密钥被清空时不该整页崩掉，降级成一条带标记的空消息，用户能看到出了什么事）。
+const decryptMessageRecord = async (record) => {
+  if (!record?.enc) return record; // 明文存量
+  const { enc, ...meta } = record;
+  const secret = await decryptJson(enc);
+  if (secret === null) {
+    return { ...meta, text: '（本地密钥已失效，无法解密这条消息）', undecryptable: true };
+  }
+  return { ...meta, ...secret };
+};
+
+// 明文存量惰性升级为密文：读到就顺手重写一次。
+// 不 await、失败也不管——迁移失败顶多下次再试，绝不该拖慢或阻断读取。
+const migrateMessageIfPlain = (db, record) => {
+  if (record?.enc || !record?.id) return;
+  encryptMessageRecord(record, record.sessionId)
+    .then((encrypted) => db.put(MESSAGES_STORE, encrypted))
+    .catch(() => {});
+};
+
+// ──────────────────────────────────────────────
 // 会话（Session）操作
 // ──────────────────────────────────────────────
 
 export const createSession = async (title = '新对话', model = '') => {
   const db = await initDB();
   const now = new Date().toISOString();
-  const session = { id: uuidv4(), title, model, createdAt: now, updatedAt: now };
+  const session = { id: uuidv4(), model, createdAt: now, updatedAt: now, titleEnc: await encryptString(title) };
   await db.put(SESSIONS_STORE, session);
-  return session;
+  // 返回给调用方的是明文形状，存储形态不外泄到上层
+  return { id: session.id, title, model, createdAt: now, updatedAt: now };
+};
+
+const decryptSession = async (session) => {
+  if (!session?.titleEnc) return session; // 明文存量
+  const { titleEnc, ...meta } = session;
+  const title = await decryptString(titleEnc);
+  return { ...meta, title: title || '（无法解密的会话）' };
 };
 
 export const getAllSessions = async () => {
   const db = await initDB();
   const all = await db.getAllFromIndex(SESSIONS_STORE, 'updatedAt');
-  return all.reverse();
+  const decrypted = await Promise.all(all.reverse().map(decryptSession));
+  // 明文存量惰性升级（同上，不阻塞列表渲染）
+  all
+    .filter((s) => s && !s.titleEnc)
+    .forEach((s) => {
+      const { title, ...meta } = s;
+      encryptString(title || '')
+        .then((titleEnc) => db.put(SESSIONS_STORE, { ...meta, titleEnc }))
+        .catch(() => {});
+    });
+  return decrypted;
 };
 
 export const updateSessionTitle = async (sessionId, title) => {
   const db = await initDB();
   const session = await db.get(SESSIONS_STORE, sessionId);
   if (!session) return;
-  await db.put(SESSIONS_STORE, { ...session, title, updatedAt: new Date().toISOString() });
+  const meta = { ...session };
+  delete meta.title; // 顺带清掉明文存量字段，改名即完成该会话的迁移
+  await db.put(SESSIONS_STORE, {
+    ...meta,
+    titleEnc: await encryptString(title),
+    updatedAt: new Date().toISOString(),
+  });
 };
 
 export const touchSession = async (sessionId) => {
@@ -144,11 +232,7 @@ export const deleteSession = async (sessionId) => {
 
 export const saveMessageToDB = async (message, sessionId) => {
   const db = await initDB();
-  await db.put(MESSAGES_STORE, {
-    ...message,
-    sessionId,
-    timestamp: new Date().toISOString(),
-  });
+  await db.put(MESSAGES_STORE, await encryptMessageRecord({ ...message, timestamp: null }, sessionId));
 };
 
 export const loadMessagesBySessionPaged = async (sessionId, limit = 30, offset = 0) => {
@@ -166,13 +250,15 @@ export const loadMessagesBySessionPaged = async (sessionId, limit = 30, offset =
     }
   }
 
-  const messages = [];
-  while (cursor && messages.length < limit) {
-    messages.push(cursor.value);
+  const records = [];
+  while (cursor && records.length < limit) {
+    records.push(cursor.value);
     cursor = await cursor.continue();
   }
 
-  return messages.reverse();
+  const messages = await Promise.all(records.reverse().map(decryptMessageRecord));
+  records.forEach((record) => migrateMessageIfPlain(db, record));
+  return messages;
 };
 
 // 删除单条消息（不存在时静默忽略）
