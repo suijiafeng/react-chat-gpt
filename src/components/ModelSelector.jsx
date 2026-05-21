@@ -60,7 +60,10 @@ const ModelSelector = React.memo(() => {
         onClick={toggleOpen}
         aria-label={`当前模型 ${currentModel}，点击切换`}
         aria-expanded={isOpen}
-        className={`flex items-center justify-between min-w-[128px] sm:min-w-[168px] px-3 sm:px-3.5 py-2 text-sm leading-5 ${
+        title={currentModel}
+        /* 限宽：模型 id 可以很长（含日期/版本后缀），不限制会把顶栏撑变形，
+           超出部分由内部 truncate 省略，hover 看完整名 */
+        className={`flex items-center justify-between min-w-[128px] sm:min-w-[168px] max-w-[180px] sm:max-w-[240px] px-3 sm:px-4 py-2 text-base leading-5 ${
           isDark ? 'bg-[#2a2a2a] text-white border-white/10 hover:bg-zinc-800' : 'bg-white text-black border-gray-300 hover:bg-gray-50'
         } border rounded-xl ${classes.themeTransition}`}
       >
@@ -73,7 +76,8 @@ const ModelSelector = React.memo(() => {
 
       {isOpen && (
         <div
-          className={`absolute mt-2 w-[260px] max-h-[440px] flex flex-col z-50 transition-colors duration-300 ${
+          /* 面板右对齐按钮：按钮限宽后若仍从左边缘展开，260px 的面板会顶出视口右侧 */
+          className={`absolute right-0 mt-2 w-[260px] max-w-[calc(100vw-24px)] max-h-[440px] flex flex-col z-50 transition-colors duration-300 ${
             isDark ? 'bg-[#1e1e1e] text-white border-zinc-800' : 'bg-white text-black border-gray-200'
           } border rounded-2xl shadow-xl overflow-hidden ${classes.themeTransition}`}
         >
@@ -118,8 +122,7 @@ const GroupLabel = ({ name, isDark, first }) => (
       first ? 'pt-0' : `pt-2.5 mt-1.5 border-t ${isDark ? 'border-white/[0.06]' : 'border-black/[0.05]'}`
     }`}
   >
-    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: dotColor(name) }} />
-    <span className={`text-[11px] font-semibold uppercase tracking-wider select-none truncate ${
+    <span className={`text-sm font-semibold uppercase tracking-wider select-none truncate ${
       isDark ? 'text-zinc-500' : 'text-gray-400'
     }`}>
       {name}

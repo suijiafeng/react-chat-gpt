@@ -70,17 +70,61 @@ body {
   border-radius: 12px;
 }
 
+/* 所有可输入控件统一：42px 高、8px 圆角、同一套内边距，
+   避免 Input / Password / Select / InputNumber 各按各的默认值渲染而高低错落 */
 .settings-modal .ant-input,
+.settings-modal .ant-input-affix-wrapper,
 .settings-modal .ant-input-password,
-.settings-modal .ant-input-number,
 .settings-modal .ant-select-selector {
   min-height: 42px;
-  border-radius: 12px !important;
+  border-radius: 8px !important;
   box-shadow: none !important;
 }
 
-.settings-modal .ant-input-number-input {
-  height: 40px;
+.settings-modal .ant-input-affix-wrapper > .ant-input {
+  min-height: auto;
+  padding: 0;
+}
+
+.settings-modal .ant-input-number {
+ padding:5px 0;
+}
+
+/* 只给单选框撑行高让文字居中；多选/tags 模式的选项是一枚枚小胶囊，
+   跟着撑高会溢出胶囊被裁掉，交给 antd 自己算 */
+.settings-modal .ant-select-single .ant-select-selection-placeholder,
+.settings-modal .ant-select-single .ant-select-selection-item {
+  line-height: 34px;
+}
+
+.settings-modal .ant-select-multiple .ant-select-selector {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* 选中的模型胶囊：字号跟输入框一致（继承下来的 16px 会把字母下缘顶出胶囊被裁掉），
+   高度留够行高 */
+.settings-modal .ant-select-multiple .ant-select-selection-item,
+.settings-modal .ant-select-multiple .ant-select-selection-item-content {
+  /* antd 的 cssinjs 样式在运行时注入、排在本文件之后，同权重会赢，这里要提权 */
+  height: auto !important;
+  font-size: 14px !important;
+  line-height: 22px !important;
+}
+
+.settings-modal .ant-select-multiple .ant-select-selection-placeholder {
+  line-height: 32px;
+}
+
+/* 正文区里的按钮与"接口服务提供商"分段按钮跟输入框同一条 42px 基线；
+   携带历史那组是 size="small"，刻意矮一档，不参与统一 */
+.settings-modal .ant-modal-body .ant-btn,
+.settings-modal .ant-modal-body .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-sm) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border-radius: 8px;
 }
 
 .settings-modal .ant-radio-button-wrapper::before {

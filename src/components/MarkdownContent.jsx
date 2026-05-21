@@ -120,7 +120,7 @@ const components = {
       );
     }
     return (
-      <code className="bg-current/[0.09] px-1.5 py-0.5 rounded-md text-[13px] font-mono text-inherit">
+      <code className="bg-current/[0.09] px-2 py-1 rounded-md text-sm font-mono text-inherit">
         {children}
       </code>
     );
@@ -149,9 +149,9 @@ const components = {
   ),
   h3: ({ children }) => <h3 className="text-lg font-bold mt-4 mb-2 text-inherit">{children}</h3>,
   h4: ({ children }) => <h4 className="text-base font-semibold mt-3 mb-1.5 text-inherit">{children}</h4>,
-  h5: ({ children }) => <h5 className="text-[15px] font-semibold mt-3 mb-1.5 text-inherit">{children}</h5>,
+  h5: ({ children }) => <h5 className="text-sm font-bold mt-3 mb-2 text-inherit">{children}</h5>,
   h6: ({ children }) => (
-    <h6 className="text-[13px] font-semibold uppercase tracking-wide mt-3 mb-1.5 opacity-70 text-inherit">
+    <h6 className="text-sm font-semibold uppercase tracking-wide mt-3 mb-2 opacity-70 text-inherit">
       {children}
     </h6>
   ),
@@ -166,7 +166,7 @@ const components = {
   },
   hr: () => <hr className="my-6 border-t border-current/10" />,
   blockquote: ({ children }) => (
-    <blockquote className="border-l-4 border-current/25 pl-4 py-1.5 my-3 bg-current/[0.04] rounded-r italic text-inherit opacity-85 text-[15px]">
+    <blockquote className="border-l-4 border-current/25 pl-4 py-2 my-3 bg-current/[0.04] rounded-r italic text-inherit opacity-85 text-base">
       {children}
     </blockquote>
   ),

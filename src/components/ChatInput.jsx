@@ -112,7 +112,7 @@ const ChatInput = ({
                   <FileText size={16} className="shrink-0 opacity-60" />
                   <div className="min-w-0">
                     <div className="truncate text-xs font-medium">{file.name}</div>
-                    <div className="text-[10px] opacity-50">
+                    <div className="text-sm opacity-50">
                       {formatFileSize(file.size)}
                       {file.truncated ? ' · 已截断' : ''}
                     </div>

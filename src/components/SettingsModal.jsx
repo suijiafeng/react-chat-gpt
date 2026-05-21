@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message, Popconfirm } from 'antd';
-import { Zap, CheckCircle2, XCircle, Loader2, ServerCog, Server, Bot, Sparkles, Trash2, Plus, ExternalLink, GripVertical } from 'lucide-react';
+import { Zap, CheckCircle2, XCircle, Loader2, ServerCog, Trash2, Plus, ExternalLink } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { getConfig, saveConfig, saveProfiles } from '../store/llmConfig';
@@ -23,6 +23,7 @@ const fetchOpenAiModelIds = async (baseUrl, apiKey) => {
 const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes, successCls, errorCls }) => (
   <>
     <Button
+    size='small'
       onClick={onTest}
       disabled={disabled || state === 'testing'}
       icon={
@@ -41,27 +42,46 @@ const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes
   </>
 );
 
+// 表单的可比较快照：与"打开弹窗时的基线"逐字节比对，判断有没有未保存的修改
+const snapshotOf = ({
+  provider,
+  contextTokens,
+  think,
+  selectedId,
+  profiles,
+  backendApiUrl,
+  backendApiKey,
+  backendModel,
+  backendProvider,
+}) =>
+  JSON.stringify({
+    provider,
+    contextTokens,
+    think,
+    selectedId,
+    profiles: (profiles || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      apiUrl: p.apiUrl,
+      apiKey: p.apiKey,
+      models: p.models,
+      enabledModels: p.enabledModels,
+    })),
+    backend: { backendApiUrl, backendApiKey, backendModel, backendProvider },
+  });
+
 let customSeq = 0;
 const newCustomId = () => `custom-${Date.now()}-${customSeq++}`;
 
-// 服务商卡片的显示顺序是纯 UI 偏好，独立于 profiles 数据本身持久化，
-// 拖拽调整后立即写入，不需要走"保存"按钮
-const CHIP_ORDER_KEY = 'llm_provider_chip_order';
-const loadChipOrder = () => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(CHIP_ORDER_KEY) || '[]');
-    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-};
-const saveChipOrder = (order) => localStorage.setItem(CHIP_ORDER_KEY, JSON.stringify(order));
+// 「服务器托管」在服务商列表里的伪 id。原来它是「接口服务提供商」tab 的一个选项，
+// 现在 tab 去掉了，它降级成服务商列表里的一张卡片——用户只需要回答"用哪家模型服务"
+// 这一个问题，而不是先选模式、再选服务商。
+const BACKEND_ID = '__backend__';
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const { isDark, classes } = useTheme();
   const { t } = useLanguage();
 
-  const [provider, setProvider] = useState('demo');
   // 多服务商 profile 列表（apiKey 为明文，保存时由配置中心统一编码）
   const [profiles, setProfiles] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -71,15 +91,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [testState, setTestState] = useState('idle');
   const [testMessage, setTestMessage] = useState('');
   const [modelsAutoLoading, setModelsAutoLoading] = useState(false);
-  // 本次会话中用户主动清空过启用勾选的 profile——自动拉取不再替它默认补选
-  const clearedEnabledRef = useRef(new Set());
   // 记录每个 profile 上一次自动拉取用的「地址|密钥」签名，避免同样的值重复请求
   const lastFetchSigRef = useRef(new Map());
-
-  // 服务商卡片的拖拽显示顺序：id 列表，内置预设 + 自定义 profile 混排
-  const [chipOrder, setChipOrder] = useState(loadChipOrder);
-  const [dragOverId, setDragOverId] = useState(null);
-  const dragIdRef = useRef(null);
+  // 打开弹窗（或后端配置加载完）时的表单基线，用于判断"有没有未保存的修改"
+  const [baseline, setBaseline] = useState(null);
 
   // "服务器托管"模式专用状态：配置存在后端账号下，不进 localStorage
   const [backendApiUrl, setBackendApiUrl] = useState('');
@@ -96,6 +111,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
   const selected = profiles.find((p) => p.id === selectedId) || null;
 
+  // provider 不再是用户显式选的"模式"，而是从选中的服务商推导出来的结果：
+  //   选中「服务器托管」→ backend；选中任意模型服务商 → custom；
+  //   一个都没配（列表里没有选中项）→ 保存时回落 demo，见 handleSave。
+  // 这样设置面板只问一个问题："用哪家模型服务"，而不是先选模式再选服务商。
+  const provider = selectedId === BACKEND_ID ? 'backend' : 'custom';
+  // 一个服务商都没配置过：当前实际跑的是演示模式，需要在面板上说清楚
+  const nothingConfigured = provider === 'custom' && !profiles.some((p) => p.apiUrl?.trim());
+
   // 表单里的 key（新输入）为空时，取配置中心内存缓存里的已存明文——
   // 测试连接 / 自动拉模型需要真实 key，但它不进入表单、不渲染到 DOM
   const effectiveKey = (profile) =>
@@ -108,26 +131,42 @@ const SettingsModal = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (!isOpen) return;
     const config = getConfig();
-    setProvider(
-      config.provider === 'custom' || config.provider === 'backend' ? config.provider : 'demo'
-    );
     // 安全：表单不回填明文 key（避免暴露在 DOM/开发者工具里）。
     // apiKey 置空 + hasApiKey 标记"已保存"；留空保存 = 沿用旧值
-    setProfiles(
-      config.profiles.map((p) => ({
-        ...p,
-        apiKey: '',
-        hasApiKey: Boolean(p.hasApiKey || p.apiKey),
-        models: [...p.models],
-        enabledModels: [...(p.enabledModels || [])],
-      }))
-    );
-    setSelectedId(config.activeProfileId || config.profiles[0]?.id || '');
+    const nextProfiles = config.profiles.map((p) => ({
+      ...p,
+      apiKey: '',
+      hasApiKey: Boolean(p.hasApiKey || p.apiKey),
+      models: [...p.models],
+      enabledModels: [...(p.enabledModels || [])],
+    }));
+    // 上次用的是服务器托管，就直接选中那张卡；否则选中上次激活的服务商
+    const nextSelectedId =
+      config.provider === 'backend' && !USE_LOCAL_DATA
+        ? BACKEND_ID
+        : config.activeProfileId || config.profiles[0]?.id || '';
+    const nextProvider = nextSelectedId === BACKEND_ID ? 'backend' : 'custom';
+    setProfiles(nextProfiles);
+    setSelectedId(nextSelectedId);
     setContextTokens(config.contextTokens);
     setThink(config.think);
     setTestState('idle');
     setTestMessage('');
     setBackendLoadError('');
+    // 基线 = 刚加载进来的这份值，之后任何差异都算"未保存的修改"
+    setBaseline(
+      snapshotOf({
+        provider: nextProvider,
+        contextTokens: config.contextTokens,
+        think: config.think,
+        selectedId: nextSelectedId,
+        profiles: nextProfiles,
+        backendApiUrl,
+        backendApiKey,
+        backendModel,
+        backendProvider,
+      })
+    );
     lastFetchSigRef.current = new Map();
     backendModelEditedRef.current = false;
     lastBackendFetchRef.current = '';
@@ -139,12 +178,24 @@ const SettingsModal = ({ isOpen, onClose }) => {
       setBackendTestMessage('');
       getBackendLlmConfig()
         .then((res) => {
-          setBackendApiUrl(res.data?.apiUrl || '');
-          setBackendModel(res.data?.model || '');
-          setBackendProvider(res.data?.provider === 'ollama' ? 'ollama' : 'custom');
+          const url = res.data?.apiUrl || '';
+          const model = res.data?.model || '';
+          const bp = res.data?.provider === 'ollama' ? 'ollama' : 'custom';
+          setBackendApiUrl(url);
+          setBackendModel(model);
+          setBackendProvider(bp);
           setBackendHasApiKey(Boolean(res.data?.hasApiKey));
           setBackendApiKey('');
           backendModelEditedRef.current = Boolean(res.data?.model);
+          // 后端配置是异步落地的，并进基线，避免被当成"用户改动"
+          setBaseline((prev) => {
+            if (prev === null) return prev;
+            const obj = JSON.parse(prev);
+            return JSON.stringify({
+              ...obj,
+              backend: { backendApiUrl: url, backendApiKey: '', backendModel: model, backendProvider: bp },
+            });
+          });
         })
         .catch((error) => {
           setBackendLoadError(
@@ -155,34 +206,22 @@ const SettingsModal = ({ isOpen, onClose }) => {
         })
         .finally(() => setBackendLoading(false));
     }
+    // 只在打开时取一次配置；backend* 初值只用于组基线，不需要作为依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // 服务商卡片显示顺序：内置预设 + 当前已配置的自定义 profile 的并集，
-  // 沿用上次拖拽保存的顺序，新出现的 id（新增自定义 profile）追加到末尾
-  useEffect(() => {
-    const allIds = [
-      ...PROVIDER_PRESETS.map((p) => p.id),
-      ...profiles
-        .filter((p) => !PROVIDER_PRESETS.some((preset) => preset.id === p.id))
-        .map((p) => p.id),
-    ];
-    setChipOrder((prev) => {
-      const known = prev.filter((id) => allIds.includes(id));
-      const missing = allIds.filter((id) => !known.includes(id));
-      return [...known, ...missing];
-    });
-  }, [profiles]);
-
-  const reorderChips = (fromId, toId) => {
-    if (!fromId || fromId === toId) return;
-    setChipOrder((prev) => {
-      const next = prev.filter((id) => id !== fromId);
-      const idx = next.indexOf(toId);
-      next.splice(idx === -1 ? next.length : idx, 0, fromId);
-      saveChipOrder(next);
-      return next;
-    });
-  };
+  const formSnapshot = snapshotOf({
+    provider,
+    contextTokens,
+    think,
+    selectedId,
+    profiles,
+    backendApiUrl,
+    backendApiKey,
+    backendModel,
+    backendProvider,
+  });
+  const dirty = baseline !== null && baseline !== formSnapshot;
 
   // 更新当前选中 profile 的字段
   const updateSelected = (patch) => {
@@ -201,9 +240,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
         apiUrl: preset.apiUrl,
         apiKey: '',
         models: [...preset.fallbackModels],
-        // 默认勾选第一个（预设把最新/主打模型排在最前）
-        enabledModels: preset.fallbackModels.slice(0, 1),
-        model: preset.fallbackModels[0],
+        // 启用模型一律由用户手动勾选，不默认补选
+        enabledModels: [],
+        model: '',
       };
       setProfiles((prev) => [...prev, profile]);
       setSelectedId(preset.id);
@@ -240,20 +279,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
   };
 
   // 把拉取到的模型 id 列表写入选中 profile（最多 200 个，作为勾选候选项）。
-  // 用户手输的自定义模型名不在拉取结果里也保留；fillDefault=true（手动测试连接导入）
-  // 且勾选为空时默认补选第一个——自动防抖拉取不补，尊重用户显式清空
-  const applyFetchedModels = (ids, fillDefault = false) => {
+  // 用户手输的自定义模型名不在拉取结果里也保留；启用模型不做任何默认补选，
+  // 完全由用户手动勾选
+  const applyFetchedModels = (ids) => {
     const list = ids.slice(0, 200);
     setProfiles((prev) =>
       prev.map((p) => {
         if (p.id !== selectedId) return p;
-        let enabled = p.enabledModels || [];
-        if (!enabled.length && fillDefault) enabled = list.slice(0, 1);
+        const enabled = p.enabledModels || [];
         return {
           ...p,
           models: [...new Set([...list, ...enabled])],
           enabledModels: enabled,
-          model: enabled.includes(p.model) ? p.model : enabled[0] || list[0],
+          model: enabled.includes(p.model) ? p.model : enabled[0] || '',
         };
       })
     );
@@ -269,7 +307,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
       setTestState('ok');
       if (ids.length > 0) {
         setTestMessage(`连接成功，检测到 ${ids.length} 个可用模型`);
-        applyFetchedModels(ids, true);
+        applyFetchedModels(ids);
         lastFetchSigRef.current.set(selected.id, selected.apiUrl.trim() + '|' + selected.apiKey.trim());
       } else {
         setTestMessage('连接成功');
@@ -281,36 +319,31 @@ const SettingsModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // 自动拉取模型：填好地址（+密钥）后防抖自动请求 /models 生成勾选候选，
-  // 让预设不会因为模型下线而过时；手输项通过并集保留，失败静默。
-  useEffect(() => {
+  // 按需拉取模型：用户展开「启用的模型」下拉时才请求 /models 生成勾选候选，
+  // 避免填地址/密钥过程中的无谓请求；同一「地址|密钥」只拉一次，手输项通过并集保留，失败静默。
+  const loadModelsOnDemand = async () => {
     if (provider !== 'custom' || !selected) return;
     const base = selected.apiUrl?.trim();
     if (!base) return;
     const sig = base + '|' + (selected.apiKey || '').trim();
     if (sig === lastFetchSigRef.current.get(selected.id)) return;
 
-    const timer = setTimeout(async () => {
-      setModelsAutoLoading(true);
-      try {
-        const ids = await fetchOpenAiModelIds(selected.apiUrl, effectiveKey(selected));
-        lastFetchSigRef.current.set(selected.id, sig);
-        if (ids.length) {
-          // 用户没主动清空过勾选时，空勾选默认补选第一个（最新）
-          applyFetchedModels(ids, !clearedEnabledRef.current.has(selected.id));
-          setTestState('ok');
-          setTestMessage(`已自动获取 ${ids.length} 个模型`);
-        }
-      } catch {
-        // 静默失败：多因平台限制浏览器跨域访问 /models，保留预设兜底，用户可手动"测试连接"
-        lastFetchSigRef.current.set(selected.id, sig);
-      } finally {
-        setModelsAutoLoading(false);
+    setModelsAutoLoading(true);
+    try {
+      const ids = await fetchOpenAiModelIds(selected.apiUrl, effectiveKey(selected));
+      lastFetchSigRef.current.set(selected.id, sig);
+      if (ids.length) {
+        applyFetchedModels(ids);
+        setTestState('ok');
+        setTestMessage(`已获取 ${ids.length} 个模型`);
       }
-    }, 900);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provider, selectedId, selected?.apiUrl, selected?.apiKey]);
+    } catch {
+      // 静默失败：多因平台限制浏览器跨域访问 /models，保留预设兜底，用户可手动"测试连接"
+      lastFetchSigRef.current.set(selected.id, sig);
+    } finally {
+      setModelsAutoLoading(false);
+    }
+  };
 
   // 自动拉取模型：backend 模式下由服务端拉取（绕开浏览器 CORS），填好地址后防抖触发，
   // 仅在用户还没填模型名时自动填充。
@@ -371,36 +404,54 @@ const SettingsModal = ({ isOpen, onClose }) => {
       const validProfiles = profiles
         .map((p) => ({ ...p, models: (p.models || []).map((m) => m.trim()).filter(Boolean) }))
         .filter((p) => p.apiUrl?.trim());
+      // 一个服务商都没配：不再弹「请至少配置一个服务商」把人拦住——
+      // 没有可用服务商时演示模式就是正确答案，直接落库 demo 即可
       if (validProfiles.length === 0) {
-        message.warning('请至少配置一个服务商（填写 API 接口地址）');
+        saveConfig({
+          provider: 'demo',
+          currentModel: 'demo-assistant',
+          contextTokens: contextTokens || 8000,
+          think,
+        });
+        message.success(t('settingsSaved') || '设置已保存，立即生效');
+        setBaseline(formSnapshot);
+        onClose();
         return;
       }
-      const active =
-        validProfiles.find((p) => p.id === selectedId) || validProfiles[0];
-      if (active.models.length === 0) {
-        message.warning(`请为「${active.name}」至少添加一个模型`);
-        return;
-      }
-      // 规范每个 profile：key 留空沿用旧值；默认模型取启用列表第一个
+      // 规范每个 profile：key 留空沿用旧值；默认模型取启用列表第一个。
+      // 启用模型允许一个都不勾——那只是"这家不在聊天页模型选择器里出现"，不是错误
       const normalized = validProfiles.map((p) => {
         const enabled = (p.enabledModels || []).filter((m) => p.models.includes(m));
-        const pool = enabled.length ? enabled : p.models;
         return {
           ...p,
           apiKey: effectiveKey(p),
           enabledModels: enabled,
-          model: pool.includes(p.model) ? p.model : pool[0] || '',
+          model: enabled.includes(p.model) ? p.model : enabled[0] || '',
         };
       });
-      const activeNorm = normalized.find((p) => p.id === active.id);
-      await saveProfiles(normalized, active.id);
-      saveConfig({
-        provider: 'custom',
-        model: activeNorm.model,
-        currentModel: activeNorm.model,
-        contextTokens: contextTokens || 8000,
-        think,
-      });
+      // 激活的必须是"有启用模型"的那家，否则聊天页无模型可用；
+      // 选中的那家没勾模型就顺延到别家，全都没勾就落回演示模式
+      const active =
+        normalized.find((p) => p.id === selectedId && p.enabledModels.length) ||
+        normalized.find((p) => p.enabledModels.length) ||
+        null;
+      await saveProfiles(normalized, active?.id || '');
+      saveConfig(
+        active
+          ? {
+              provider: 'custom',
+              model: active.model,
+              currentModel: active.model,
+              contextTokens: contextTokens || 8000,
+              think,
+            }
+          : {
+              provider: 'demo',
+              currentModel: 'demo-assistant',
+              contextTokens: contextTokens || 8000,
+              think,
+            }
+      );
     } else if (provider === 'backend') {
       if (!backendApiUrl.trim()) {
         message.warning('请填写 API 接口地址');
@@ -430,28 +481,44 @@ const SettingsModal = ({ isOpen, onClose }) => {
         contextTokens: contextTokens || 8000,
         think,
       });
-    } else {
-      saveConfig({
-        provider: 'demo',
-        currentModel: 'demo-assistant',
-        contextTokens: contextTokens || 8000,
-        think,
-      });
     }
     message.success(t('settingsSaved') || '设置已保存，立即生效');
+    // 保存成功后重新取基线：留在弹窗里继续调整时，状态条会显示"已保存"
+    setBaseline(formSnapshot);
     onClose();
+  };
+
+  // 关闭前拦截：有未保存修改时先确认，避免误点遮罩/Esc 丢掉刚填的配置
+  const handleRequestClose = () => {
+    if (!dirty) {
+      onClose();
+      return;
+    }
+    Modal.confirm({
+      title: '放弃未保存的修改？',
+      content: '当前的模型与 API 配置还没保存，关闭后这些改动会丢失。',
+      okText: '放弃并关闭',
+      cancelText: '继续编辑',
+      okButtonProps: { danger: true },
+      // 确认框自己不吃 Esc：否则从 Esc 触发时会被同一次按键顺手关掉
+      keyboard: false,
+      maskClosable: false,
+      onOk: onClose,
+    });
   };
 
   const modalThemeClass = isDark ? 'settings-modal settings-modal-dark' : 'settings-modal settings-modal-light';
   const dropdownPopupClass = isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown';
-  const labelCls = `block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`;
+  const labelCls = `block text-base${isDark ? 'text-zinc-300' : 'text-slate-700'}`;
   const helpTextCls = `text-xs leading-relaxed ${isDark ? 'text-zinc-500' : 'text-slate-500'}`;
   // 扁平分区风格：不再用"卡片套卡片"的重边框方块，改成同一层级内用细分割线
   // 区隔各区块，减少不必要的留白与视觉重量，弹窗内容更紧凑
   const sectionCls = `pt-4 mt-4 border-t first:pt-0 first:mt-0 first:border-t-0 ${
     isDark ? 'border-white/10' : 'border-slate-200'
   }`;
-  const inputCls = `rounded-xl px-4 py-2.5 text-sm ${classes.themeTransition} ${
+  // 只覆盖圆角与配色，左右内边距交给 antd 自己——Input/Password/Select/InputNumber
+  // 各自的内边距实现不同，一旦手写 px-* 就会互相错位、文字对不齐
+  const inputCls = `text-base ${classes.themeTransition} ${
     isDark
       ? 'bg-[#121212] text-white border-white/10 focus:bg-[#121212] focus:border-zinc-500 focus:text-white placeholder:text-zinc-600'
       : 'bg-white text-slate-950 border-slate-200 placeholder:text-slate-400'
@@ -461,32 +528,56 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
   const selectedPreset = selected ? PROVIDER_PRESETS.find((p) => p.id === selected.id) : null;
 
-  // 服务商卡片：内置预设 + 自定义 profile 按 chipOrder 混排成一份统一列表
-  const chipItems = chipOrder
-    .map((id) => {
-      const preset = PROVIDER_PRESETS.find((p) => p.id === id);
-      if (preset) return { id, isPreset: true, name: preset.name, preset, configured: profiles.find((p) => p.id === id) };
-      const custom = profiles.find((p) => p.id === id);
-      return custom ? { id, isPreset: false, name: custom.name, configured: custom } : null;
-    })
-    .filter(Boolean);
+  // 服务商卡片：内置预设在前（按预设表顺序），用户新建的自定义服务商追加在后
+  const chipItems = [
+    ...PROVIDER_PRESETS.map((preset) => ({ id: preset.id, preset })),
+    ...profiles
+      .filter((p) => !PROVIDER_PRESETS.some((preset) => preset.id === p.id))
+      .map((p) => ({ id: p.id, preset: null })),
+  ].map(({ id, preset }) => {
+    const configured = profiles.find((p) => p.id === id);
+    return {
+      id,
+      isPreset: !!preset,
+      name: preset ? preset.name : configured.name,
+      preset,
+      configured,
+      hasKey: !!(configured && (configured.apiKey || configured.hasApiKey)),
+      hasEnabledModels: !!configured?.enabledModels?.length,
+    };
+  });
 
-  // 通用参数（纵向排列）：custom 模式并入模型卡，demo/backend 模式单独成卡
+  // 「服务器托管」跟在服务商列表末尾，只在接了真实后端的部署下出现。
+  // 固定收尾，跟在模型服务商后面
+  const providerChips = USE_LOCAL_DATA
+    ? chipItems
+    : [
+        ...chipItems,
+        {
+          id: BACKEND_ID,
+          isBackend: true,
+          name: t('backendHosted') || '服务器托管',
+          hasKey: backendHasApiKey,
+          hasEnabledModels: Boolean(backendModel),
+        },
+      ];
+
+  // 通用参数一行：上下文预算靠左，展示思考过程贴右
   const generalParams = (
-    <div className="space-y-3 pt-1">
-      <div className="space-y-1">
-        <p className={helpTextCls}>上下文预算 (Token)</p>
+    <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className={labelCls}>上下文预算</span>
         <InputNumber
           value={contextTokens}
           onChange={(v) => setContextTokens(v)}
           min={1000}
           max={200000}
           step={1000}
-          className={`w-full ${isDark ? 'bg-[#121212] border-white/10' : ''}`}
+          size="small"
         />
       </div>
-      <div className="flex items-center justify-between gap-3">
-        <p className={helpTextCls}>Think 模式（展示思考过程）</p>
+      <div className="flex items-center gap-3">
+        <span className={labelCls}>展示思考过程</span>
         <Switch checked={think} onChange={setThink} />
       </div>
     </div>
@@ -496,31 +587,47 @@ const SettingsModal = ({ isOpen, onClose }) => {
     <Modal
       title={
         <div className="flex items-center gap-3">
-          <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
+          <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${
             isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-50 text-blue-600'
           }`}>
-            <ServerCog size={20} />
+            <ServerCog size={16} />
           </span>
-          <div>
-            <span className={`block text-base font-semibold ${isDark ? 'text-white' : 'text-slate-950'}`}>
-              {t('settings') || '模型与 API 配置'}
-            </span>
-            <span className={`block text-xs font-normal ${isDark ? 'text-zinc-500' : 'text-slate-500'}`}>
-              可同时配置多家模型服务商，在聊天页顶部快速切换
-            </span>
-          </div>
+          <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-950'}`}>
+            {t('settings') || '模型与 API 配置'}
+          </span>
         </div>
       }
       open={isOpen}
-      onCancel={onClose}
-      footer={[
-        <Button key="cancel" onClick={onClose} className={isDark ? 'bg-transparent text-zinc-300 border-white/10 hover:bg-white/5' : ''}>
-          {t('cancel') || '取消'}
-        </Button>,
-        <Button key="save" type="primary" onClick={handleSave} className="bg-blue-600 hover:bg-blue-500 border-0 shadow-none">
-          {t('save') || '保存'}
-        </Button>,
-      ]}
+      onCancel={handleRequestClose}
+      /* 误点遮罩/误按 Esc 就丢配置太伤：点空白永远不关；有未保存修改时 Esc 也不关，
+         只能走「取消 / ×」，那条路上有二次确认 */
+      maskClosable={false}
+      keyboard={!dirty}
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <span
+            className={`inline-flex items-center gap-2 text-sm ${
+              dirty ? (isDark ? 'text-amber-300' : 'text-amber-600') : isDark ? 'text-zinc-500' : 'text-slate-400'
+            }`}
+          >
+            {dirty ? <span className="h-2 w-2 rounded-full bg-current" /> : <CheckCircle2 size={13} />}
+            {dirty ? '未保存' : '已保存'}
+          </span>
+          <span className="flex items-center gap-2">
+            <Button onClick={handleRequestClose} className={isDark ? 'bg-transparent text-zinc-300 border-white/10 hover:bg-white/5' : ''}>
+              {t('cancel') || '取消'}
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleSave}
+              disabled={!dirty}
+              className="bg-blue-600 hover:bg-blue-500 border-0 shadow-none"
+            >
+              {t('save') || '保存'}
+            </Button>
+          </span>
+        </div>
+      }
       className={modalThemeClass}
       wrapClassName={isDark ? 'settings-modal-wrap settings-modal-wrap-dark' : 'settings-modal-wrap'}
       centered
@@ -543,76 +650,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
       }}
     >
       <div className="py-5">
-        {/* 服务提供商选择 */}
+        {/* 服务商列表：原来「接口服务提供商」tab 的三个模式收敛到了这一份列表里，
+            服务器托管（如有）作为末尾一张卡片。列表始终渲染，否则选中托管后就切不回来了 */}
         <div className={`${sectionCls} space-y-3`}>
-          <label className={labelCls}>{t('apiProvider') || '接口服务提供商'}</label>
-          <Radio.Group
-            value={provider}
-            onChange={(e) => setProvider(e.target.value)}
-            className="flex flex-col sm:flex-row gap-3 w-full"
-          >
-            {[
-              { value: 'demo', icon: Sparkles, label: t('demoMockMode') || '前端演示模式' },
-              { value: 'custom', icon: Bot, label: t('customOpenAi') || '模型服务商' },
-              // 服务器托管模式依赖真实登录后端（USE_LOCAL_DATA=false 部署），
-              // 演示/本地部署下没有意义，不展示这个选项，避免用户点了却因为没登录而困惑
-              ...(!USE_LOCAL_DATA
-                ? [{ value: 'backend', icon: Server, label: t('backendHosted') || '服务器托管' }]
-                : []),
-            ].map((opt) => (
-              <Radio.Button
-                key={opt.value}
-                value={opt.value}
-                className={`flex-1 text-center py-2 h-auto rounded-xl ${classes.themeTransition} ${
-                  isDark
-                    ? 'bg-[#121212] text-zinc-200 border-white/10 hover:text-white hover:border-zinc-500'
-                    : 'bg-white text-slate-700 border-slate-200 hover:text-slate-950 hover:border-slate-300'
-                }`}
-              >
-                <span className="inline-flex items-center justify-center gap-1.5">
-                  <opt.icon size={14} className="shrink-0" />
-                  {opt.label}
-                </span>
-              </Radio.Button>
-            ))}
-          </Radio.Group>
-          <p className={helpTextCls}>
-            {provider === 'demo'
-              ? t('demoHint') || '演示模式下无需配置 key，AI 回复采用预设素材，流式打字返回，安全省心。'
-              : provider === 'backend'
-              ? t('backendHint') ||
-                '登录后台账号后，模型请求经服务端转发，API Key 只存在服务端，不经过浏览器，也不受各家模型商 CORS 限制。'
-              : t('customHint') ||
-                '支持任何兼容 OpenAI 格式的大模型 API（DeepSeek、Kimi、通义、智谱、OpenRouter、Claude、Gemini、本地 Ollama 等），可同时配置多家。'}
-          </p>
-        </div>
-
-        {provider === 'custom' && (
-          <>
-            {/* 服务商预设 + 已配置列表 */}
-            <div className={`${sectionCls} space-y-2.5`}>
-              <label className={labelCls}>服务商（点击切换或添加，可拖拽排序）</label>
-              <div className="flex flex-wrap gap-1.5">
-                {chipItems.map((item) => {
+          <label className={labelCls}>服务商</label>
+              <div className="flex flex-wrap gap-2">
+                {providerChips.map((item) => {
                   const isActive = selectedId === item.id;
-                  const isDragOver = dragOverId === item.id;
                   return (
-                    <div
+                    <button
                       key={item.id}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        if (dragOverId !== item.id) setDragOverId(item.id);
-                      }}
-                      onDragLeave={() => setDragOverId((prev) => (prev === item.id ? null : prev))}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        reorderChips(dragIdRef.current, item.id);
-                        dragIdRef.current = null;
-                        setDragOverId(null);
-                      }}
-                      className={`group rounded-full border text-xs inline-flex items-center overflow-hidden ${classes.themeTransition} ${
-                        isDragOver ? (isDark ? 'ring-2 ring-blue-400/60' : 'ring-2 ring-blue-400') : ''
-                      } ${
+                      type="button"
+                      onClick={() => (item.isPreset ? applyPreset(item.preset) : setSelectedId(item.id))}
+                      className={`rounded-full border px-3 py-1 text-sm inline-flex items-center gap-1 ${classes.themeTransition} ${
                         isActive
                           ? isDark
                             ? 'border-blue-400 bg-blue-500/10 text-blue-300'
@@ -622,38 +672,15 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
                       }`}
                     >
-                      {/* 单独的小拖拽把手：整块可点击区域不带 draggable，
-                          避免"点击"和"拖拽"两种手势在同一元素上冲突（误触发拖拽/点击不生效） */}
-                      <span
-                        draggable
-                        onDragStart={() => {
-                          dragIdRef.current = item.id;
-                        }}
-                        onDragEnd={() => {
-                          dragIdRef.current = null;
-                          setDragOverId(null);
-                        }}
-                        title="拖拽调整顺序"
-                        className="pl-2 pr-0.5 py-1 flex items-center opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing"
-                      >
-                        <GripVertical size={10} />
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => (item.isPreset ? applyPreset(item.preset) : setSelectedId(item.id))}
-                        className="pl-0.5 pr-2.5 py-1 flex items-center gap-1"
-                      >
-                        {item.configured && (
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              item.configured.apiKey || item.configured.hasApiKey ? 'bg-emerald-400' : 'bg-stone-400'
-                            }`}
-                            title={item.configured.apiKey || item.configured.hasApiKey ? '已配置密钥' : '已添加，未填密钥'}
-                          />
-                        )}
-                        {item.name}
-                      </button>
-                    </div>
+                      {/* 标识仅在"已选启用模型"时出现：绿点=有密钥且已选模型，灰点=已选模型但未填密钥 */}
+                      {item.hasEnabledModels && (
+                        <span
+                          className={`h-2 w-2 rounded-full ${item.hasKey ? 'bg-emerald-400' : 'bg-stone-400'}`}
+                          title={item.hasKey ? '已配置密钥并选择模型' : '已选择模型，未填密钥'}
+                        />
+                      )}
+                      {item.name}
+                    </button>
                   );
                 })}
                 <button
@@ -668,15 +695,21 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   <Plus size={12} /> 自定义
                 </button>
               </div>
-              <p className={helpTextCls}>绿点 = 已配置密钥；灰点 = 待配置。自定义服务商最多 10 个，内置服务商不可删除。</p>
+              {/* 没配任何服务商时当前实际跑的是演示回复。原来这句话挂在「前端演示模式」
+                  这个 tab 下，tab 移除后改成按状态出现，用户不至于疑惑回复是哪来的 */}
+              {nothingConfigured && (
+                <p className={helpTextCls}>
+                  {t('demoHint') || '尚未配置服务商，当前使用演示回复（预设素材，无需密钥）。选择上方任意服务商即可接入真实模型。'}
+                </p>
+              )}
             </div>
 
-            {selected && (
+            {provider === 'custom' && selected && (
               <>
-                {/* 连接：地址 + 密钥 + 测试合并为一张卡 */}
-                <div className={`${sectionCls} space-y-2.5`}>
+                {/* 一张卡按填写顺序排：地址 → 密钥 → 模型，最后才是"测试可用性" */}
+                <div className={`${sectionCls} space-y-3`}>
                   <div className="flex items-center justify-between">
-                    <label className={labelCls}>{selected.name} · 连接</label>
+                    <label className={labelCls}>{selected.name}</label>
                     <div className="flex items-center gap-3">
                       {selectedPreset?.docs && (
                         <a
@@ -714,7 +747,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     <Input
                       value={selected.name}
                       onChange={(e) => updateSelected({ name: e.target.value })}
-                      placeholder="服务商名称（用于模型选择器分组显示）"
+                      placeholder="服务商名称"
                       className={inputCls}
                     />
                   )}
@@ -724,7 +757,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       updateSelected({ apiUrl: e.target.value });
                       setTestState('idle');
                     }}
-                    placeholder="接口地址，例如 https://api.deepseek.com/v1"
+                    placeholder="https://api.deepseek.com/v1"
                     className={inputCls}
                   />
                   <Input.Password
@@ -733,14 +766,37 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       updateSelected({ apiKey: e.target.value });
                       setTestState('idle');
                     }}
-                    placeholder={
-                      selected.hasApiKey
-                        ? 'API Key 已加密保存（不回显），留空则沿用'
-                        : 'API Key，例如 sk-xxxxxxxxxxxxxxxx'
-                    }
+                    placeholder={selected.hasApiKey ? '已保存，留空则不修改' : 'sk-xxxxxxxx'}
                     className={inputCls}
                   />
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <Select
+                    mode="tags"
+                    value={selected.enabledModels || []}
+                    onChange={(vals) => {
+                      updateSelected({
+                        enabledModels: vals,
+                        // 手输的新模型名并入候选，刷新拉取时也不会丢
+                        models: [...new Set([...selected.models, ...vals])],
+                        model: vals.includes(selected.model) ? selected.model : vals[0] || '',
+                      });
+                    }}
+                    options={selected.models.map((m) => ({ value: m, label: m }))}
+                    // 展开下拉时才去平台拉模型列表
+                    onOpenChange={(open) => {
+                      if (open) loadModelsOnDemand();
+                    }}
+                    loading={modelsAutoLoading}
+                    notFoundContent={modelsAutoLoading ? '获取模型中…' : undefined}
+                    placeholder="点此选择模型"
+                    className={`w-full ${inputCls}`}
+                    classNames={{ popup: { root: dropdownPopupClass } }}
+                    showSearch
+                    maxTagCount="responsive"
+                    allowClear
+                    tokenSeparators={[',']}
+                  />
+                  {/* 三项填完再验证，所以放在它们下方；按钮右对齐，结果文案排在它左侧 */}
+                  <div className="flex flex-row-reverse justify-start items-center gap-3 flex-wrap pt-1">
                     <TestConnection
                       onTest={handleTest}
                       state={testState}
@@ -752,48 +808,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       errorCls={errorTextCls}
                     />
                   </div>
-                  <p className={helpTextCls}>密钥加密存于本地、不回显；高安全需求用「服务器托管」。</p>
                 </div>
 
-                {/* 模型与通用参数合并为一张卡 */}
-                <div className={`${sectionCls} space-y-2.5`}>
-                  <label className={`${labelCls} flex items-center gap-2`}>
-                    启用的模型
-                    {modelsAutoLoading && (
-                      <span className="flex items-center gap-1 text-blue-400 normal-case tracking-normal font-normal">
-                        <Loader2 size={12} className="animate-spin" /> 自动获取中…
-                      </span>
-                    )}
-                  </label>
-                  <Select
-                    mode="tags"
-                    value={selected.enabledModels || []}
-                    onChange={(vals) => {
-                      if (vals.length === 0) clearedEnabledRef.current.add(selected.id);
-                      else clearedEnabledRef.current.delete(selected.id);
-                      updateSelected({
-                        enabledModels: vals,
-                        // 手输的新模型名并入候选，刷新拉取时也不会丢
-                        models: [...new Set([...selected.models, ...vals])],
-                        model: vals.includes(selected.model) ? selected.model : vals[0] || selected.models[0] || '',
-                      });
-                    }}
-                    options={selected.models.map((m) => ({ value: m, label: m }))}
-                    placeholder="勾选或输入模型名；留空则该服务商不出现在顶部列表"
-                    className="w-full"
-                    classNames={{ popup: { root: dropdownPopupClass } }}
-                    showSearch
-                    maxTagCount="responsive"
-                    allowClear
-                    tokenSeparators={[',']}
-                  />
-                  <p className={helpTextCls}>候选项自动来自平台，第一个为默认模型。</p>
-                  {generalParams}
-                </div>
+                <div className={`${sectionCls}`}>{generalParams}</div>
               </>
             )}
-          </>
-        )}
 
         {provider === 'backend' && (
           <>
@@ -828,9 +847,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   </Radio.Button>
                 ))}
               </Radio.Group>
-              <p className={helpTextCls}>
-                大多数平台选「OpenAI 兼容」；本机 Ollama 的思考型模型选「Ollama 原生」可支持 think 开关、避免思维链拖慢首字节。
-              </p>
             </div>
 
             <div className={`${sectionCls} space-y-2`}>
@@ -853,9 +869,6 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 disabled={backendLoading}
                 className={inputCls}
               />
-              <p className={helpTextCls}>
-                密钥经加密后保存在服务器数据库里，浏览器只知道&ldquo;已配置&rdquo;，不会拿到明文。
-              </p>
             </div>
 
             {/* 连接测试：由服务端拉取上游模型列表验证地址/密钥（不受浏览器 CORS 限制） */}
@@ -885,8 +898,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
           </>
         )}
 
-        {/* demo / backend 模式下通用参数单独成卡（custom 已并入模型卡） */}
-        {provider !== 'custom' && (
+        {/* 托管模式、以及还没选中任何服务商时，通用参数单独成卡（选中服务商后已并入模型卡） */}
+        {(provider === 'backend' || !selected) && (
           <div className={`${sectionCls} space-y-3`}>
             <label className={labelCls}>通用参数</label>
             {generalParams}

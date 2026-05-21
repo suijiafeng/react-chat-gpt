@@ -135,7 +135,7 @@ const ChatMessage = React.memo(
       isUser ? 'items-end' : 'items-start'
     }`;
     const messageClasses = `
-      px-5 py-2 text-[15px] leading-7
+      px-5 py-2 text-base leading-7
       ${
         isUser
           ? isDark
@@ -174,7 +174,7 @@ const ChatMessage = React.memo(
                   }
                   if (e.key === 'Escape') setIsEditing(false);
                 }}
-                className="w-full bg-transparent text-[15px] leading-7 outline-none resize-none"
+                className="w-full bg-transparent text-base leading-7 outline-none resize-none"
               />
               <div className="flex justify-end gap-2 mt-2">
                 <button
@@ -234,7 +234,7 @@ const ChatMessage = React.memo(
                   <FileText size={16} className="shrink-0 opacity-60" />
                   <div className="min-w-0">
                     <div className="truncate text-xs font-medium">{file.name}</div>
-                    <div className="text-[10px] opacity-50">{formatFileSize(file.size)}</div>
+                    <div className="text-xs opacity-50">{formatFileSize(file.size)}</div>
                   </div>
                 </div>
               ))}
@@ -253,7 +253,7 @@ const ChatMessage = React.memo(
                 )}
                 {reasoning && (
                   <div
-                    className={`mb-3 px-1 text-[11px] leading-5 ${
+                    className={`mb-3 px-1 text-xs leading-5 ${
                       message
                         ? isDark
                           ? 'text-white/35'
