@@ -1,30 +1,45 @@
 import { useTheme } from '../contexts/ThemeContext';
 
 /**
- * Reusable app logo: 2×2 grid icon + name label.
- * Adapts automatically to light / dark theme.
+ * 品牌标识：说话气泡 + 内部四角星（AI spark）。
+ * 几何与 public/favicon.svg 完全一致——改这里请同步改那边，
+ * 否则站内 logo 会和浏览器标签页图标长得不一样。
  */
-const AppLogo = ({ name }) => {
-  const { isDark, classes } = useTheme();
-
-  // Icon colours per theme
-  const iconBorder = isDark ? 'border-white/10' : 'border-black/10';
-  const iconBg = isDark ? 'bg-white/5' : 'bg-black/5';
-  const dotBg = isDark ? 'bg-white/80' : 'bg-gray-700/80';
+export const LogoMark = ({ size = 32, className = '' }) => {
+  const { isDark } = useTheme();
+  // 暗色下用 indigo-500，深底上比 indigo-600 更透气
+  const ink = isDark ? '#6366f1' : '#4f46e5';
 
   return (
-    <div className="flex items-center gap-3">
-      <div className={`w-8 h-8 rounded-xl border ${iconBorder} ${iconBg} ${classes.themeTransition} flex items-center justify-center`}>
-        <div className="grid grid-cols-2 gap-0.5">
-          <span className={`block w-2.5 h-2.5 ${dotBg} rounded-[2px]`} />
-          <span className={`block w-2.5 h-2.5 ${dotBg} rounded-[2px]`} />
-          <span className={`block w-2.5 h-2.5 ${dotBg} rounded-[2px]`} />
-          <span className={`block w-2.5 h-2.5 ${dotBg} rounded-[2px]`} />
-        </div>
-      </div>
-      {name && <div className="text-base font-semibold tracking-tight">{name}</div>}
-    </div>
+    <svg
+      viewBox="0 0 32 32"
+      width={size}
+      height={size}
+      className={className}
+      role="img"
+      aria-label="logo"
+    >
+      <g fill={ink}>
+        <rect x="1.5" y="2.5" width="29" height="21.5" rx="7.5" />
+        <polygon points="9,18 9,29 18.5,22.5" />
+      </g>
+      <path
+        fill="#fff"
+        d="M16 6.5 q1.92 5.18 7.40 7.00 q-5.48 1.82 -7.40 7.00 q-1.92 -5.18 -7.40 -7.00 q5.48 -1.82 7.40 -7.00Z"
+      />
+    </svg>
   );
 };
+
+/**
+ * Reusable app logo: brand mark + name label.
+ * Adapts automatically to light / dark theme.
+ */
+const AppLogo = ({ name }) => (
+  <div className="flex items-center gap-3">
+    <LogoMark size={32} />
+    {name && <div className="text-lg font-semibold tracking-tight">{name}</div>}
+  </div>
+);
 
 export default AppLogo;
