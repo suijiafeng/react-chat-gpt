@@ -98,7 +98,7 @@ const ModelSelector = React.memo(() => {
 const ModelItem = ({ model, isActive, onClick, isDark }) => (
   <button
     onClick={onClick}
-    className={`flex min-h-[36px] w-full items-center justify-between text-left px-3 py-2 mb-0.5 last:mb-0 text-sm leading-5 rounded-lg transition-colors duration-150 ${
+    className={`flex min-h-[36px] w-full items-center justify-between text-left px-3 py-2 mb-1 last:mb-0 text-base leading-5 rounded-lg transition-colors duration-150 ${
       isActive
         ? isDark
           ? 'bg-blue-500/15 text-blue-300 font-medium'
@@ -131,7 +131,7 @@ const GroupLabel = ({ name, isDark, first }) => (
 );
 
 const EmptyHint = ({ isDark, children }) => (
-  <div className={`px-3 py-4 text-sm text-center ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+  <div className={`px-3 py-4 text-base text-center ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
     {children}
   </div>
 );
@@ -262,7 +262,7 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="搜索模型"
-              className={`w-full bg-transparent text-sm outline-none ${
+              className={`w-full bg-transparent text-base outline-none ${
                 isDark ? 'text-white placeholder:text-zinc-600' : 'text-black placeholder:text-gray-400'
               }`}
             />

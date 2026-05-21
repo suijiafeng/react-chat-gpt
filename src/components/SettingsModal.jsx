@@ -38,7 +38,7 @@ const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes
     >
       {state === 'testing' ? '测试中...' : '测试连接'}
     </Button>
-    {msg && <p className={`text-xs ${state === 'ok' ? successCls : errorCls}`}>{msg}</p>}
+    {msg && <p className={`text-sm ${state === 'ok' ? successCls : errorCls}`}>{msg}</p>}
   </>
 );
 
@@ -510,7 +510,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const modalThemeClass = isDark ? 'settings-modal settings-modal-dark' : 'settings-modal settings-modal-light';
   const dropdownPopupClass = isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown';
   const labelCls = `block text-base${isDark ? 'text-zinc-300' : 'text-slate-700'}`;
-  const helpTextCls = `text-xs leading-relaxed ${isDark ? 'text-zinc-500' : 'text-slate-500'}`;
+  const helpTextCls = `text-sm leading-relaxed ${isDark ? 'text-zinc-500' : 'text-slate-500'}`;
   // 扁平分区风格：不再用"卡片套卡片"的重边框方块，改成同一层级内用细分割线
   // 区隔各区块，减少不必要的留白与视觉重量，弹窗内容更紧凑
   const sectionCls = `pt-4 mt-4 border-t first:pt-0 first:mt-0 first:border-t-0 ${
@@ -686,7 +686,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 <button
                   type="button"
                   onClick={addCustomProfile}
-                  className={`rounded-full border border-dashed px-2.5 py-1 text-xs inline-flex items-center gap-0.5 ${classes.themeTransition} ${
+                  className={`rounded-full border border-dashed px-3 py-1 text-sm inline-flex items-center gap-1 ${classes.themeTransition} ${
                     isDark
                       ? 'border-white/20 text-zinc-400 hover:border-zinc-400 hover:text-white'
                       : 'border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-800'
@@ -716,7 +716,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           href={selectedPreset.docs}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1 text-xs ${
+                          className={`inline-flex items-center gap-1 text-sm ${
                             isDark ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-500'
                           }`}
                         >
@@ -733,7 +733,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                         >
                           <button
                             type="button"
-                            className={`inline-flex items-center gap-1 text-xs ${
+                            className={`inline-flex items-center gap-1 text-sm ${
                               isDark ? 'text-rose-300 hover:text-rose-200' : 'text-rose-500 hover:text-rose-400'
                             }`}
                           >
@@ -817,7 +817,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         {provider === 'backend' && (
           <>
             {backendLoadError && (
-              <div className={`${sectionCls} text-sm ${isDark ? 'text-red-300' : 'text-red-600'}`}>
+              <div className={`${sectionCls} text-base ${isDark ? 'text-red-300' : 'text-red-600'}`}>
                 {backendLoadError}
               </div>
             )}

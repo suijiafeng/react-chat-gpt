@@ -168,11 +168,11 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 两套并存时原生气泡会先拦下提交（文案还是浏览器语言），我们的提示反而看不到 */}
             <form className="flex flex-col" onSubmit={handleSubmit} noValidate>
               <div className="mb-1 text-center">
-                <div className="text-2xl font-medium">
+                <div className="text-3xl font-medium">
                   {mode === 'signin' ? t('Sign in') : t('Sign up')} {t('to')} {WEBUI_NAME}
                 </div>
                 {mode === 'signup' && (
-                  <div className={`mt-1 text-xs font-medium ${classes.mutedText}`}>
+                  <div className={`mt-1 text-sm font-medium ${classes.mutedText}`}>
                     ⓘ {t('localStorageNotice')}
                   </div>
                 )}
@@ -182,7 +182,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 用户名（仅注册） */}
                 {mode === 'signup' && (
                   <div>
-                    <div className="text-sm font-medium text-left mb-2">{t('Name')}</div>
+                    <div className="text-base font-medium text-left mb-2">{t('Name')}</div>
                     <input
                       value={name}
                       onChange={bind(setName, 'name')}
@@ -200,7 +200,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
 
                 {/* 邮箱 */}
                 <div>
-                  <div className="text-sm font-medium text-left mb-2">{t('Email')}</div>
+                  <div className="text-base font-medium text-left mb-2">{t('Email')}</div>
                   <input
                     value={email}
                     onChange={bind(setEmail, 'email')}
@@ -217,7 +217,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
 
                 {/* 密码 */}
                 <div>
-                  <div className="text-sm font-medium text-left mb-2">{t('Password')}</div>
+                  <div className="text-base font-medium text-left mb-2">{t('Password')}</div>
                   <PasswordInput
                     value={password}
                     onChange={bind(setPassword, 'password')}
@@ -235,7 +235,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 确认密码（仅注册） */}
                 {mode === 'signup' && (
                   <div>
-                    <div className="text-sm font-medium text-left mb-2">{t('Confirm Password')}</div>
+                    <div className="text-base font-medium text-left mb-2">{t('Confirm Password')}</div>
                     <PasswordInput
                       value={confirmPassword}
                       onChange={bind(setConfirmPassword, 'confirmPassword')}
@@ -264,7 +264,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                       : t('Create Account')}
                 </button>
 
-                <div className="mt-4 text-sm text-center">
+                <div className="mt-4 text-base text-center">
                   {mode === 'signin' ? t('Dont have an account?') : t('Already have an account?')}
                   <button
                     className="font-medium underline ml-1"
@@ -277,7 +277,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
 
                 {/* 默认账号提示：仅本地演示构建展示，真实后端部署下不提示弱口令 */}
                 {mode === 'signin' && USE_LOCAL_DATA && (
-                  <p className={`mt-5 text-center text-xs ${classes.mutedText}`}>
+                  <p className={`mt-5 text-center text-sm ${classes.mutedText}`}>
                     {t('demoCredentialsHint')}
                     <span className="font-mono ml-1">
                       {DEMO_ACCOUNT.email} / {DEMO_ACCOUNT.password}

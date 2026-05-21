@@ -371,7 +371,7 @@ const ChatInterface = () => {
             {showEmptyState && (
               <div className="flex min-h-[50vh] items-center justify-center px-4">
                 <div className="text-center select-none">
-                  <div className={`text-lg md:text-4xl leading-relaxed ${classes.mutedText}`}>
+                  <div className={`text-xl md:text-4xl leading-relaxed ${classes.mutedText}`}>
                     今天想聊些什么呢？
                   </div>
                 </div>

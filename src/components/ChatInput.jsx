@@ -71,7 +71,7 @@ const ChatInput = ({
         {/* 视觉能力提示：软提醒，不拦截发送 */}
         {visionWarning && (
           <div
-            className={`mb-2 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs ${
+            className={`mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
               isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-600'
             }`}
           >
@@ -111,7 +111,7 @@ const ChatInput = ({
                 >
                   <FileText size={16} className="shrink-0 opacity-60" />
                   <div className="min-w-0">
-                    <div className="truncate text-xs font-medium">{file.name}</div>
+                    <div className="truncate text-sm font-medium">{file.name}</div>
                     <div className="text-sm opacity-50">
                       {formatFileSize(file.size)}
                       {file.truncated ? ' · 已截断' : ''}
@@ -128,7 +128,7 @@ const ChatInput = ({
                 </div>
               ))}
               {isReadingFiles && (
-                <div className="flex items-center gap-1.5 px-2 text-xs opacity-60">
+                <div className="flex items-center gap-2 px-2 text-sm opacity-60">
                   <Loader2 size={14} className="animate-spin" /> 解析附件中…
                 </div>
               )}
@@ -196,7 +196,7 @@ const ChatInput = ({
                 key={item.title}
                 type="button"
                 onClick={() => onSuggestionClick?.(item.prompt)}
-                className={`rounded-2xl border px-3 py-3 text-left text-sm ${classes.border} ${classes.themeTransition} ${
+                className={`rounded-2xl border px-3 py-3 text-left text-base ${classes.border} ${classes.themeTransition} ${
                   isDark
                     ? 'bg-white/[0.03] text-white/80 hover:bg-white/10'
                     : 'bg-white text-gray-600 hover:bg-black/5'
@@ -209,7 +209,7 @@ const ChatInput = ({
           </div>
         )}
         {/* 小屏收起免责提示，把纵向空间留给对话内容 */}
-        <div className={`mt-3 text-center text-xs hidden sm:block ${classes.mutedText}`}>
+        <div className={`mt-3 text-center text-sm hidden sm:block ${classes.mutedText}`}>
           AI 回复仅供参考，重要信息请自行核实。
         </div>
       </form>

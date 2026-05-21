@@ -146,7 +146,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           <button
             type="button"
             onClick={handleNewChat}
-            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${classes.themeTransition} ${classes.buttonHover}`}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-base ${classes.themeTransition} ${classes.buttonHover}`}
           >
             <PenSquare size={18} className="shrink-0" />
             <span>{t('newChat')}</span>
@@ -155,7 +155,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
         <div className={`border-b h-[8px] ${isDark ? 'border-white/10' : 'border-black/10'}`}></div>
         <button
           onClick={toggleRecentChats}
-          className={`w-full px-5 pt-5 pb-2 flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-[0.2em] ${classes.themeTransition} ${classes.buttonHover} rounded-lg`}
+          className={`w-full px-5 pt-5 pb-2 flex items-center justify-between gap-2 text-sm font-medium uppercase tracking-[0.2em] ${classes.themeTransition} ${classes.buttonHover} rounded-lg`}
         >
           <span className={isDark ? 'text-white/35' : 'text-black/35'}>
             {t('recentChats')}
@@ -174,13 +174,13 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           {!isRecentChatsCollapsed && (
             <>
               {sessions === null ? null : sessions.length === 0 ? (
-                <div className={`px-3 py-6 text-sm ${classes.mutedText}`}>暂无聊天记录</div>
+                <div className={`px-3 py-6 text-base ${classes.mutedText}`}>暂无聊天记录</div>
               ) : (
                 <div className="space-y-1">
                   {sessions.map((session) => (
                     <div
                       key={session.id}
-                      className={`group relative flex items-center justify-between w-full rounded-xl text-sm ${classes.themeTransition} ${chatId === session.id
+                      className={`group relative flex items-center justify-between w-full rounded-xl text-base ${classes.themeTransition} ${chatId === session.id
                         ? isDark
                           ? 'bg-white/[0.08] text-white'
                           : 'bg-black/[0.05] text-black'
@@ -219,7 +219,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                           <button
                             type="button"
                             onClick={() => handleDownloadSession(session.id)}
-                            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-white'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
@@ -231,7 +231,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                           <button
                             type="button"
                             onClick={() => handleDeleteSession(session.id)}
-                            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-red-300'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-red-500'
@@ -270,7 +270,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm ${classes.themeTransition} ${
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
                       isDark
                         ? 'text-white/70 hover:bg-white/10 hover:text-red-300'
                         : 'text-gray-600 hover:bg-black/5 hover:text-red-500'
@@ -299,13 +299,13 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                       className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                     />
                   ) : (
-                    <div className="rounded-full w-10 h-10 bg-[#c2410c] flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold">
+                    <div className="rounded-full w-10 h-10 bg-[#c2410c] flex items-center justify-center flex-shrink-0 text-white text-sm font-semibold">
                       {(userProfile.name || userProfile.email || 'U').slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="ml-3 min-w-0">
-                    <div className="truncate text-sm font-medium">{userProfile.name || 'Demo User'}</div>
-                    <div className={`truncate text-xs ${classes.mutedText}`}>{userProfile.email}</div>
+                    <div className="truncate text-base font-medium">{userProfile.name || 'Demo User'}</div>
+                    <div className={`truncate text-sm ${classes.mutedText}`}>{userProfile.email}</div>
                   </div>
                 </div>
                 <ChevronUp
