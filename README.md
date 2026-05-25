@@ -15,7 +15,7 @@
 
 ![登录页](./screenshot/Snipaste_2026-04-14_00-34-58.png)
 
-![用户区下拉菜单](./screenshot/Snipaste_2026-04-14_00-35-16.png)
+![用户区模型设置菜单](./screenshot/Snipaste_2026-07-27_05-41-50.png)
 
 ## 项目简介
 
