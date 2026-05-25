@@ -195,7 +195,7 @@ const ChatInput = ({
               <button
                 key={item.title}
                 type="button"
-                onClick={() => onSuggestionClick?.(item.prompt)}
+                onClick={() => onSuggestionClick?.(item)}
                 className={`rounded-2xl border px-3 py-3 text-left text-base ${classes.border} ${classes.themeTransition} ${
                   isDark
                     ? 'bg-white/[0.03] text-white/80 hover:bg-white/10'

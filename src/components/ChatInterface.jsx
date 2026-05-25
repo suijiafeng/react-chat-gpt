@@ -14,9 +14,11 @@ import ChatMessage from '../components/ChatMessage';
 import ChatHeader from '../components/ChatHeader';
 import ChatInput from '../components/ChatInput';
 import { useTheme } from '../contexts/ThemeContext';
-import { createSession } from '../store/db';
+import { createSession, getSessionById, setSessionSystemPrompt } from '../store/db';
 import { useLlmConfig, resolveCurrentModel, resolveProviderName } from '../store/llmConfig';
 import { DEMO_PROMPTS } from '../constants/demoReplies';
+import { getPromptTemplates } from '../constants/promptTemplates';
+import { useLanguage } from '../hooks';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar_collapsed';
 
@@ -38,6 +40,30 @@ const ChatInterface = () => {
     setSidebarRefreshKey((k) => k + 1);
   }, []);
 
+  // 每会话系统提示词：切换会话时从 DB 读取，编辑保存时同步落库
+  const [systemPrompt, setSystemPrompt] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    setSystemPrompt('');
+    if (!sessionId) return undefined;
+    getSessionById(sessionId)
+      .then((session) => {
+        if (!cancelled) setSystemPrompt(session?.systemPrompt || '');
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  const handleSystemPromptChange = useCallback(
+    (next) => {
+      setSystemPrompt(next);
+      if (sessionId) setSessionSystemPrompt(sessionId, next).catch(() => {});
+    },
+    [sessionId]
+  );
+
   const {
     messages,
     input,
@@ -56,9 +82,10 @@ const ChatInterface = () => {
     continueGeneration,
     deleteMessage,
     autoFollowRef,
-  } = useChat(currentModel, sessionId, handleSessionTouched);
+  } = useChat(currentModel, sessionId, handleSessionTouched, systemPrompt);
 
   const { classes } = useTheme();
+  const { t } = useLanguage();
 
   // 待发送附件：图片（vision 输入）与文件（文本提取注入上下文）
   const [pendingImages, setPendingImages] = useState([]);
@@ -179,13 +206,19 @@ const ChatInterface = () => {
     [input, isStreaming, sendMessage, cancelChatCompletion]
   );
 
-  // 点击默认提示词卡片：直接发送对应内容
+  // 点击提示词卡片：
+  // - 演示模式的 DEMO_PROMPTS 直接发送（保持原行为）；
+  // - Prompt 模板（prefill）只填入输入框，等用户补全内容后自己发送
   const handlePromptClick = useCallback(
-    (prompt) => {
+    (item) => {
       if (isStreaming) return;
-      sendMessage(prompt);
+      if (item?.prefill) {
+        setInput(item.prompt);
+        return;
+      }
+      sendMessage(item?.prompt ?? item);
     },
-    [isStreaming, sendMessage]
+    [isStreaming, sendMessage, setInput]
   );
 
   // 首屏加载完成（initialLoaded）之前不当作"空对话"处理，
@@ -360,7 +393,12 @@ const ChatInterface = () => {
         {srAnnouncement}
       </div>
       <div className="relative flex-1 flex flex-col overflow-hidden min-w-0">
-        <ChatHeader toggleSidebar={toggleSidebar} />
+        <ChatHeader
+          toggleSidebar={toggleSidebar}
+          sessionId={sessionId}
+          systemPrompt={systemPrompt}
+          onSystemPromptChange={handleSystemPromptChange}
+        />
         <div className="relative flex-1 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_28%)] pointer-events-none" />
           <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 md:px-8">
@@ -406,7 +444,7 @@ const ChatInterface = () => {
             handleSubmit={handleSubmit}
             isStreaming={isStreaming}
             isEmpty={showEmptyState}
-            suggestions={resolveProviderName() === 'demo' ? DEMO_PROMPTS : []}
+            suggestions={resolveProviderName() === 'demo' ? DEMO_PROMPTS : getPromptTemplates(t)}
             onSuggestionClick={handlePromptClick}
             pendingImages={pendingImages}
             pendingFiles={pendingFiles}

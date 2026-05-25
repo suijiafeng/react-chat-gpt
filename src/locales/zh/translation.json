@@ -45,5 +45,25 @@
   "rename": "重命名",
   "pin": "置顶",
   "unpin": "取消置顶",
-  "noSearchResults": "没有匹配的会话"
+  "noSearchResults": "没有匹配的会话",
+  "systemPrompt": "系统提示词",
+  "systemPromptPlaceholder": "为当前会话设置系统提示词，例如：你是一位资深翻译，回答保持简洁…",
+  "tpl": {
+    "translate": {
+      "title": "翻译助手",
+      "prompt": "请把下面这段文字翻译成英文，保持语气自然：\n"
+    },
+    "code": {
+      "title": "代码解释",
+      "prompt": "请逐步解释下面这段代码的作用和潜在问题：\n"
+    },
+    "polish": {
+      "title": "写作润色",
+      "prompt": "请帮我润色下面这段文字，使其更通顺、更有说服力：\n"
+    },
+    "brainstorm": {
+      "title": "头脑风暴",
+      "prompt": "我想围绕一个主题做头脑风暴，请给出 10 个有创意的想法。主题是："
+    }
+  }
 }

@@ -45,5 +45,25 @@
   "rename": "Rename",
   "pin": "Pin",
   "unpin": "Unpin",
-  "noSearchResults": "No matching chats"
+  "noSearchResults": "No matching chats",
+  "systemPrompt": "System prompt",
+  "systemPromptPlaceholder": "Set a system prompt for this chat, e.g. You are a senior translator, keep answers concise…",
+  "tpl": {
+    "translate": {
+      "title": "Translate",
+      "prompt": "Please translate the following text into English, keeping a natural tone:\n"
+    },
+    "code": {
+      "title": "Explain code",
+      "prompt": "Please explain step by step what the following code does and any potential issues:\n"
+    },
+    "polish": {
+      "title": "Polish writing",
+      "prompt": "Please polish the following text to make it smoother and more persuasive:\n"
+    },
+    "brainstorm": {
+      "title": "Brainstorm",
+      "prompt": "I'd like to brainstorm around a topic. Please give me 10 creative ideas. The topic is: "
+    }
+  }
 }

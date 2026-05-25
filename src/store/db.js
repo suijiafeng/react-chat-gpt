@@ -175,10 +175,19 @@ export const createSession = async (title = '新对话', model = '') => {
 };
 
 const decryptSession = async (session) => {
-  if (!session?.titleEnc) return session; // 明文存量
-  const { titleEnc, ...meta } = session;
-  const title = await decryptString(titleEnc);
-  return { ...meta, title: title || '（无法解密的会话）' };
+  if (!session) return session;
+  let result = session;
+  if (session.titleEnc) {
+    const { titleEnc, ...meta } = result;
+    const title = await decryptString(titleEnc);
+    result = { ...meta, title: title || '（无法解密的会话）' };
+  }
+  // 每会话系统提示词：与标题同样加密落盘，读出时还原为明文字段
+  if (session.systemPromptEnc) {
+    const { systemPromptEnc, ...meta } = result;
+    result = { ...meta, systemPrompt: (await decryptString(systemPromptEnc)) || '' };
+  }
+  return result;
 };
 
 // 置顶优先的稳定排序：pinned 在前，组内保持传入顺序（即 updatedAt 倒序）。
@@ -208,6 +217,23 @@ export const getAllSessions = async () => {
         .catch(() => {});
     });
   return sortSessions(decrypted);
+};
+
+export const getSessionById = async (sessionId) => {
+  const db = await initDB();
+  return decryptSession(await db.get(SESSIONS_STORE, sessionId));
+};
+
+export const setSessionSystemPrompt = async (sessionId, systemPrompt) => {
+  const db = await initDB();
+  const session = await db.get(SESSIONS_STORE, sessionId);
+  if (!session) return;
+  const meta = { ...session };
+  delete meta.systemPromptEnc;
+  const trimmed = (systemPrompt || '').trim();
+  // 清空时直接移除字段，避免留一条加密的空串
+  if (trimmed) meta.systemPromptEnc = await encryptString(trimmed);
+  await db.put(SESSIONS_STORE, meta);
 };
 
 export const updateSessionTitle = async (sessionId, title) => {

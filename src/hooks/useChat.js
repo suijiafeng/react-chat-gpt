@@ -90,7 +90,15 @@ export const toConversation = (msgs) =>
       : { role: 'assistant', content: msg.text }
   );
 
-export const useChat = (currentModel, sessionId, onSessionTouched) => {
+// 每会话系统提示词注入：非空时前置一条 system 消息。
+// trimConversation 会始终保留开头的 system 消息，这里只负责拼装。
+export const withSystemPrompt = (conversation, systemPrompt) => {
+  const trimmed = (systemPrompt || '').trim();
+  if (!trimmed) return conversation;
+  return [{ role: 'system', content: trimmed }, ...conversation];
+};
+
+export const useChat = (currentModel, sessionId, onSessionTouched, systemPrompt = '') => {
   const [messages, dispatchMessages] = useReducer(messagesReducer, []);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -108,6 +116,11 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
   useEffect(() => {
     onSessionTouchedRef.current = onSessionTouched;
   }, [onSessionTouched]);
+  // 同上：system prompt 用 ref 镜像，避免它成为 runCompletion 的依赖
+  const systemPromptRef = useRef(systemPrompt);
+  useEffect(() => {
+    systemPromptRef.current = systemPrompt;
+  }, [systemPrompt]);
 
   // 分页及滚动控制相关状态
   const [hasMore, setHasMore] = useState(true);
@@ -327,8 +340,9 @@ export const useChat = (currentModel, sessionId, onSessionTouched) => {
           {
             stream: true,
             model: currentModel,
-            // 发送前按 token 预算截断历史，避免长对话超出模型上下文窗口
-            messages: trimConversation(conversation),
+            // 注入每会话 system prompt 后，按 token 预算截断历史
+            // （trimConversation 会保留开头的 system 消息）
+            messages: trimConversation(withSystemPrompt(conversation, systemPromptRef.current)),
             options: {},
             think,
             session_id: activeSessionId,
