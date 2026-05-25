@@ -39,5 +39,6 @@
   "demoHint": "No API key needed — replies come from bundled samples.",
   "apiUrl": "API Base URL",
   "apiKey": "API Key",
-  "modelName": "Model Name"
+  "modelName": "Model Name",
+  "tryDemo": "Try demo — no sign-in"
 }

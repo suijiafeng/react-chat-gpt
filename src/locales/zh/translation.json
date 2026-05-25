@@ -39,5 +39,6 @@
   "demoHint": "无需密钥，AI 回复采用预设素材。",
   "apiUrl": "API 接口地址 (Base URL)",
   "apiKey": "API 密钥 (API Key)",
-  "modelName": "模型名称 (Model Name)"
+  "modelName": "模型名称 (Model Name)",
+  "tryDemo": "免登录体验"
 }

@@ -106,6 +106,18 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
     return next;
   };
 
+  // 免登录一键体验：不走任何账号校验，直接置 demo_mode 标记进入演示模式。
+  // resolveAuthState 会在刷新后依据该标记还原演示用户；退出登录时 userSignOut 会清掉标记。
+  const handleDemoLogin = () => {
+    localStorage.setItem('demo_mode', 'true');
+    userStore.setUser({
+      email: DEMO_ACCOUNT.email,
+      name: DEMO_ACCOUNT.name,
+      profile_image_url: '',
+    });
+    navigate('/new', { replace: true });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return; // 双击提交按钮不应发两次注册请求
@@ -263,6 +275,18 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                       ? t('Sign in')
                       : t('Create Account')}
                 </button>
+
+                {/* 免登录体验：最低门槛的上手入口，点一下直接进入演示模式聊天 */}
+                {mode === 'signin' && (
+                  <button
+                    className={`mt-3 w-full rounded-2xl border font-medium text-base py-3 ${classes.input} ${classes.themeTransition} hover:opacity-80`}
+                    type="button"
+                    onClick={handleDemoLogin}
+                    disabled={loading}
+                  >
+                    {t('tryDemo')}
+                  </button>
+                )}
 
                 <div className="mt-4 text-base text-center">
                   {mode === 'signin' ? t('Dont have an account?') : t('Already have an account?')}
