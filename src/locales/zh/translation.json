@@ -40,5 +40,10 @@
   "apiUrl": "API 接口地址 (Base URL)",
   "apiKey": "API 密钥 (API Key)",
   "modelName": "模型名称 (Model Name)",
-  "tryDemo": "免登录体验"
+  "tryDemo": "免登录体验",
+  "searchChats": "搜索会话",
+  "rename": "重命名",
+  "pin": "置顶",
+  "unpin": "取消置顶",
+  "noSearchResults": "没有匹配的会话"
 }

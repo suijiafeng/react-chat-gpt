@@ -40,5 +40,10 @@
   "apiUrl": "API Base URL",
   "apiKey": "API Key",
   "modelName": "Model Name",
-  "tryDemo": "Try demo — no sign-in"
+  "tryDemo": "Try demo — no sign-in",
+  "searchChats": "Search chats",
+  "rename": "Rename",
+  "pin": "Pin",
+  "unpin": "Unpin",
+  "noSearchResults": "No matching chats"
 }

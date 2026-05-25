@@ -181,6 +181,19 @@ const decryptSession = async (session) => {
   return { ...meta, title: title || '（无法解密的会话）' };
 };
 
+// 置顶优先的稳定排序：pinned 在前，组内保持传入顺序（即 updatedAt 倒序）。
+// 抽成纯函数便于单测，也让排序规则只有一处定义。
+export const sortSessions = (sessions) =>
+  [...sessions].sort((a, b) => (b.pinned === true) - (a.pinned === true));
+
+export const setSessionPinned = async (sessionId, pinned) => {
+  const db = await initDB();
+  const session = await db.get(SESSIONS_STORE, sessionId);
+  if (!session) return;
+  // 刻意不动 updatedAt：置顶不该改变"最近活跃"的语义
+  await db.put(SESSIONS_STORE, { ...session, pinned: Boolean(pinned) });
+};
+
 export const getAllSessions = async () => {
   const db = await initDB();
   const all = await db.getAllFromIndex(SESSIONS_STORE, 'updatedAt');
@@ -194,7 +207,7 @@ export const getAllSessions = async () => {
         .then((titleEnc) => db.put(SESSIONS_STORE, { ...meta, titleEnc }))
         .catch(() => {});
     });
-  return decrypted;
+  return sortSessions(decrypted);
 };
 
 export const updateSessionTitle = async (sessionId, title) => {

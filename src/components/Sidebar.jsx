@@ -11,13 +11,17 @@ import {
   MoreHorizontal,
   Trash2,
   Download,
+  Search,
+  Pencil,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import AppLogo from './AppLogo';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { userStore } from '../store';
-import { getAllSessions, deleteSession } from '../store/db';
+import { getAllSessions, deleteSession, updateSessionTitle, setSessionPinned } from '../store/db';
 import { userSignOut } from '../apis/auths';
 import { APP_NAME } from '../constants';
 
@@ -38,8 +42,14 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   );
   // 当前展开"更多操作"菜单的会话 id（同一时间只能有一个展开）
   const [openMenuSessionId, setOpenMenuSessionId] = useState(null);
+  // 会话搜索关键词（客户端过滤已加载的列表）
+  const [query, setQuery] = useState('');
+  // 正在重命名的会话 id 及草稿
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const userMenuRef = useRef(null);
   const sessionMenuRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   const loadSessions = useCallback(async () => {
     const all = await getAllSessions();
@@ -75,6 +85,42 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [openMenuSessionId]);
+
+  // Cmd/Ctrl+K 聚焦搜索框（同类产品的通用习惯）
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const startRename = useCallback((session) => {
+    setOpenMenuSessionId(null);
+    setRenamingId(session.id);
+    setRenameDraft(session.title || '新对话');
+  }, []);
+
+  const commitRename = useCallback(async () => {
+    const id = renamingId;
+    const title = renameDraft.trim();
+    setRenamingId(null);
+    if (!id || !title) return;
+    await updateSessionTitle(id, title);
+    await loadSessions();
+  }, [renamingId, renameDraft, loadSessions]);
+
+  const handleTogglePinned = useCallback(
+    async (session) => {
+      setOpenMenuSessionId(null);
+      await setSessionPinned(session.id, !session.pinned);
+      await loadSessions();
+    },
+    [loadSessions]
+  );
 
   const handleNewChat = useCallback(() => {
     navigate('/new');
@@ -151,6 +197,21 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
             <PenSquare size={18} className="shrink-0" />
             <span>{t('newChat')}</span>
           </button>
+          {/* 会话搜索：客户端按标题过滤，Cmd/Ctrl+K 快速聚焦 */}
+          <div className="relative">
+            <Search
+              size={15}
+              className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${classes.mutedText}`}
+            />
+            <input
+              ref={searchInputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              type="text"
+              placeholder={`${t('searchChats')} (⌘K)`}
+              className={`w-full rounded-xl border pl-9 pr-3 py-2 text-sm outline-none ${classes.input} ${classes.themeTransition}`}
+            />
+          </div>
         </div>
         <div className={`border-b h-[8px] ${isDark ? 'border-white/10' : 'border-black/10'}`}></div>
         <button
@@ -177,7 +238,19 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                 <div className={`px-3 py-6 text-base ${classes.mutedText}`}>暂无聊天记录</div>
               ) : (
                 <div className="space-y-1">
-                  {sessions.map((session) => (
+                  {(() => {
+                    const keyword = query.trim().toLowerCase();
+                    const visible = keyword
+                      ? sessions.filter((s) => (s.title || '新对话').toLowerCase().includes(keyword))
+                      : sessions;
+                    if (keyword && visible.length === 0) {
+                      return (
+                        <div className={`px-3 py-6 text-base ${classes.mutedText}`}>
+                          {t('noSearchResults')}
+                        </div>
+                      );
+                    }
+                    return visible.map((session) => (
                     <div
                       key={session.id}
                       className={`group relative flex items-center justify-between w-full rounded-xl text-base ${classes.themeTransition} ${chatId === session.id
@@ -187,14 +260,35 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                         : `${classes.text} ${classes.buttonHover}`
                         }`}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSelectSession(session.id)}
-                        className="flex flex-1 min-w-0 items-center gap-3 px-3 py-3 text-left"
-                      >
-                        <MessageSquare size={16} className="shrink-0 opacity-70" />
-                        <span className="truncate">{session.title || '新对话'}</span>
-                      </button>
+                      {renamingId === session.id ? (
+                        <div className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2">
+                          <MessageSquare size={16} className="shrink-0 opacity-70" />
+                          <input
+                            autoFocus
+                            value={renameDraft}
+                            onChange={(e) => setRenameDraft(e.target.value)}
+                            onBlur={commitRename}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') commitRename();
+                              if (e.key === 'Escape') setRenamingId(null);
+                            }}
+                            className={`w-full min-w-0 rounded-lg border px-2 py-1 text-base outline-none ${classes.input} ${classes.themeTransition}`}
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSelectSession(session.id)}
+                          className="flex flex-1 min-w-0 items-center gap-3 px-3 py-3 text-left"
+                        >
+                          {session.pinned ? (
+                            <Pin size={16} className="shrink-0 opacity-70" />
+                          ) : (
+                            <MessageSquare size={16} className="shrink-0 opacity-70" />
+                          )}
+                          <span className="truncate">{session.title || '新对话'}</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
@@ -216,6 +310,30 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                             isDark ? 'bg-[#222222]' : 'bg-white'
                           }`}
                         >
+                          <button
+                            type="button"
+                            onClick={() => startRename(session)}
+                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                              isDark
+                                ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                                : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                            }`}
+                          >
+                            <Pencil size={15} />
+                            <span>{t('rename')}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePinned(session)}
+                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                              isDark
+                                ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                                : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                            }`}
+                          >
+                            {session.pinned ? <PinOff size={15} /> : <Pin size={15} />}
+                            <span>{session.pinned ? t('unpin') : t('pin')}</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleDownloadSession(session.id)}
@@ -243,7 +361,8 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                         </div>
                       )}
                     </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               )}
             </>
