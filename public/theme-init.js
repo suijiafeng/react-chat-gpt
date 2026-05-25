@@ -5,6 +5,9 @@
   try {
     var isDark = JSON.parse(localStorage.getItem('isDarkTheme') || 'false');
     document.documentElement.style.background = isDark ? '#212121' : '#f7f7f8';
+    // 同步挂上 .dark-theme：Tailwind 的 dark: 变体依赖这个类（见 tailwind.config.js
+    // 的 darkMode 配置）。等 React 挂载后再加会先闪一帧亮色边框。
+    if (isDark) document.documentElement.classList.add('dark-theme');
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
   } catch {
     // 读取失败按浅色主题处理，不影响后续 React 正常接管

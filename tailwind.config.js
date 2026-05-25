@@ -4,6 +4,9 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  // 主题是手动切换（ThemeContext 往 <html> 挂 .dark-theme），不是系统偏好。
+  // 不配这项的话 dark: 会走 prefers-color-scheme，跟的是操作系统而非应用主题。
+  darkMode: ['selector', '.dark-theme'],
   theme: {
     // 全站字号统一为偶数。整体上提一档后：正文 18px，次要 16px，装饰 14px
     fontSize: {

@@ -5,6 +5,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlightLite from './markdown/rehypeHighlightLite';
 import MermaidBlock from './markdown/MermaidBlock';
+import { useTheme } from '../contexts/ThemeContext';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github-dark.css';
 
@@ -33,8 +34,18 @@ const CODE_COLLAPSE_LINES = 30;
 
 // 带复制按钮的代码块组件；超长代码默认折叠，可展开
 const CodeBlock = React.memo(({ lang, codeText, children }) => {
+  const { isDark } = useTheme();
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+
+  // 代码块跟随主题：浅色下是浅灰卡片（配 global.css 里作用域化的 github 亮色高亮），
+  // 深色下才用深底。以前两种主题都写死深色，浅色页面上是一块突兀的黑板。
+  const surface = isDark
+    ? 'bg-[#1e1e1e] text-[#d4d4d4] border-white/10'
+    : 'bg-[#f6f8fa] text-[#24292e] border-black/10';
+  const chrome = isDark
+    ? 'bg-[#2d2d2d] text-gray-400 hover:text-white'
+    : 'bg-[#eaeef2] text-gray-500 hover:text-gray-900';
 
   const lineCount = codeText.split('\n').length;
   const collapsible = lineCount > CODE_COLLAPSE_LINES;
@@ -47,12 +58,12 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
   };
 
   return (
-    <div className="my-4 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm bg-[#1e1e1e] text-[#d4d4d4] font-mono text-sm">
-      <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] text-xs text-gray-400 select-none">
+    <div className={`my-4 overflow-hidden rounded-lg border shadow-sm font-mono text-sm ${surface}`}>
+      <div className={`flex items-center justify-between px-4 py-2 text-xs select-none ${chrome}`}>
         <span className="uppercase font-semibold">{lang || 'text'}</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 hover:text-white transition-colors"
+          className="flex items-center gap-1 transition-colors"
         >
           {copied ? 'Copied!' : 'Copy'}
         </button>
@@ -65,7 +76,7 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
       {collapsible && (
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="w-full px-4 py-2 bg-[#2d2d2d] text-xs text-gray-400 hover:text-white transition-colors text-center select-none"
+          className={`w-full px-4 py-2 text-xs transition-colors text-center select-none ${chrome}`}
         >
           {collapsed ? `展开全部 ${lineCount} 行 ▾` : '收起 ▴'}
         </button>
