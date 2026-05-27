@@ -165,10 +165,30 @@ const migrateMessageIfPlain = (db, record) => {
 // 会话（Session）操作
 // ──────────────────────────────────────────────
 
+// 当前登录用户 id：会话数据按用户隔离的依据。
+// - 免登录演示：固定的演示用户 id（与默认账号登录是同一个演示身份，数据互通是预期行为）；
+// - 账号登录：auth_session 里的用户 id。
+// 直接读 localStorage 而不 import apis/auths，避免 db ↔ auths 循环依赖。
+const currentUserId = () => {
+  if (localStorage.getItem('demo_mode') === 'true') return DEMO_USER_ID;
+  try {
+    return JSON.parse(localStorage.getItem('auth_session'))?.id || null;
+  } catch {
+    return null;
+  }
+};
+
 export const createSession = async (title = '新对话', model = '') => {
   const db = await initDB();
   const now = new Date().toISOString();
-  const session = { id: uuidv4(), model, createdAt: now, updatedAt: now, titleEnc: await encryptString(title) };
+  const session = {
+    id: uuidv4(),
+    model,
+    createdAt: now,
+    updatedAt: now,
+    userId: currentUserId(),
+    titleEnc: await encryptString(title),
+  };
   await db.put(SESSIONS_STORE, session);
   // 返回给调用方的是明文形状，存储形态不外泄到上层
   return { id: session.id, title, model, createdAt: now, updatedAt: now };
@@ -195,6 +215,11 @@ const decryptSession = async (session) => {
 export const sortSessions = (sessions) =>
   [...sessions].sort((a, b) => (b.pinned === true) - (a.pinned === true));
 
+// 按用户过滤会话（数据隔离的唯一判断点，纯函数便于单测）。
+// userId 为空的存量会话视为"隔离上线前的历史数据"，由当前用户继承（见 getAllSessions 的惰性迁移）。
+export const filterSessionsByUser = (sessions, userId) =>
+  sessions.filter((s) => !s.userId || s.userId === userId);
+
 export const setSessionPinned = async (sessionId, pinned) => {
   const db = await initDB();
   const session = await db.get(SESSIONS_STORE, sessionId);
@@ -205,23 +230,41 @@ export const setSessionPinned = async (sessionId, pinned) => {
 
 export const getAllSessions = async () => {
   const db = await initDB();
+  const activeUserId = currentUserId();
   const all = await db.getAllFromIndex(SESSIONS_STORE, 'updatedAt');
-  const decrypted = await Promise.all(all.reverse().map(decryptSession));
-  // 明文存量惰性升级（同上，不阻塞列表渲染）
-  all
-    .filter((s) => s && !s.titleEnc)
+  // 数据隔离：只返回当前用户的会话（无 userId 的存量视为当前用户的历史数据）
+  const ownSessions = filterSessionsByUser(all.reverse(), activeUserId);
+  const decrypted = await Promise.all(ownSessions.map(decryptSession));
+  // 存量惰性升级（不阻塞列表渲染）：
+  // - 明文标题 → 加密；
+  // - 无 userId 的隔离前旧数据 → 归属当前用户，之后其他账号不再看到
+  ownSessions
+    .filter((s) => s && (!s.titleEnc || !s.userId))
     .forEach((s) => {
-      const { title, ...meta } = s;
-      encryptString(title || '')
-        .then((titleEnc) => db.put(SESSIONS_STORE, { ...meta, titleEnc }))
-        .catch(() => {});
+      const migrateSessionRecord = async () => {
+        const record = { ...s, userId: s.userId || activeUserId };
+        if (!s.titleEnc) {
+          delete record.title;
+          record.titleEnc = await encryptString(s.title || '');
+        }
+        await db.put(SESSIONS_STORE, record);
+      };
+      migrateSessionRecord().catch(() => {});
     });
   return sortSessions(decrypted);
 };
 
+// 会话归属校验：属于其他账号的会话按不存在处理。
+// 会话 id 虽是不可猜的 UUID，但既然做了隔离，直接持有 URL 也不该能读到别人的会话
+const resolveOwnedSession = (session) => {
+  if (!session) return null;
+  if (session.userId && session.userId !== currentUserId()) return null;
+  return session;
+};
+
 export const getSessionById = async (sessionId) => {
   const db = await initDB();
-  return decryptSession(await db.get(SESSIONS_STORE, sessionId));
+  return decryptSession(resolveOwnedSession(await db.get(SESSIONS_STORE, sessionId)));
 };
 
 export const setSessionSystemPrompt = async (sessionId, systemPrompt) => {
@@ -276,6 +319,8 @@ export const saveMessageToDB = async (message, sessionId) => {
 
 export const loadMessagesBySessionPaged = async (sessionId, limit = 30, offset = 0) => {
   const db = await initDB();
+  // 数据隔离：其他账号的会话即使拿到 URL 也读不到消息
+  if (!resolveOwnedSession(await db.get(SESSIONS_STORE, sessionId))) return [];
   const tx = db.transaction(MESSAGES_STORE, 'readonly');
   const index = tx.store.index('sessionId_timestamp');
   const range = IDBKeyRange.bound([sessionId, ''], [sessionId, '\uffff']);

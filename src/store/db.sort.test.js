@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sortSessions } from './db';
+import { sortSessions, filterSessionsByUser } from './db';
 
 // sortSessions 是纯函数，不触碰 IndexedDB，可直接在 node 环境测试
 describe('sortSessions', () => {
@@ -23,5 +23,22 @@ describe('sortSessions', () => {
     const out = sortSessions(input);
     expect(out.map((s) => s.id)).toEqual(['a', 'b']);
     expect(input).not.toBe(out);
+  });
+});
+
+describe('filterSessionsByUser', () => {
+  it('只保留当前用户的会话', () => {
+    const input = [
+      { id: 'a', userId: 'u1' },
+      { id: 'b', userId: 'u2' },
+      { id: 'c', userId: 'u1' },
+    ];
+    expect(filterSessionsByUser(input, 'u1').map((s) => s.id)).toEqual(['a', 'c']);
+  });
+
+  it('无 userId 的存量会话对任何用户可见（由读取方惰性认领）', () => {
+    const input = [{ id: 'legacy' }, { id: 'b', userId: 'u2' }];
+    expect(filterSessionsByUser(input, 'u1').map((s) => s.id)).toEqual(['legacy']);
+    expect(filterSessionsByUser(input, 'u2').map((s) => s.id)).toEqual(['legacy', 'b']);
   });
 });

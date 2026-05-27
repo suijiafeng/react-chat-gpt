@@ -9,6 +9,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { userSignIn, userSignUp } from '../apis/auths';
 import { userStore } from '../store';
 import { consumeExpiredFlag } from '../utils/session';
+import { reloadForCurrentUser } from '../store/llmConfig';
 import { USE_LOCAL_DATA, DEMO_ACCOUNT } from '../constants';
 
 const MIN_PASSWORD_LENGTH = 6;
@@ -115,6 +116,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
       name: DEMO_ACCOUNT.name,
       profile_image_url: '',
     });
+    reloadForCurrentUser(); // 切到演示账号的配置命名空间
     navigate('/new', { replace: true });
   };
 
@@ -140,6 +142,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
         message.success(t('signUpSuccess'));
       }
       userStore.setUser(session);
+      reloadForCurrentUser(); // 切到该账号的配置命名空间
       navigate(redirectTo, { replace: true });
     } catch (err) {
       // err.message 已由 axios 拦截器统一换成服务端可读文案（如"该邮箱已被注册"）

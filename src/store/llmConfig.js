@@ -35,6 +35,59 @@ const DEFAULT_API_URL = 'https://api.openai.com/v1';
 export const DEMO_MODELS = ['demo-assistant'];
 
 // ──────────────────────────────────────────────
+// 按账号隔离的存储访问层
+//
+// LLM 配置（服务商、密钥、参数、当前模型）属于账号私有数据：
+// localStorage 键统一加当前用户 id 后缀（如 llm_profiles:xxx），
+// 不同账号各存一份，互不可见。apiKey 依旧经 keyVault AES-256-GCM 加密后才落盘。
+// 隔离上线前的全局存量在首次读取时迁移给当前账号（搬走即删，其他账号不再看到）。
+// 与 store/db.js 的会话隔离同一套身份判定，直接读 localStorage 避免循环依赖。
+// ──────────────────────────────────────────────
+
+const DEMO_USER_ID = 'demo-user-fixed-id';
+
+const currentUserId = () => {
+  if (localStorage.getItem('demo_mode') === 'true') return DEMO_USER_ID;
+  try {
+    return JSON.parse(localStorage.getItem('auth_session'))?.id || 'anon';
+  } catch {
+    return 'anon';
+  }
+};
+
+// 需要按账号隔离的键（旧版单配置键仅作迁移来源，保持全局读取）
+const ACCOUNT_SCOPED_KEYS = new Set([
+  KEYS.provider,
+  KEYS.profiles,
+  KEYS.activeProfile,
+  KEYS.contextTokens,
+  KEYS.think,
+  KEYS.currentModel,
+]);
+
+const scopedKey = (key) => (ACCOUNT_SCOPED_KEYS.has(key) ? `${key}:${currentUserId()}` : key);
+
+const accountScopedStorage = {
+  get(key) {
+    const scopedName = scopedKey(key);
+    let value = localStorage.getItem(scopedName);
+    if (value === null && scopedName !== key) {
+      // 隔离前的全局存量：迁移给当前账号
+      const legacy = localStorage.getItem(key);
+      if (legacy !== null) {
+        localStorage.setItem(scopedName, legacy);
+        localStorage.removeItem(key);
+        value = legacy;
+      }
+    }
+    return value;
+  },
+  set(key, value) {
+    localStorage.setItem(scopedKey(key), value);
+  },
+};
+
+// ──────────────────────────────────────────────
 // 订阅机制
 // ──────────────────────────────────────────────
 
@@ -82,7 +135,7 @@ const keyCache = new Map(); // profileId → 明文 key
 const initKeyCache = async () => {
   let profiles;
   try {
-    profiles = JSON.parse(localStorage.getItem(KEYS.profiles) || '[]');
+    profiles = JSON.parse(accountScopedStorage.get(KEYS.profiles) || '[]');
   } catch {
     return;
   }
@@ -104,7 +157,7 @@ const initKeyCache = async () => {
     }
   }
   if (needRewrite) {
-    localStorage.setItem(KEYS.profiles, JSON.stringify(profiles));
+    accountScopedStorage.set(KEYS.profiles, JSON.stringify(profiles));
   }
   notify(); // 让已渲染的组件拿到解密后的 key
 };
@@ -113,6 +166,20 @@ const initKeyCache = async () => {
 if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
   initKeyCache().catch((e) => console.error('API Key 解密初始化失败：', e));
 }
+
+/**
+ * 账号切换（登录/免登录/退出）后调用：
+ * 清空上一个账号的明文 key 内存缓存与配置快照，按新账号的命名空间重新解密加载。
+ * 不调用的话，SPA 内切换账号会继续读到上一个账号的配置。
+ */
+export const reloadForCurrentUser = () => {
+  keyCache.clear();
+  snapshot = null;
+  if (typeof indexedDB !== 'undefined') {
+    initKeyCache().catch(() => {});
+  }
+  notify();
+};
 
 const readLegacyModels = () => {
   try {
@@ -125,7 +192,7 @@ const readLegacyModels = () => {
 
 // 读取 profiles（存储态，apiKey 保持编码），并在首次读取时做旧配置迁移
 const readStoredProfiles = () => {
-  const raw = localStorage.getItem(KEYS.profiles);
+  const raw = accountScopedStorage.get(KEYS.profiles);
   if (raw !== null) {
     try {
       const parsed = JSON.parse(raw);
@@ -156,9 +223,9 @@ const readStoredProfiles = () => {
       model: legacyModel,
     },
   ];
-  localStorage.setItem(KEYS.profiles, JSON.stringify(migrated));
-  if (!localStorage.getItem(KEYS.activeProfile)) {
-    localStorage.setItem(KEYS.activeProfile, migrated[0].id);
+  accountScopedStorage.set(KEYS.profiles, JSON.stringify(migrated));
+  if (!accountScopedStorage.get(KEYS.activeProfile)) {
+    accountScopedStorage.set(KEYS.activeProfile, migrated[0].id);
   }
   return migrated;
 };
@@ -192,11 +259,11 @@ export const getConfig = () => {
     };
   });
 
-  const storedActiveId = localStorage.getItem(KEYS.activeProfile);
+  const storedActiveId = accountScopedStorage.get(KEYS.activeProfile);
   const active =
     profiles.find((p) => p.id === storedActiveId) || profiles[0] || null;
 
-  const provider = localStorage.getItem(KEYS.provider) || DEFAULT_LLM_PROVIDER;
+  const provider = accountScopedStorage.get(KEYS.provider) || DEFAULT_LLM_PROVIDER;
   const model = active?.model || localStorage.getItem(KEYS.model) || DEFAULT_LLM_MODEL;
   // 顶层 models 镜像 = 激活 profile 的启用子集（外部选择器与模型解析以它为准）；
   // 全部取消勾选时回退为当前模型单项，保证请求与头部展示仍可用
@@ -212,9 +279,9 @@ export const getConfig = () => {
     apiKey: active ? active.apiKey : decodeLegacyKey(localStorage.getItem(KEYS.apiKey)),
     model,
     models,
-    contextTokens: parseInt(localStorage.getItem(KEYS.contextTokens), 10) || 8000,
-    think: localStorage.getItem(KEYS.think) === 'true',
-    currentModel: localStorage.getItem(KEYS.currentModel) || '',
+    contextTokens: parseInt(accountScopedStorage.get(KEYS.contextTokens), 10) || 8000,
+    think: accountScopedStorage.get(KEYS.think) === 'true',
+    currentModel: accountScopedStorage.get(KEYS.currentModel) || '',
   };
   return snapshot;
 };
@@ -225,16 +292,16 @@ export const getConfig = () => {
 
 /** 保存配置（可部分更新），并通知所有订阅者 */
 export const saveConfig = (partial) => {
-  if (partial.provider !== undefined) localStorage.setItem(KEYS.provider, partial.provider);
+  if (partial.provider !== undefined) accountScopedStorage.set(KEYS.provider, partial.provider);
   if (partial.model !== undefined) localStorage.setItem(KEYS.model, partial.model.trim());
   if (partial.contextTokens !== undefined) {
-    localStorage.setItem(KEYS.contextTokens, String(partial.contextTokens));
+    accountScopedStorage.set(KEYS.contextTokens, String(partial.contextTokens));
   }
   if (partial.think !== undefined) {
-    localStorage.setItem(KEYS.think, String(Boolean(partial.think)));
+    accountScopedStorage.set(KEYS.think, String(Boolean(partial.think)));
   }
   if (partial.currentModel !== undefined) {
-    localStorage.setItem(KEYS.currentModel, partial.currentModel);
+    accountScopedStorage.set(KEYS.currentModel, partial.currentModel);
   }
   notify();
 };
@@ -262,8 +329,8 @@ export const saveProfiles = async (profiles, activeId) => {
       };
     })
   );
-  localStorage.setItem(KEYS.profiles, JSON.stringify(stored));
-  if (activeId !== undefined) localStorage.setItem(KEYS.activeProfile, activeId);
+  accountScopedStorage.set(KEYS.profiles, JSON.stringify(stored));
+  if (activeId !== undefined) accountScopedStorage.set(KEYS.activeProfile, activeId);
   notify();
 };
 
@@ -288,7 +355,7 @@ export const setCurrentSelection = (profileId, model) => {
   const { profiles } = getConfig();
   const target = profiles.find((p) => p.id === profileId);
   if (!target) return;
-  localStorage.setItem(KEYS.activeProfile, profileId);
+  accountScopedStorage.set(KEYS.activeProfile, profileId);
   // 把选中的模型写回该 profile 的默认模型，请求层直接读 getConfig().model
   saveProfiles(
     profiles.map((p) => (p.id === profileId ? { ...p, model } : p)),
@@ -316,7 +383,7 @@ export const isDemoMode = () =>
  * 优先级：服务器托管（显式保存过）> 有可用服务商则 custom > 兜底 demo。
  */
 export const resolveProviderName = () => {
-  const stored = localStorage.getItem(KEYS.provider);
+  const stored = accountScopedStorage.get(KEYS.provider);
   // 服务器托管仍是一次显式配置行为（配置存在服务端账号下），保持尊重
   if (stored === 'backend') return 'backend';
 
