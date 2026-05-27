@@ -46,6 +46,7 @@
   "pin": "Pin",
   "unpin": "Unpin",
   "noSearchResults": "No matching chats",
+  "invalidCredentials": "Incorrect email or password",
   "systemPrompt": "System prompt",
   "systemPromptPlaceholder": "Set a system prompt for this chat, e.g. You are a senior translator, keep answers concise…",
   "tpl": {

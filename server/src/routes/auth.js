@@ -58,11 +58,14 @@ router.post('/signin', async (req, res) => {
   if (!email?.trim()) return res.status(400).json({ message: '邮箱不能为空' });
   if (!password) return res.status(400).json({ message: '密码不能为空' });
 
+  // 统一模糊报错，避免账号枚举：区分"账号不存在/密码错误"会让攻击者
+  // 能批量验证哪些邮箱注册过。注意用户不存在时也要跑一次 bcrypt 比对，
+  // 否则两种失败的响应耗时差异仍可被计时攻击利用来区分。
+  const INVALID_CREDENTIALS = { message: '邮箱或密码不正确' };
+  const DUMMY_HASH = '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7kC0iRfYIqyaJZ5ZP1r0Xj6C0kANAAm';
   const user = findUserByEmail(email);
-  if (!user) return res.status(401).json({ message: '账号不存在' });
-
-  const matches = await bcrypt.compare(password, user.password_hash);
-  if (!matches) return res.status(401).json({ message: '密码错误' });
+  const matches = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
+  if (!user || !matches) return res.status(401).json(INVALID_CREDENTIALS);
 
   establishSession(req, res, user);
 });

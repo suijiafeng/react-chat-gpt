@@ -1,6 +1,8 @@
 import request from './config';
 import { WEBUI_API_BASE_URL, USE_LOCAL_DATA } from '../constants';
-import { getUserByEmail, createUser } from '../store/db';
+import { getUserByEmail, createUser, seedDemoUser } from '../store/db';
+import { DEMO_ACCOUNT } from '../constants';
+import i18n from '../locales/i18n';
 import { generateSalt, hashPassword, safeCompare } from '../utils/crypto';
 
 const SESSION_KEY = 'auth_session';
@@ -65,11 +67,32 @@ export const userSignIn = async ({ email, password }) => {
     if (!email?.trim()) throw new Error('邮箱不能为空');
     if (!password) throw new Error('密码不能为空');
 
-    const user = await getUserByEmail(email);
-    if (!user) throw new Error('账号不存在');
+    let user = await getUserByEmail(email);
 
-    const hash = await hashPassword(password, user.salt);
-    if (!safeCompare(hash, user.passwordHash)) throw new Error('密码错误');
+    // 演示账号自愈：预置种子是页面加载后异步写入的，用户打开页面立刻登录、
+    // 或老库里的种子还是旧邮箱/旧密码时，这里会查不到或对不上。
+    // 只要输入的是文档公示的演示账号，就地重新补种一次再校验，
+    // 避免"按 README 输入默认账号却提示不存在/密码错误"的困惑。
+    const isDemoCredentials =
+      email.trim().toLowerCase() === DEMO_ACCOUNT.email && password === DEMO_ACCOUNT.password;
+    if (!user && isDemoCredentials) {
+      await seedDemoUser();
+      user = await getUserByEmail(email);
+    }
+    // 统一模糊报错："账号不存在"和"密码错误"分开提示会让攻击者能批量验证
+    // 哪些邮箱注册过（账号枚举），一律只说"邮箱或密码不正确"
+    const invalidCredentials = () => new Error(i18n.t('invalidCredentials'));
+    if (!user) throw invalidCredentials();
+
+    let hash = await hashPassword(password, user.salt);
+    if (!safeCompare(hash, user.passwordHash)) {
+      if (!isDemoCredentials) throw invalidCredentials();
+      // 老种子密码对不上：强制覆盖为当前版本的演示账号后重试
+      await seedDemoUser({ force: true });
+      user = await getUserByEmail(email);
+      hash = await hashPassword(password, user.salt);
+      if (!safeCompare(hash, user.passwordHash)) throw invalidCredentials();
+    }
 
     return saveSession(user);
   }

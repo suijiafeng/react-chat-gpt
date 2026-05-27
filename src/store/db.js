@@ -61,10 +61,12 @@ export const initDB = async () => {
 // 预置演示账号（首次启动时写入）。
 // 账号固定 id，改邮箱/密码时按 id 覆盖写入即可完成升级——老用户库里那条
 // demo@example.com 记录会被同一条 id 直接替换，不会残留一个还能用的弱口令账号。
-export const seedDemoUser = async () => {
+// force：无视"邮箱已是最新"的跳过逻辑强制覆盖——用于登录自愈场景
+// （库里躺着同邮箱但旧密码的种子时，必须重写才能让公示的演示密码生效）
+export const seedDemoUser = async ({ force = false } = {}) => {
   const db = await initDB();
   const existing = await db.get(USERS_STORE, DEMO_USER_ID);
-  if (existing?.email === DEMO_ACCOUNT.email) return; // 已是最新的演示账号，跳过
+  if (!force && existing?.email === DEMO_ACCOUNT.email) return; // 已是最新的演示账号，跳过
 
   const salt = generateSalt();
   const passwordHash = await hashPassword(DEMO_ACCOUNT.password, salt);
