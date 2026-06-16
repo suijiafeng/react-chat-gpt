@@ -1,6 +1,6 @@
 import request from './config';
 import { WEBUI_API_BASE_URL, USE_LOCAL_DATA } from '../constants';
-import { getUserByEmail, createUser, seedDemoUser, clearAllSessions } from '../store/db';
+import { getUserByEmail, createUser, updateUserName, seedDemoUser, clearAllSessions } from '../store/db';
 import { wipeCurrentAccountConfig } from '../store/llmConfig';
 import { DEMO_ACCOUNT } from '../constants';
 import i18n from '../locales/i18n';
@@ -104,6 +104,33 @@ export const userSignIn = async ({ email, password }) => {
 };
 
 // ──────────────────────────────────────────────
+// 个人资料
+// ──────────────────────────────────────────────
+
+// 更新昵称。三种登录形态分别持久化：
+// - 免登录演示（demo_mode）：写 localStorage 的 demo_name，resolveAuthState 恢复时读取；
+// - 本地账号（auth_session + IndexedDB）：同步更新 users 表与 session；
+// - 后端模式：仅更新本地 session 展示（服务端未提供改名接口，属已知限制）。
+export const updateProfileName = async (name) => {
+  const trimmed = (name || '').trim();
+  if (!trimmed) throw new Error('用户名不能为空');
+
+  if (localStorage.getItem('demo_mode') === 'true') {
+    localStorage.setItem('demo_name', trimmed);
+    return trimmed;
+  }
+
+  const session = getSession();
+  if (session) {
+    if (USE_LOCAL_DATA && session.id) {
+      await updateUserName(session.id, trimmed);
+    }
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, name: trimmed }));
+  }
+  return trimmed;
+};
+
+// ──────────────────────────────────────────────
 // 注销
 // ──────────────────────────────────────────────
 
@@ -116,11 +143,12 @@ export const userSignOut = async () => {
   }
 
   // 免登录体验是一次性的：退出即销毁该体验身份的全部数据
-  // （会话与消息、LLM 配置及加密密钥密文），下次体验从零开始。
+  // （会话与消息、LLM 配置及加密密钥密文、改过的昵称），下次体验从零开始。
   // 必须在清掉 demo_mode 标记之前执行——数据归属就是按这个标记解析的。
   if (localStorage.getItem('demo_mode') === 'true') {
     await clearAllSessions().catch(() => {});
     wipeCurrentAccountConfig();
+    localStorage.removeItem('demo_name');
   }
 
   localStorage.removeItem(SESSION_KEY);

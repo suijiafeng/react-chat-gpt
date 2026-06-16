@@ -15,7 +15,9 @@ import {
   Pencil,
   Pin,
   PinOff,
+  UserRound,
 } from 'lucide-react';
+import ProfileModal from './ProfileModal';
 import AppLogo from './AppLogo';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
@@ -31,6 +33,8 @@ const RECENT_CHATS_COLLAPSED_KEY = 'recent_chats_collapsed';
 const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   const { classes, isDark } = useTheme();
   const { t } = useLanguage();
+  // 个人设置弹窗（昵称/数据管理）
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const navigate = useNavigate();
   const { chatId } = useParams();
   const { userProfile } = userStore;
@@ -44,7 +48,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   // 当前展开"更多操作"菜单的会话 id（同一时间只能有一个展开）
   const [openMenuSessionId, setOpenMenuSessionId] = useState(null);
   // 会话搜索关键词（客户端过滤已加载的列表）
-  const [query, setQuery] = useState('');
+  const [searchKeyword, setSearchKeyword] = useState('');
   // 正在重命名的会话 id 及草稿
   const [renamingId, setRenamingId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
@@ -102,8 +106,8 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   const startRename = useCallback((session) => {
     setOpenMenuSessionId(null);
     setRenamingId(session.id);
-    setRenameDraft(session.title || '新对话');
-  }, []);
+    setRenameDraft(session.title || t('newChatTitle'));
+  }, [t]);
 
   const commitRename = useCallback(async () => {
     const id = renamingId;
@@ -153,9 +157,9 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
       const { exportSessionAsMarkdown } = await import('../utils/exportMarkdown');
       await exportSessionAsMarkdown(id);
     } catch (error) {
-      antdMessage.error(`导出失败：${error.message}`);
+      antdMessage.error(t('exportFailed', { msg: error.message }));
     }
-  }, []);
+  }, [t]);
 
   const handleSignOut = useCallback(() => {
     setIsUserMenuOpen(false);
@@ -220,8 +224,8 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
             />
             <input
               ref={searchInputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
               type="text"
               placeholder={`${t('searchChats')} (⌘K)`}
               className={`w-full rounded-xl border pl-9 pr-3 py-2 text-sm outline-none ${classes.input} ${classes.themeTransition}`}
@@ -250,22 +254,22 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           {!isRecentChatsCollapsed && (
             <>
               {sessions === null ? null : sessions.length === 0 ? (
-                <div className={`px-3 py-6 text-base ${classes.mutedText}`}>暂无聊天记录</div>
+                <div className={`px-3 py-6 text-base ${classes.mutedText}`}>{t('noChats')}</div>
               ) : (
                 <div className="space-y-1">
                   {(() => {
-                    const keyword = query.trim().toLowerCase();
-                    const visible = keyword
-                      ? sessions.filter((s) => (s.title || '新对话').toLowerCase().includes(keyword))
+                    const keyword = searchKeyword.trim().toLowerCase();
+                    const visibleSessions = keyword
+                      ? sessions.filter((s) => (s.title || t('newChatTitle')).toLowerCase().includes(keyword))
                       : sessions;
-                    if (keyword && visible.length === 0) {
+                    if (keyword && visibleSessions.length === 0) {
                       return (
                         <div className={`px-3 py-6 text-base ${classes.mutedText}`}>
                           {t('noSearchResults')}
                         </div>
                       );
                     }
-                    return visible.map((session) => (
+                    return visibleSessions.map((session) => (
                     <div
                       key={session.id}
                       className={`group relative flex items-center justify-between w-full rounded-xl text-base ${classes.themeTransition} ${chatId === session.id
@@ -301,7 +305,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                           ) : (
                             <MessageSquare size={16} className="shrink-0 opacity-70" />
                           )}
-                          <span className="truncate">{session.title || '新对话'}</span>
+                          <span className="truncate">{session.title || t('newChatTitle')}</span>
                         </button>
                       )}
                       <button
@@ -309,8 +313,8 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                         onClick={() =>
                           setOpenMenuSessionId((prev) => (prev === session.id ? null : session.id))
                         }
-                        aria-label="更多操作"
-                        title="更多操作"
+                        aria-label={t('moreActions')}
+                        title={t('moreActions')}
                         className={`mr-2 shrink-0 rounded-md p-1 opacity-60 transition-opacity duration-200 ease-out hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 ${
                           openMenuSessionId === session.id ? 'opacity-100' : ''
                         } ${isDark ? 'text-white/45 hover:bg-white/10 hover:text-white' : 'text-gray-400 hover:bg-black/5 hover:text-gray-700'
@@ -359,7 +363,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                             }`}
                           >
                             <Download size={15} />
-                            <span>下载</span>
+                            <span>{t('download')}</span>
                           </button>
                           <button
                             type="button"
@@ -371,7 +375,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                             }`}
                           >
                             <Trash2 size={15} />
-                            <span>删除</span>
+                            <span>{t('delete')}</span>
                           </button>
                         </div>
                       )}
@@ -403,6 +407,21 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                 >
                   <button
                     type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setIsProfileOpen(true);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                      isDark
+                        ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                        : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                    }`}
+                  >
+                    <UserRound size={18} />
+                    <span>{t('profile')}</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleSignOut}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
                       isDark
@@ -411,7 +430,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                     }`}
                   >
                     <LogOut size={18} />
-                    <span>退出登录</span>
+                    <span>{t('signOut')}</span>
                   </button>
                 </div>
               </div>
@@ -452,6 +471,14 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           </div>
         )}
       </div>
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        onChatsCleared={() => {
+          loadSessions();
+          navigate('/new');
+        }}
+      />
     </div>
   );
 });

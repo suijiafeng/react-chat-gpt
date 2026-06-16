@@ -312,6 +312,14 @@ export const clearAllSessions = async () => {
   }
 };
 
+// 更新用户昵称（本地账号模式：IndexedDB users 表按 id 覆盖）
+export const updateUserName = async (userId, name) => {
+  const db = await initDB();
+  const user = await db.get(USERS_STORE, userId);
+  if (!user) return;
+  await db.put(USERS_STORE, { ...user, name });
+};
+
 export const deleteSession = async (sessionId) => {
   const db = await initDB();
   const messages = await db.getAllFromIndex(MESSAGES_STORE, 'sessionId', sessionId);

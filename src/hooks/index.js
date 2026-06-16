@@ -36,7 +36,8 @@ const resolveAuthState = () => {
   if (localStorage.getItem('demo_mode') === 'true') {
     userStore.setUser({
       email: DEMO_ACCOUNT.email,
-      name: DEMO_ACCOUNT.name,
+      // 演示模式支持改昵称（存 localStorage），恢复时优先取用户改过的名字
+      name: localStorage.getItem('demo_name') || DEMO_ACCOUNT.name,
       profile_image_url: '',
     });
     return true;
