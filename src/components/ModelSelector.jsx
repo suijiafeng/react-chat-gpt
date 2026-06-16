@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, Check, Search } from 'lucide-react';
+import { ChevronDown, Check, Search, Settings } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import SettingsModal from './SettingsModal';
+import { useLanguage } from '../hooks';
 import {
   useLlmConfig,
   setCurrentModel,
@@ -22,6 +24,8 @@ const dotColor = (str) => `hsl(${hueOf(str)}, 62%, 58%)`;
 const ModelSelector = React.memo(() => {
   const { isDark, classes } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  // 模型与 API 配置弹窗：入口在下拉面板顶部，与模型搜索同一行
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const containerRef = useRef(null);
 
   // 订阅配置中心：设置弹窗保存后，这里的 provider / 模型列表 / 当前模型即时更新
@@ -30,6 +34,11 @@ const ModelSelector = React.memo(() => {
   const currentModel = resolveCurrentModel();
 
   const toggleOpen = useCallback(() => setIsOpen((prev) => !prev), []);
+
+  const handleOpenSettings = useCallback(() => {
+    setIsOpen(false);
+    setIsSettingsOpen(true);
+  }, []);
 
   const handleModelSelect = useCallback((model) => {
     setCurrentModel(model);
@@ -88,9 +97,11 @@ const ModelSelector = React.memo(() => {
             onSelect={handleModelSelect}
             onProfileSelect={handleProfileModelSelect}
             isDark={isDark}
+            onOpenSettings={handleOpenSettings}
           />
         </div>
       )}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 });
@@ -141,7 +152,8 @@ const EmptyHint = ({ isDark, children }) => (
 // custom → 按已配置的服务商分组展示，点击任意模型即切换到该服务商；
 // backend（服务器托管）→ 后端账号配置的模型列表；
 // ollama（后端部署模式）→ 从后端接口拉取，失败时回退到用户配置的列表
-const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSelect, isDark }) => {
+const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSelect, isDark, onOpenSettings }) => {
+  const { t } = useLanguage();
   const [remoteModels, setRemoteModels] = useState(null);
   const [query, setQuery] = useState('');
 
@@ -181,11 +193,8 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
     return remoteModels || config.models;
   }, [providerName, remoteModels, config.model, config.models]);
 
-  // 搜索框：条目总数较多时才展示，避免给简单场景（演示模式单模型等）徒增视觉噪音
-  const totalCount = customGroups
-    ? customGroups.reduce((sum, g) => sum + g.displayModels.length, 0)
-    : flatModels?.length || 0;
-  const showSearch = totalCount > 8;
+  // 搜索框常驻：曾按"模型多于 8 个才显示"做过降噪，实际反而让用户找不到搜索入口，
+  // 且面板头布局会随模型数量变化跳动，得不偿失
 
   const q = query.trim().toLowerCase();
   const filteredGroups = customGroups
@@ -205,10 +214,10 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
   const body = (() => {
     if (providerName === 'custom') {
       if (!customGroups || customGroups.length === 0) {
-        return <EmptyHint isDark={isDark}>尚未配置模型，请先在设置里添加服务商</EmptyHint>;
+        return <EmptyHint isDark={isDark}>{t('noModelsCustom')}</EmptyHint>;
       }
       if (!filteredGroups || filteredGroups.length === 0) {
-        return <EmptyHint isDark={isDark}>没有匹配的模型</EmptyHint>;
+        return <EmptyHint isDark={isDark}>{t('noMatchModels')}</EmptyHint>;
       }
       return filteredGroups.map((profile, idx) => (
         <div key={profile.id}>
@@ -227,10 +236,10 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
     }
 
     if (!flatModels || flatModels.length === 0) {
-      return <EmptyHint isDark={isDark}>尚未配置模型，请先完成下方配置</EmptyHint>;
+      return <EmptyHint isDark={isDark}>{t('noModelsFlat')}</EmptyHint>;
     }
     if (!filteredFlat || filteredFlat.length === 0) {
-      return <EmptyHint isDark={isDark}>没有匹配的模型</EmptyHint>;
+      return <EmptyHint isDark={isDark}>{t('noMatchModels')}</EmptyHint>;
     }
     return filteredFlat.map((model) => (
       <ModelItem
@@ -245,30 +254,40 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
 
   return (
     <>
-      {showSearch && (
+      {/* 面板头：模型搜索框（常驻）与「模型与 API 配置」入口保持一行 */}
+      <div
+        className={`sticky top-0 z-10 px-3 py-2 border-b flex items-center gap-2 ${
+          isDark ? 'bg-[#1e1e1e] border-white/[0.06]' : 'bg-white border-black/[0.05]'
+        }`}
+      >
         <div
-          className={`sticky top-0 z-10 px-3 py-2 border-b ${
-            isDark ? 'bg-[#1e1e1e] border-white/[0.06]' : 'bg-white border-black/[0.05]'
+          className={`flex flex-1 min-w-0 items-center gap-2 rounded-lg px-3 py-2 ${
+            isDark ? 'bg-white/5' : 'bg-black/[0.035]'
           }`}
         >
-          <div
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 ${
-              isDark ? 'bg-white/5' : 'bg-black/[0.035]'
+          <Search size={13} className={isDark ? 'text-zinc-500' : 'text-gray-400'} />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('searchModels')}
+            className={`w-full bg-transparent text-base outline-none ${
+              isDark ? 'text-white placeholder:text-zinc-600' : 'text-black placeholder:text-gray-400'
             }`}
-          >
-            <Search size={13} className={isDark ? 'text-zinc-500' : 'text-gray-400'} />
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索模型"
-              className={`w-full bg-transparent text-base outline-none ${
-                isDark ? 'text-white placeholder:text-zinc-600' : 'text-black placeholder:text-gray-400'
-              }`}
-            />
-          </div>
+          />
         </div>
-      )}
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          title={t('settings')}
+          aria-label={t('settings')}
+          className={`shrink-0 rounded-lg p-2 transition-colors duration-150 ${
+            isDark ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800'
+          }`}
+        >
+          <Settings size={16} />
+        </button>
+      </div>
       <div className="px-2 py-2 overflow-y-auto">{body}</div>
     </>
   );

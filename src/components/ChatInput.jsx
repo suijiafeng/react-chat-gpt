@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react';
-import { Send, CircleStop, Plus, X, FileText, Loader2, TriangleAlert } from 'lucide-react';
+import { useRef, useEffect, useState } from 'react';
+import { Send, CircleStop, Plus, X, FileText, Loader2, TriangleAlert, NotebookPen, Paperclip } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { IMAGE_ACCEPT, FILE_ACCEPT, formatFileSize } from '../utils/attachments';
@@ -20,11 +20,27 @@ const ChatInput = ({
   onRemoveFile,
   isReadingFiles = false,
   visionWarning = false,
+  // 每会话系统提示词入口（仅已持久化的会话展示；Modal 由 ChatInterface 管理）
+  showSystemPrompt = false,
+  hasSystemPrompt = false,
+  onOpenSystemPrompt,
 }) => {
   const { classes, isDark } = useTheme();
   const { t } = useLanguage();
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
+  // + 按钮弹出菜单：附件与系统提示词入口统一收纳在这里
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
+  const plusMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!isPlusMenuOpen) return;
+    const onPointerDown = (e) => {
+      if (!plusMenuRef.current?.contains(e.target)) setIsPlusMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [isPlusMenuOpen]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -76,7 +92,7 @@ const ChatInput = ({
             }`}
           >
             <TriangleAlert size={13} />
-            当前模型可能不支持图片输入，发送后如报错请切换到视觉模型（如 gpt-4o / claude / qwen-vl）
+            {t('visionWarning')}
           </div>
         )}
         <div
@@ -96,7 +112,7 @@ const ChatInput = ({
                     type="button"
                     onClick={() => onRemoveImage?.(i)}
                     className="absolute -top-2 -right-2 rounded-full bg-black/70 text-white p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                    title="移除图片"
+                    title={t('removeImage')}
                   >
                     <X size={12} />
                   </button>
@@ -114,14 +130,14 @@ const ChatInput = ({
                     <div className="truncate text-sm font-medium">{file.name}</div>
                     <div className="text-sm opacity-50">
                       {formatFileSize(file.size)}
-                      {file.truncated ? ' · 已截断' : ''}
+                      {file.truncated ? ` · ${t('truncatedTag')}` : ''}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => onRemoveFile?.(i)}
                     className="absolute -top-2 -right-2 rounded-full bg-black/70 text-white p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                    title="移除文件"
+                    title={t('removeFile')}
                   >
                     <X size={12} />
                   </button>
@@ -129,7 +145,7 @@ const ChatInput = ({
               ))}
               {isReadingFiles && (
                 <div className="flex items-center gap-2 px-2 text-sm opacity-60">
-                  <Loader2 size={14} className="animate-spin" /> 解析附件中…
+                  <Loader2 size={14} className="animate-spin" /> {t('parsingFiles')}
                 </div>
               )}
             </div>
@@ -147,15 +163,70 @@ const ChatInput = ({
                 e.target.value = ''; // 允许重复选择同一文件
               }}
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              title="添加图片或文件（也可直接粘贴图片）"
-              aria-label="添加图片或文件"
-              className={`rounded-full p-2 mb-1 ${isDark ? 'text-white/75 hover:bg-white/10' : 'text-gray-500 hover:bg-black/5'}`}
-            >
-              <Plus size={18} />
-            </button>
+            {/* + 弹出菜单：附件上传与系统提示词入口 */}
+            <div className="relative" ref={plusMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsPlusMenuOpen((prev) => !prev)}
+                title={t('moreActions')}
+                aria-label={t('moreActions')}
+                aria-expanded={isPlusMenuOpen}
+                className={`rounded-full p-2 mb-1 ${
+                  hasSystemPrompt
+                    ? 'text-blue-500 hover:bg-blue-500/10'
+                    : isDark
+                      ? 'text-white/75 hover:bg-white/10'
+                      : 'text-gray-500 hover:bg-black/5'
+                }`}
+              >
+                <Plus
+                  size={18}
+                  className={`transform transition-transform duration-150 ${isPlusMenuOpen ? 'rotate-45' : ''}`}
+                />
+              </button>
+              {isPlusMenuOpen && (
+                <div
+                  className={`absolute bottom-full left-0 mb-2 z-30 w-44 rounded-xl border p-1 shadow-lg ${classes.border} ${
+                    isDark ? 'bg-[#222222]' : 'bg-white'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPlusMenuOpen(false);
+                      fileInputRef.current?.click();
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+                      isDark
+                        ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                        : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                    }`}
+                  >
+                    <Paperclip size={15} />
+                    <span>{t('addFiles')}</span>
+                  </button>
+                  {showSystemPrompt && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusMenuOpen(false);
+                        onOpenSystemPrompt?.();
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+                        hasSystemPrompt
+                          ? 'text-blue-500 hover:bg-blue-500/10'
+                          : isDark
+                            ? 'text-white/70 hover:bg-white/10 hover:text-white'
+                            : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                      }`}
+                    >
+                      <NotebookPen size={15} />
+                      <span>{t('systemPrompt')}</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <textarea
               ref={textareaRef}
               rows={1}
@@ -174,7 +245,7 @@ const ChatInput = ({
             />
             <button
               type="submit"
-              aria-label={isStreaming ? '停止生成' : '发送消息'}
+              aria-label={isStreaming ? t('stopGen') : t('sendMsg')}
               className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${classes.themeTransition} ${
                 isStreaming || input.trim() || hasAttachments
                   ? isDark
@@ -210,7 +281,7 @@ const ChatInput = ({
         )}
         {/* 小屏收起免责提示，把纵向空间留给对话内容 */}
         <div className={`mt-3 text-center text-sm hidden sm:block ${classes.mutedText}`}>
-          AI 回复仅供参考，重要信息请自行核实。
+          {t('disclaimer')}
         </div>
       </form>
     </div>

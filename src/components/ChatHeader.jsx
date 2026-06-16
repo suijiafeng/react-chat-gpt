@@ -1,17 +1,12 @@
-import { Menu, Settings, NotebookPen } from 'lucide-react';
-import { useState } from 'react';
+import { Menu } from 'lucide-react';
 import ModelSelector from '../components/ModelSelector';
 import NavHeader from './NavHeader';
-import SettingsModal from './SettingsModal';
-import SystemPromptModal from './SystemPromptModal';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLanguage } from '../hooks';
 
-const ChatHeader = ({ toggleSidebar, sessionId, systemPrompt, onSystemPromptChange }) => {
+// 设置入口已收纳到侧边栏底部的个人中心菜单，系统提示词入口移到输入框附近，
+// 顶栏只保留侧边栏开关、模型切换与主题切换
+const ChatHeader = ({ toggleSidebar }) => {
   const { classes } = useTheme();
-  const { t } = useLanguage();
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false);
 
   return (
     <div
@@ -23,42 +18,13 @@ const ChatHeader = ({ toggleSidebar, sessionId, systemPrompt, onSystemPromptChan
           aria-label="切换侧边栏"
           className={`${classes.buttonText} ${classes.buttonHover} rounded-lg p-2`}
         >
-          <Menu size={20} />
+          <Menu size={18} />
         </button>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
         <ModelSelector />
-        {/* 每会话系统提示词入口：仅已持久化的会话（有 sessionId）展示。
-            已设置时高亮蓝色，让用户知道当前会话带着系统提示词在跑 */}
-        {sessionId && (
-          <button
-            onClick={() => setIsSystemPromptOpen(true)}
-            title={t('systemPrompt')}
-            aria-label={t('systemPrompt')}
-            className={`${systemPrompt ? 'text-blue-500' : classes.buttonText} ${classes.buttonHover} rounded-lg p-2`}
-          >
-            <NotebookPen size={18} />
-          </button>
-        )}
-        <button
-          onClick={() => setIsSettingsOpen(true)}
-          title="模型与 API 配置"
-          aria-label="模型与 API 配置"
-          className={`${classes.buttonText} ${classes.buttonHover} rounded-lg p-2`}
-        >
-          <Settings size={18} />
-        </button>
         <NavHeader />
       </div>
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-      {sessionId && (
-        <SystemPromptModal
-          isOpen={isSystemPromptOpen}
-          onClose={() => setIsSystemPromptOpen(false)}
-          value={systemPrompt}
-          onSave={onSystemPromptChange}
-        />
-      )}
     </div>
   );
 };

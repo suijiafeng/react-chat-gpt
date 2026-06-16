@@ -13,6 +13,7 @@ import Sidebar from '../components/Sidebar';
 import ChatMessage from '../components/ChatMessage';
 import ChatHeader from '../components/ChatHeader';
 import ChatInput from '../components/ChatInput';
+import SystemPromptModal from '../components/SystemPromptModal';
 import { useTheme } from '../contexts/ThemeContext';
 import { createSession, getSessionById, setSessionSystemPrompt } from '../store/db';
 import { useLlmConfig, resolveCurrentModel, resolveProviderName } from '../store/llmConfig';
@@ -56,6 +57,7 @@ const ChatInterface = () => {
     };
   }, [sessionId]);
 
+  const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false);
   const handleSystemPromptChange = useCallback(
     (next) => {
       setSystemPrompt(next);
@@ -102,18 +104,18 @@ const ChatInterface = () => {
       for (const file of files) {
         // 拖拽/粘贴可绕过 <input accept>，这里统一做格式白名单拦截
         if (!isSupportedFile(file)) {
-          antdMessage.warning(`「${file.name}」格式不支持，已跳过（支持图片、PDF 与常见文本/代码文件）`);
+          antdMessage.warning(t('fileUnsupported', { name: file.name }));
           continue;
         }
         if (file.size > MAX_FILE_SIZE) {
-          antdMessage.warning(`「${file.name}」超过 20MB，已跳过`);
+          antdMessage.warning(t('fileTooLarge', { name: file.name }));
           continue;
         }
         if (file.type.startsWith('image/')) {
           const img = await readImageFile(file);
           setPendingImages((prev) => {
             if (prev.length >= MAX_IMAGES) {
-              antdMessage.warning(`最多附带 ${MAX_IMAGES} 张图片`);
+              antdMessage.warning(t('maxImages', { n: MAX_IMAGES }));
               return prev;
             }
             return [...prev, img];
@@ -124,11 +126,11 @@ const ChatInterface = () => {
         }
       }
     } catch (error) {
-      antdMessage.error(`附件解析失败：${error.message}`);
+      antdMessage.error(t('fileParseError', { msg: error.message }));
     } finally {
       setIsReadingFiles(false);
     }
-  }, []);
+  }, [t]);
 
   const removePendingImage = useCallback(
     (index) => setPendingImages((prev) => prev.filter((_, i) => i !== index)),
@@ -149,7 +151,10 @@ const ChatInterface = () => {
       const MAX_INPUT_CHARS = 60000;
       if (text.length > MAX_INPUT_CHARS) {
         antdMessage.warning(
-          `消息过长（${text.length.toLocaleString()} 字，上限 ${MAX_INPUT_CHARS.toLocaleString()}）。超长内容请保存为 .txt 用附件上传，或拆分后分次发送。`
+          t('msgTooLong', {
+            len: text.length.toLocaleString(),
+            max: MAX_INPUT_CHARS.toLocaleString(),
+          })
         );
         return;
       }
@@ -191,6 +196,7 @@ const ChatInterface = () => {
       pendingImages,
       pendingFiles,
       autoFollowRef,
+      t,
     ]
   );
 
@@ -234,12 +240,12 @@ const ChatInterface = () => {
   const prevStreamingRef = useRef(false);
   useEffect(() => {
     if (prevStreamingRef.current && !isStreaming) {
-      setSrAnnouncement('AI 回复已生成完毕');
+      setSrAnnouncement(t('srDone'));
     } else if (!prevStreamingRef.current && isStreaming) {
-      setSrAnnouncement('AI 正在生成回复');
+      setSrAnnouncement(t('srGenerating'));
     }
     prevStreamingRef.current = isStreaming;
-  }, [isStreaming]);
+  }, [isStreaming, t]);
 
   // 桌面端的收起/展开是用户的持久偏好，存 localStorage；
   // 移动端始终是临时抽屉（关闭态默认），不与桌面偏好混用
@@ -393,12 +399,7 @@ const ChatInterface = () => {
         {srAnnouncement}
       </div>
       <div className="relative flex-1 flex flex-col overflow-hidden min-w-0">
-        <ChatHeader
-          toggleSidebar={toggleSidebar}
-          sessionId={sessionId}
-          systemPrompt={systemPrompt}
-          onSystemPromptChange={handleSystemPromptChange}
-        />
+        <ChatHeader toggleSidebar={toggleSidebar} />
         <div className="relative flex-1 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_28%)] pointer-events-none" />
           <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 md:px-8">
@@ -410,7 +411,7 @@ const ChatInterface = () => {
               <div className="flex min-h-[50vh] items-center justify-center px-4">
                 <div className="text-center select-none">
                   <div className={`text-xl md:text-4xl leading-relaxed ${classes.mutedText}`}>
-                    今天想聊些什么呢？
+                    {t('welcome')}
                   </div>
                 </div>
               </div>
@@ -453,7 +454,18 @@ const ChatInterface = () => {
             onRemoveFile={removePendingFile}
             isReadingFiles={isReadingFiles}
             visionWarning={pendingImages.length > 0 && !isLikelyVisionModel(currentModel)}
+            showSystemPrompt={Boolean(sessionId)}
+            hasSystemPrompt={Boolean(systemPrompt)}
+            onOpenSystemPrompt={() => setIsSystemPromptOpen(true)}
           />
+          {sessionId && (
+            <SystemPromptModal
+              isOpen={isSystemPromptOpen}
+              onClose={() => setIsSystemPromptOpen(false)}
+              value={systemPrompt}
+              onSave={handleSystemPromptChange}
+            />
+          )}
         </div>
       </div>
     </div>
