@@ -44,10 +44,12 @@ export const DEMO_MODELS = ['demo-assistant'];
 // 与 store/db.js 的会话隔离同一套身份判定，直接读 localStorage 避免循环依赖。
 // ──────────────────────────────────────────────
 
-const DEMO_USER_ID = 'demo-user-fixed-id';
+// 与 store/db.js 的 GUEST_USER_ID 是同一个值：免登录体验与登录默认演示账号
+// （demo@aichat.local）刻意分属两个身份，配置也不共用
+const GUEST_USER_ID = 'guest-user-fixed-id';
 
 const currentUserId = () => {
-  if (localStorage.getItem('demo_mode') === 'true') return DEMO_USER_ID;
+  if (localStorage.getItem('demo_mode') === 'true') return GUEST_USER_ID;
   try {
     return JSON.parse(localStorage.getItem('auth_session'))?.id || 'anon';
   } catch {

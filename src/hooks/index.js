@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import i18n from '../locales/i18n';
 import { getSession } from '../apis/auths';
 import { seedDemoUser } from '../store/db';
 import { userStore } from '../store';
 import { isDemoMode } from '../store/llmConfig';
 import { handleSessionExpired } from '../utils/session';
-import { WEBUI_API_BASE_URL, DEMO_ACCOUNT } from '../constants';
+import { WEBUI_API_BASE_URL } from '../constants';
 import request from '../apis/config';
 export * from './useChat';
 
@@ -32,12 +33,13 @@ export const useLanguage = () => {
 // 之前放在 effect 里异步设置，首帧必定先渲染全屏加载动画、下一帧才换成页面，
 // 刷新时正文文字（如欢迎语）会"跳"出来。
 const resolveAuthState = () => {
-  // Demo 快捷模式
+  // Demo 快捷模式：展示身份用「访客」，与需要登录的默认演示账号
+  // （demo@aichat.local）是刻意分开的两个身份，数据不互通
   if (localStorage.getItem('demo_mode') === 'true') {
     userStore.setUser({
-      email: DEMO_ACCOUNT.email,
+      email: '',
       // 演示模式支持改昵称（存 localStorage），恢复时优先取用户改过的名字
-      name: localStorage.getItem('demo_name') || DEMO_ACCOUNT.name,
+      name: localStorage.getItem('demo_name') || i18n.t('guestName'),
       profile_image_url: '',
     });
     return true;

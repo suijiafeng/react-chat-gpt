@@ -41,6 +41,7 @@
   "apiKey": "API 密钥 (API Key)",
   "modelName": "模型名称 (Model Name)",
   "tryDemo": "免登录体验",
+  "guestName": "访客",
   "searchChats": "搜索会话",
   "rename": "重命名",
   "pin": "置顶",

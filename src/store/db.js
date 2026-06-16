@@ -5,6 +5,9 @@ import { encryptString, decryptString, encryptJson, decryptJson } from '../utils
 import { DEMO_ACCOUNT } from '../constants';
 
 const DEMO_USER_ID = 'demo-user-fixed-id';
+// 免登录体验（demo_mode）的固定身份——与 DEMO_USER_ID（demo@aichat.local 那个需要登录的
+// 演示账号）刻意分开：随手点"免登录体验"和真正登录默认演示账号，数据不该互通。
+const GUEST_USER_ID = 'guest-user-fixed-id';
 
 const DB_NAME = 'chatDB';
 const DB_VERSION = 4;
@@ -168,11 +171,12 @@ const migrateMessageIfPlain = (db, record) => {
 // ──────────────────────────────────────────────
 
 // 当前登录用户 id：会话数据按用户隔离的依据。
-// - 免登录演示：固定的演示用户 id（与默认账号登录是同一个演示身份，数据互通是预期行为）；
+// - 免登录演示：固定的访客用户 id，与登录默认演示账号（demo@aichat.local）是两个独立身份，
+//   数据互不可见——避免"随手点一下试用"和"真的登录了默认账号"被当成同一个账号；
 // - 账号登录：auth_session 里的用户 id。
 // 直接读 localStorage 而不 import apis/auths，避免 db ↔ auths 循环依赖。
 const currentUserId = () => {
-  if (localStorage.getItem('demo_mode') === 'true') return DEMO_USER_ID;
+  if (localStorage.getItem('demo_mode') === 'true') return GUEST_USER_ID;
   try {
     return JSON.parse(localStorage.getItem('auth_session'))?.id || null;
   } catch {
