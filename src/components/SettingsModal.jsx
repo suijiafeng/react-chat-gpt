@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message, Popconfirm } from 'antd';
-import { Zap, CheckCircle2, XCircle, Loader2, ServerCog, Trash2, Plus, ExternalLink } from 'lucide-react';
+import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message, Popconfirm, Checkbox } from 'antd';
+import { Zap, CheckCircle2, XCircle, Loader2, ServerCog, Trash2, Plus, ExternalLink, X } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { getConfig, saveConfig, saveProfiles } from '../store/llmConfig';
@@ -19,8 +19,43 @@ const fetchOpenAiModelIds = async (baseUrl, apiKey) => {
   return (data?.data || []).map((m) => m.id).filter(Boolean);
 };
 
+// 模型可用性探测（浏览器直连，custom 模式）：向所选模型发一条最小对话请求。
+// 接口连通 ≠ 模型可用——模型名拼错、无权限、欠费只有真正调用一次才会暴露。
+// 非流式、max_tokens 压到个位数，代价可忽略；返回耗时毫秒数。
+const probeModelCompletion = async (baseUrl, apiKey, model, abortSignal) => {
+  const base = baseUrl.trim().replace(/\/+$/, '');
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey.trim()) headers['Authorization'] = `Bearer ${apiKey.trim()}`;
+  const startedAt = Date.now();
+  // 真跑一次推理比 /models 慢得多，超时放宽；外部 abortSignal（切换服务商等）可提前终止
+  const timeout = AbortSignal.timeout(30000);
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: 'Hi' }],
+      stream: false,
+      max_tokens: 8,
+    }),
+    signal: abortSignal ? AbortSignal.any([timeout, abortSignal]) : timeout,
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      detail = data?.error?.message || data?.message || detail;
+    } catch { /* 上游错误体不是 JSON 时保留状态码 */ }
+    throw new Error(detail);
+  }
+  await res.json();
+  return Date.now() - startedAt;
+};
+
 // "测试连接"按钮 + 结果文案（custom / backend 两个分区共用同一套外观与状态图标）
-const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes, successCls, errorCls }) => (
+const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes, successCls, errorCls }) => {
+  const { t } = useLanguage();
+  return (
   <>
     <Button
     size='small'
@@ -36,11 +71,12 @@ const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes
         isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
       }`}
     >
-      {state === 'testing' ? '测试中...' : '测试连接'}
+      {state === 'testing' ? t('set.testing') : t('set.testConnection')}
     </Button>
     {msg && <p className={`text-sm ${state === 'ok' ? successCls : errorCls}`}>{msg}</p>}
   </>
-);
+  );
+};
 
 // 表单的可比较快照：与"打开弹窗时的基线"逐字节比对，判断有没有未保存的修改
 const snapshotOf = ({
@@ -95,6 +131,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const lastFetchSigRef = useRef(new Map());
   // 打开弹窗（或后端配置加载完）时的表单基线，用于判断"有没有未保存的修改"
   const [baseline, setBaseline] = useState(null);
+
+  // "逐个验证"勾选项：勾上后点"测试连接"会对启用列表里的每个模型串行发对话探测，
+  // 逐行展示 ✓/✗；取消勾选则维持只测默认模型的轻量行为。
+  // batchResults: { [model]: { status: 'pending'|'testing'|'ok'|'fail', ms?, error? } }
+  const [verifyEachEnabled, setVerifyEachEnabled] = useState(false);
+  const [batchResults, setBatchResults] = useState({});
+  // 验证期间切换服务商/关闭弹窗时终止在途探测请求（否则过期结果会写回新卡片的状态）
+  const verifyAbortRef = useRef(null);
 
   // "服务器托管"模式专用状态：配置存在后端账号下，不进 localStorage
   const [backendApiUrl, setBackendApiUrl] = useState('');
@@ -200,8 +244,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
         .catch((error) => {
           setBackendLoadError(
             error.response?.status === 401
-              ? '请先登录后再配置服务器托管模式'
-              : '加载后端配置失败：' + (error.response?.data?.message || error.message)
+              ? t('set.loginFirstForBackend')
+              : t('set.backendLoadFailed', { msg: error.response?.data?.message || error.message })
           );
         })
         .finally(() => setBackendLoading(false));
@@ -255,13 +299,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const addCustomProfile = () => {
     const customCount = profiles.filter((p) => !PROVIDER_PRESETS.some((preset) => preset.id === p.id)).length;
     if (customCount >= 10) {
-      message.warning('最多支持 10 个自定义服务商');
+      message.warning(t('set.maxCustomProviders'));
       return;
     }
     const id = newCustomId();
     setProfiles((prev) => [
       ...prev,
-      { id, name: '自定义服务商', apiUrl: '', apiKey: '', models: [], model: '' },
+      { id, name: t('set.customProviderDefaultName'), apiUrl: '', apiKey: '', models: [], model: '' },
     ]);
     setSelectedId(id);
     setTestState('idle');
@@ -297,26 +341,148 @@ const SettingsModal = ({ isOpen, onClose }) => {
     );
   };
 
-  // 手动"测试连接"：显式请求 {base}/models 验证地址/密钥，并导入模型列表
+  // 手动"测试连接"，两步走：
+  // ① 请求 {base}/models 验证地址/密钥并导入模型列表（接口连通性）；
+  // ② 用选中的模型发一条最小对话请求（模型真实可用性）——模型名错误、
+  //    无权限、欠费等问题只有这一步才能暴露。
+  // /models 因 CORS 失败时②仍会执行：对话接口通了照样算测试通过。
   const handleTest = async () => {
     if (!selected) return;
+
+    // 勾选了"逐个验证"：改为对每个启用模型串行探测（见 runVerifyEachModel）
+    if (verifyEachEnabled) {
+      await runVerifyEachModel();
+      return;
+    }
+    setBatchResults({});
     setTestState('testing');
     setTestMessage('');
+
+    // 单模型测试同样可被切换服务商终止
+    verifyAbortRef.current?.abort();
+    const controller = new AbortController();
+    verifyAbortRef.current = controller;
+
+    const apiKey = effectiveKey(selected);
+    let fetchedIds = [];
+    let modelsError = null;
     try {
-      const ids = await fetchOpenAiModelIds(selected.apiUrl, effectiveKey(selected));
-      setTestState('ok');
-      if (ids.length > 0) {
-        setTestMessage(`连接成功，检测到 ${ids.length} 个可用模型`);
-        applyFetchedModels(ids);
+      fetchedIds = await fetchOpenAiModelIds(selected.apiUrl, apiKey);
+      if (fetchedIds.length > 0) {
+        applyFetchedModels(fetchedIds);
         lastFetchSigRef.current.set(selected.id, selected.apiUrl.trim() + '|' + selected.apiKey.trim());
-      } else {
-        setTestMessage('连接成功');
       }
     } catch (error) {
-      setTestState('fail');
-      // 部分平台的 /models 接口有 CORS 限制，测试失败不代表对话一定不可用
-      setTestMessage(`连接失败：${error.message}（部分平台限制浏览器直接访问，可忽略并直接保存试用）`);
+      modelsError = error;
     }
+
+    // 待验证的模型：已选默认模型 > 启用列表第一个 > 刚拉到的第一个
+    const modelToProbe = selected.model || selected.enabledModels?.[0] || fetchedIds[0] || '';
+    if (!modelToProbe) {
+      if (modelsError) {
+        setTestState('fail');
+        // 部分平台的 /models 接口有 CORS 限制，测试失败不代表对话一定不可用
+        setTestMessage(t('set.connFailedBrowser', { msg: modelsError.message }));
+      } else {
+        setTestState('ok');
+        setTestMessage(t('set.connOkNoModel'));
+      }
+      return;
+    }
+
+    try {
+      const elapsedMs = await probeModelCompletion(selected.apiUrl, apiKey, modelToProbe, controller.signal);
+      setTestState('ok');
+      setTestMessage(t('set.modelUsable', { model: modelToProbe, ms: elapsedMs }));
+    } catch (error) {
+      if (controller.signal.aborted) return; // 被切换服务商终止：状态由切换方重置
+      setTestState('fail');
+      setTestMessage(
+        modelsError
+          ? t('set.connFailedBrowser', { msg: error.message })
+          : t('set.modelCallFailed', { model: modelToProbe, msg: error.message })
+      );
+    }
+  };
+
+  // 逐个验证：串行探测每个启用模型的对话可用性。
+  // 刻意不并发——免费平台按分钟限流，并发全测容易集体 429，串行 + 间隔更接近真实可用性；
+  // 结果只是提示，不阻止保存（此刻限流失败不代表模型不可用）。
+  const runVerifyEachModel = async () => {
+    const modelsToVerify = selected.enabledModels?.length
+      ? selected.enabledModels
+      : selected.model
+        ? [selected.model]
+        : [];
+    if (!modelsToVerify.length) {
+      message.warning(t('set.fillModelName'));
+      return;
+    }
+
+    // 每轮验证持有自己的 AbortController：切换服务商/关闭弹窗即 abort，
+    // 在途请求立刻终止，循环也随之退出，不会把过期结果写进新状态
+    verifyAbortRef.current?.abort();
+    const controller = new AbortController();
+    verifyAbortRef.current = controller;
+
+    setTestState('testing');
+    setTestMessage('');
+    setBatchResults(Object.fromEntries(modelsToVerify.map((m) => [m, { status: 'pending' }])));
+    const apiKey = effectiveKey(selected);
+    let failCount = 0;
+
+    for (let i = 0; i < modelsToVerify.length; i++) {
+      if (controller.signal.aborted) return;
+      const model = modelsToVerify[i];
+      setBatchResults((prev) => ({ ...prev, [model]: { status: 'testing' } }));
+      try {
+        const ms = await probeModelCompletion(selected.apiUrl, apiKey, model, controller.signal);
+        setBatchResults((prev) => ({ ...prev, [model]: { status: 'ok', ms } }));
+      } catch (error) {
+        if (controller.signal.aborted) return; // 被终止：直接退出，状态由切换方重置
+        failCount++;
+        setBatchResults((prev) => ({ ...prev, [model]: { status: 'fail', error: error.message } }));
+      }
+      // 相邻探测之间留间隔，避免触发平台的每分钟限流
+      if (i < modelsToVerify.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        if (controller.signal.aborted) return;
+      }
+    }
+
+    if (failCount === 0) {
+      setTestState('ok');
+      setTestMessage(t('set.verifySummaryOk', { n: modelsToVerify.length }));
+    } else {
+      setTestState('fail');
+      setTestMessage(t('set.verifySummaryFail', { fail: failCount, n: modelsToVerify.length }));
+    }
+  };
+
+  // 切换服务商卡片时：终止在途的验证请求，并清掉上一家的验证结果与测试状态
+  //（模型列表都换了，旧结果没有意义，残留的 testing 态还会卡住按钮）
+  useEffect(() => {
+    verifyAbortRef.current?.abort();
+    setBatchResults({});
+    setVerifyEachEnabled(false);
+    setTestState('idle');
+    setTestMessage('');
+  }, [selectedId, isOpen]);
+
+  // 从验证结果列表删除失败的模型：同步从上方"启用的模型"里移除，
+  // 默认模型恰好是它时顺移到剩余第一个（与 Select 手动取消勾选的行为一致）
+  const removeFailedModel = (model) => {
+    setBatchResults((prev) => {
+      const next = { ...prev };
+      delete next[model];
+      return next;
+    });
+    if (!selected) return;
+    const remainingModels = (selected.enabledModels || []).filter((m) => m !== model);
+    updateSelected({
+      enabledModels: remainingModels,
+      model: selected.model === model ? remainingModels[0] || '' : selected.model,
+    });
   };
 
   // 按需拉取模型：用户展开「启用的模型」下拉时才请求 /models 生成勾选候选，
@@ -335,7 +501,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
       if (ids.length) {
         applyFetchedModels(ids);
         setTestState('ok');
-        setTestMessage(`已获取 ${ids.length} 个模型`);
+        setTestMessage(t('set.modelsFetched', { n: ids.length }));
       }
     } catch {
       // 静默失败：多因平台限制浏览器跨域访问 /models，保留预设兜底，用户可手动"测试连接"
@@ -362,19 +528,19 @@ const SettingsModal = ({ isOpen, onClose }) => {
         if (ids.length && !backendModelEditedRef.current) {
           setBackendModel((prev) => (ids.includes(prev) ? prev : ids[0]));
           setBackendTestState('ok');
-          setBackendTestMessage(`已自动获取 ${ids.length} 个模型`);
+          setBackendTestMessage(t('set.modelsAutoFetched', { n: ids.length }));
         }
       } catch {
         lastBackendFetchRef.current = sig; // 静默，用户可手动点"测试连接"看具体错误
       }
     }, 900);
     return () => clearTimeout(timer);
-  }, [provider, backendApiUrl, backendApiKey, backendLoading]);
+  }, [provider, backendApiUrl, backendApiKey, backendLoading, t]);
 
   // 后端模式连接测试：让服务端用当前表单里的地址/密钥去拉模型列表（绕开浏览器 CORS）。
   const handleBackendTest = async () => {
     if (!backendApiUrl.trim()) {
-      message.warning('请先填写 API 接口地址');
+      message.warning(t('set.fillApiUrlFirst'));
       return;
     }
     setBackendTestState('testing');
@@ -385,16 +551,30 @@ const SettingsModal = ({ isOpen, onClose }) => {
         apiKey: backendApiKey.trim(),
       });
       const ids = (res.data?.data || []).map((m) => m.id).filter(Boolean);
-      setBackendTestState('ok');
       if (ids.length > 0) {
-        setBackendTestMessage(`连接成功，检测到 ${ids.length} 个可用模型`);
         setBackendModel((prev) => (ids.includes(prev) ? prev : ids[0]));
+      }
+
+      // 第二步：有确定的模型就让服务端向它发一条最小对话请求，验证模型真实可用
+      const modelToProbe = (backendModel || ids[0] || '').trim();
+      if (modelToProbe) {
+        const probe = await testBackendLlmConfig({
+          apiUrl: backendApiUrl.trim(),
+          apiKey: backendApiKey.trim(),
+          model: modelToProbe,
+          provider: backendProvider,
+        });
+        setBackendTestState('ok');
+        setBackendTestMessage(
+          t('set.modelUsable', { model: modelToProbe, ms: probe.data?.elapsedMs ?? '?' })
+        );
       } else {
-        setBackendTestMessage('连接成功');
+        setBackendTestState('ok');
+        setBackendTestMessage(ids.length > 0 ? t('set.connOkWithModels', { n: ids.length }) : t('set.connOkNoModel'));
       }
     } catch (error) {
       setBackendTestState('fail');
-      setBackendTestMessage('连接失败：' + (error.response?.data?.message || error.message));
+      setBackendTestMessage(t('set.connFailed', { msg: error.response?.data?.message || error.message }));
     }
   };
 
@@ -413,7 +593,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
           contextTokens: contextTokens || 8000,
           think,
         });
-        message.success(t('settingsSaved') || '设置已保存，立即生效');
+        message.success(t('settingsSaved'));
         setBaseline(formSnapshot);
         onClose();
         return;
@@ -454,11 +634,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
       );
     } else if (provider === 'backend') {
       if (!backendApiUrl.trim()) {
-        message.warning('请填写 API 接口地址');
+        message.warning(t('set.fillApiUrl'));
         return;
       }
       if (!backendModel.trim()) {
-        message.warning('请填写模型名称');
+        message.warning(t('set.fillModelName'));
         return;
       }
       try {
@@ -470,7 +650,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
           provider: backendProvider,
         });
       } catch (error) {
-        message.error('保存到服务器失败：' + (error.response?.data?.message || error.message));
+        message.error(t('set.saveToServerFailed', { msg: error.response?.data?.message || error.message }));
         return;
       }
       // 本地只记一个指针：当前用的是 backend 模式 + 展示哪个模型，真正的 Key 留在服务端
@@ -482,7 +662,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         think,
       });
     }
-    message.success(t('settingsSaved') || '设置已保存，立即生效');
+    message.success(t('settingsSaved'));
     // 保存成功后重新取基线：留在弹窗里继续调整时，状态条会显示"已保存"
     setBaseline(formSnapshot);
     onClose();
@@ -495,10 +675,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
       return;
     }
     Modal.confirm({
-      title: '放弃未保存的修改？',
-      content: '当前的模型与 API 配置还没保存，关闭后这些改动会丢失。',
-      okText: '放弃并关闭',
-      cancelText: '继续编辑',
+      title: t('set.discardTitle'),
+      content: t('set.discardContent'),
+      okText: t('set.discardOk'),
+      cancelText: t('set.keepEditing'),
       okButtonProps: { danger: true },
       // 确认框自己不吃 Esc：否则从 Esc 触发时会被同一次按键顺手关掉
       keyboard: false,
@@ -556,30 +736,39 @@ const SettingsModal = ({ isOpen, onClose }) => {
         {
           id: BACKEND_ID,
           isBackend: true,
-          name: t('backendHosted') || '服务器托管',
+          name: t('backendHosted'),
           hasKey: backendHasApiKey,
           hasEnabledModels: Boolean(backendModel),
         },
       ];
 
-  // 通用参数一行：上下文预算靠左，展示思考过程贴右
+  // 通用参数一行：上下文预算靠左，展示思考过程贴右。
+  // 免登录/演示回复状态（没有任何可用服务商）下这两个参数不会被消费——
+  // 演示 provider 不读上下文预算也没有思考流，整行置灰并说明原因，
+  // 避免用户在无效配置上浪费时间
   const generalParams = (
-    <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className={labelCls}>上下文预算</span>
-        <InputNumber
-          value={contextTokens}
-          onChange={(v) => setContextTokens(v)}
-          min={1000}
-          max={200000}
-          step={1000}
-          size="small"
-        />
+    <div className={nothingConfigured ? 'opacity-50' : ''}>
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className={labelCls}>{t('set.contextBudget')}</span>
+          <InputNumber
+            value={contextTokens}
+            onChange={(v) => setContextTokens(v)}
+            min={1000}
+            max={200000}
+            step={1000}
+            size="small"
+            disabled={nothingConfigured}
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={labelCls}>{t('set.showThinking')}</span>
+          <Switch checked={think} onChange={setThink} disabled={nothingConfigured} />
+        </div>
       </div>
-      <div className="flex items-center gap-3">
-        <span className={labelCls}>展示思考过程</span>
-        <Switch checked={think} onChange={setThink} />
-      </div>
+      {nothingConfigured && (
+        <p className={`${helpTextCls} mt-2`}>{t('demoParamsDisabled')}</p>
+      )}
     </div>
   );
 
@@ -593,7 +782,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             <ServerCog size={16} />
           </span>
           <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-950'}`}>
-            {t('settings') || '模型与 API 配置'}
+            {t('settings')}
           </span>
         </div>
       }
@@ -611,11 +800,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
             }`}
           >
             {dirty ? <span className="h-2 w-2 rounded-full bg-current" /> : <CheckCircle2 size={13} />}
-            {dirty ? '未保存' : '已保存'}
+            {dirty ? t('set.unsaved') : t('set.saved')}
           </span>
           <span className="flex items-center gap-2">
             <Button onClick={handleRequestClose} className={isDark ? 'bg-transparent text-zinc-300 border-white/10 hover:bg-white/5' : ''}>
-              {t('cancel') || '取消'}
+              {t('cancel')}
             </Button>
             <Button
               type="primary"
@@ -623,7 +812,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
               disabled={!dirty}
               className="bg-blue-600 hover:bg-blue-500 border-0 shadow-none"
             >
-              {t('save') || '保存'}
+              {t('save')}
             </Button>
           </span>
         </div>
@@ -653,7 +842,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         {/* 服务商列表：原来「接口服务提供商」tab 的三个模式收敛到了这一份列表里，
             服务器托管（如有）作为末尾一张卡片。列表始终渲染，否则选中托管后就切不回来了 */}
         <div className={`${sectionCls} space-y-3`}>
-          <label className={labelCls}>服务商</label>
+          <label className={labelCls}>{t('set.providers')}</label>
               <div className="flex flex-wrap gap-2">
                 {providerChips.map((item) => {
                   const isActive = selectedId === item.id;
@@ -676,7 +865,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       {item.hasEnabledModels && (
                         <span
                           className={`h-2 w-2 rounded-full ${item.hasKey ? 'bg-emerald-400' : 'bg-stone-400'}`}
-                          title={item.hasKey ? '已配置密钥并选择模型' : '已选择模型，未填密钥'}
+                          title={item.hasKey ? t('set.chipKeyAndModel') : t('set.chipModelNoKey')}
                         />
                       )}
                       {item.name}
@@ -692,14 +881,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       : 'border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-800'
                   }`}
                 >
-                  <Plus size={12} /> 自定义
+                  <Plus size={12} /> {t('set.custom')}
                 </button>
               </div>
               {/* 没配任何服务商时当前实际跑的是演示回复。原来这句话挂在「前端演示模式」
                   这个 tab 下，tab 移除后改成按状态出现，用户不至于疑惑回复是哪来的 */}
               {nothingConfigured && (
                 <p className={helpTextCls}>
-                  {t('demoHint') || '尚未配置服务商，当前使用演示回复（预设素材，无需密钥）。选择上方任意服务商即可接入真实模型。'}
+                  {t('demoHint')}
                 </p>
               )}
             </div>
@@ -720,16 +909,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             isDark ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-500'
                           }`}
                         >
-                          获取密钥 <ExternalLink size={11} />
+                          {t('set.getKey')} <ExternalLink size={11} />
                         </a>
                       )}
                       {/* 内置预设不可删除，只有自定义服务商能删除 */}
                       {!selectedPreset && (
                         <Popconfirm
-                          title={`删除「${selected.name}」的配置？`}
+                          title={t('set.deleteProviderConfirm', { name: selected.name })}
                           onConfirm={removeSelected}
-                          okText="删除"
-                          cancelText="取消"
+                          okText={t('delete')}
+                          cancelText={t('cancel')}
                         >
                           <button
                             type="button"
@@ -737,7 +926,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                               isDark ? 'text-rose-300 hover:text-rose-200' : 'text-rose-500 hover:text-rose-400'
                             }`}
                           >
-                            <Trash2 size={11} /> 删除
+                            <Trash2 size={11} /> {t('delete')}
                           </button>
                         </Popconfirm>
                       )}
@@ -747,7 +936,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     <Input
                       value={selected.name}
                       onChange={(e) => updateSelected({ name: e.target.value })}
-                      placeholder="服务商名称"
+                      placeholder={t('set.providerNamePlaceholder')}
                       className={inputCls}
                     />
                   )}
@@ -766,7 +955,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       updateSelected({ apiKey: e.target.value });
                       setTestState('idle');
                     }}
-                    placeholder={selected.hasApiKey ? '已保存，留空则不修改' : 'sk-xxxxxxxx'}
+                    placeholder={selected.hasApiKey ? t('set.keySavedPlaceholder') : 'sk-xxxxxxxx'}
                     className={inputCls}
                   />
                   <Select
@@ -786,8 +975,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       if (open) loadModelsOnDemand();
                     }}
                     loading={modelsAutoLoading}
-                    notFoundContent={modelsAutoLoading ? '获取模型中…' : undefined}
-                    placeholder="点此选择模型"
+                    notFoundContent={modelsAutoLoading ? t('set.fetchingModels') : undefined}
+                    placeholder={t('set.selectModels')}
                     className={`w-full ${inputCls}`}
                     classNames={{ popup: { root: dropdownPopupClass } }}
                     showSearch
@@ -795,9 +984,25 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     allowClear
                     tokenSeparators={[',']}
                   />
+                  
                   {/* 三项填完再验证，所以放在它们下方；按钮右对齐，结果文案排在它左侧 */}
                   <div className="flex flex-row-reverse justify-start items-center gap-3 flex-wrap pt-1">
-                    <TestConnection
+                
+                    {/* 逐个验证勾选项：勾了多个模型时出现；勾上后"测试连接"改为逐一探测 */}
+                    {(selected.enabledModels?.length || 0) > 1 && (
+                      <Checkbox
+                        checked={verifyEachEnabled}
+                        disabled={testState === 'testing'}
+                        onChange={(e) => {
+                          setVerifyEachEnabled(e.target.checked);
+                          if (!e.target.checked) setBatchResults({});
+                        }}
+                        className={isDark ? 'text-zinc-300' : 'text-slate-600'}
+                      >
+                        <span className="text-sm">{t('set.verifyAll')}</span>
+                      </Checkbox>
+                    )}
+                      <TestConnection
                       onTest={handleTest}
                       state={testState}
                       message={testMessage}
@@ -808,6 +1013,47 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       errorCls={errorTextCls}
                     />
                   </div>
+                  {/* 逐个验证的结果列表：✓ 耗时 / ✗ 原因，实时更新 */}
+                  {Object.keys(batchResults).length > 0 && (
+                    <ul className="space-y-1 pt-1 overflow-y-auto max-h-32">
+                      {Object.entries(batchResults).map(([model, result]) => (
+                        <li key={model} className="flex items-center gap-2 text-sm">
+                          {result.status === 'testing' ? (
+                            <Loader2 size={13} className="animate-spin shrink-0 opacity-60" />
+                          ) : result.status === 'ok' ? (
+                            <CheckCircle2 size={13} className="shrink-0 text-green-500" />
+                          ) : result.status === 'fail' ? (
+                            <XCircle size={13} className="shrink-0 text-red-500" />
+                          ) : (
+                            <span className="inline-block h-[13px] w-[13px] shrink-0 text-center opacity-30">·</span>
+                          )}
+                          <span className="truncate font-mono">{model}</span>
+                          {result.status === 'ok' && (
+                            <span className={successTextCls}>{result.ms} ms</span>
+                          )}
+                          {result.status === 'fail' && (
+                            <>
+                              <span className={`${errorTextCls} truncate`}>{result.error}</span>
+                              {/* 删除失败模型：从结果列表与上方启用列表中同步移除 */}
+                              <button
+                                type="button"
+                                onClick={() => removeFailedModel(model)}
+                                title={t('delete')}
+                                aria-label={`${t('delete')} ${model}`}
+                                className={`ml-auto shrink-0 rounded p-1 transition-colors ${
+                                  isDark
+                                    ? 'text-zinc-500 hover:text-red-300 hover:bg-white/10'
+                                    : 'text-gray-400 hover:text-red-500 hover:bg-black/5'
+                                }`}
+                              >
+                                <X size={13} />
+                              </button>
+                            </>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <div className={`${sectionCls}`}>{generalParams}</div>
@@ -823,7 +1069,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             )}
 
             <div className={`${sectionCls} space-y-3`}>
-              <label className={labelCls}>接口类型</label>
+              <label className={labelCls}>{t('set.apiType')}</label>
               <Radio.Group
                 value={backendProvider}
                 onChange={(e) => { setBackendProvider(e.target.value); setBackendTestState('idle'); }}
@@ -831,8 +1077,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 className="flex gap-3 w-full"
               >
                 {[
-                  { value: 'custom', label: 'OpenAI 兼容' },
-                  { value: 'ollama', label: 'Ollama 原生' },
+                  { value: 'custom', label: t('set.openaiCompatible') },
+                  { value: 'ollama', label: t('set.ollamaNative') },
                 ].map((opt) => (
                   <Radio.Button
                     key={opt.value}
@@ -850,7 +1096,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             </div>
 
             <div className={`${sectionCls} space-y-2`}>
-              <label className={labelCls}>{t('apiUrl') || 'API 接口地址 (Base URL)'}</label>
+              <label className={labelCls}>{t('apiUrl')}</label>
               <Input
                 value={backendApiUrl}
                 onChange={(e) => { setBackendApiUrl(e.target.value); setBackendTestState('idle'); }}
@@ -861,11 +1107,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
             </div>
 
             <div className={`${sectionCls} space-y-2`}>
-              <label className={labelCls}>{t('apiKey') || 'API 密钥 (API Key)'}</label>
+              <label className={labelCls}>{t('apiKey')}</label>
               <Input.Password
                 value={backendApiKey}
                 onChange={(e) => { setBackendApiKey(e.target.value); setBackendTestState('idle'); }}
-                placeholder={backendHasApiKey ? '已在服务器保存，留空则不修改' : 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'}
+                placeholder={backendHasApiKey ? t('set.keySavedOnServer') : 'sk-xxxxxxxxxxxxxxxxxxxxxxxx'}
                 disabled={backendLoading}
                 className={inputCls}
               />
@@ -886,11 +1132,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
             </div>
 
             <div className={`${sectionCls} space-y-2`}>
-              <label className={labelCls}>{t('modelName') || '模型名称'}</label>
+              <label className={labelCls}>{t('modelName')}</label>
               <Input
                 value={backendModel}
                 onChange={(e) => { backendModelEditedRef.current = true; setBackendModel(e.target.value); }}
-                placeholder="填好地址后自动获取，或手动输入，例如: deepseek-v4-flash"
+                placeholder={t('set.backendModelPlaceholder')}
                 disabled={backendLoading}
                 className={inputCls}
               />
@@ -901,7 +1147,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         {/* 托管模式、以及还没选中任何服务商时，通用参数单独成卡（选中服务商后已并入模型卡） */}
         {(provider === 'backend' || !selected) && (
           <div className={`${sectionCls} space-y-3`}>
-            <label className={labelCls}>通用参数</label>
+            <label className={labelCls}>{t('set.generalParams')}</label>
             {generalParams}
           </div>
         )}

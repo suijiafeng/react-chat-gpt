@@ -12,5 +12,7 @@ export const saveBackendLlmConfig = ({ apiUrl, apiKey, model, provider = 'custom
 // 设置页"测试连接"：让后端用表单里的临时地址/密钥去拉上游模型列表，
 // 未填 apiKey 时后端回退到已保存的加密 Key。返回 { data: [{ id }] }。
 // 密钥走 POST body，不进 URL——查询串会明文落入代理日志/浏览器网络面板。
-export const testBackendLlmConfig = ({ apiUrl, apiKey }) =>
-  request.post(`${WEBUI_API_BASE_URL}/llm/models/test`, { apiUrl, apiKey });
+// 不带 model：验证接口连通并返回模型列表；带 model：让服务端向该模型发一条
+// 最小对话请求，验证模型真实可用（返回 { modelOk, elapsedMs }）
+export const testBackendLlmConfig = ({ apiUrl, apiKey, model, provider }) =>
+  request.post(`${WEBUI_API_BASE_URL}/llm/models/test`, { apiUrl, apiKey, model, provider });

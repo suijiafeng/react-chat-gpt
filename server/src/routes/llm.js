@@ -109,16 +109,60 @@ router.get('/models', async (req, res) => {
   await fetchUpstreamModels(apiUrl, decrypt(saved?.api_key_encrypted || ''), res);
 });
 
+// 模型可用性探测：向上游发一条最小对话请求（非流式、几个 token 就停），
+// 验证"这个模型真的能对话"，而不只是接口能连通——网关通了但模型名错误/无权限/欠费
+// 的情况只有真正调用一次才能暴露。
+const probeUpstreamModel = async ({ apiUrl, apiKey, model, provider }, res) => {
+  const base = apiUrl.replace(/\/+$/, '');
+  const isOllamaNativeApi = provider === 'ollama' || /:11434\b/.test(base);
+  const url = isOllamaNativeApi
+    ? `${base.replace(/\/v1$/, '')}/api/chat`
+    : `${base}/chat/completions`;
+  const body = isOllamaNativeApi
+    ? { model, messages: [{ role: 'user', content: 'Hi' }], stream: false, think: false, options: { num_predict: 8 } }
+    : { model, messages: [{ role: 'user', content: 'Hi' }], stream: false, max_tokens: 8 };
+
+  const startedAt = Date.now();
+  try {
+    const upstream = await safeFetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify(body),
+      // 对话探测比 /models 慢得多（要真跑一次推理），超时放宽
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!upstream.ok) {
+      const detail = await readUpstreamError(upstream);
+      return res.status(upstream.status).json({ message: `模型调用失败 (${upstream.status}): ${detail}` });
+    }
+    await upstream.json();
+    res.json({ modelOk: true, elapsedMs: Date.now() - startedAt });
+  } catch (error) {
+    if (error instanceof UpstreamUrlError) {
+      return res.status(400).json({ message: error.message });
+    }
+    const msg = error.name === 'TimeoutError' ? '连接超时' : error.message;
+    res.status(502).json({ message: `模型调用失败：${msg}` });
+  }
+};
+
 // 设置页"测试连接"：用表单里的临时地址/密钥验证可用性（保存前即可校验）。
 // 密钥必须走 POST body——绝不能放 URL 查询串，否则会明文出现在反向代理访问日志、
 // 浏览器网络面板的 URL 一栏等处。apiKey 为空则回退到已保存的 Key（改地址不重输密钥的场景）。
+// 不带 model：拉模型列表验证接口连通；带 model：做一次最小对话探测验证模型可用。
 router.post('/models/test', async (req, res) => {
-  const { apiUrl = '', apiKey = '' } = req.body || {};
+  const { apiUrl = '', apiKey = '', model = '', provider = '' } = req.body || {};
   const url = apiUrl.trim();
   if (!url) return res.status(400).json({ message: '请填写 API 接口地址' });
 
   const saved = getLlmConfig(req.session.userId);
   const key = apiKey.trim() || decrypt(saved?.api_key_encrypted || '');
+  if (model.trim()) {
+    return probeUpstreamModel({ apiUrl: url, apiKey: key, model: model.trim(), provider }, res);
+  }
   await fetchUpstreamModels(url, key, res);
 });
 

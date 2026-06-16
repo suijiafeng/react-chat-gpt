@@ -88,6 +88,7 @@ body {
 
 .settings-modal .ant-input-number {
  padding:5px 0;
+ border-radius: 8px;
 }
 
 /* 只给单选框撑行高让文字居中；多选/tags 模式的选项是一枚枚小胶囊，
