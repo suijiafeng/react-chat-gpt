@@ -4,24 +4,24 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Loader, Copy, Check, RefreshCw, Pencil, StepForward, AlertTriangle, ChevronDown, Trash2, FileText } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { formatFileSize } from '../utils/attachments';
+import { useLanguage } from '../hooks';
 
 // 还没收到第一个字符前展示的等待动画；等待较久时升级为文字提示，
 // 让用户知道请求还活着、并提示可以随时停止（30 秒无任何数据会被看门狗自动中止）
 const SLOW_HINT_SECONDS = 8;
 
-const LoadingIndicator = ({ classes, elapsed }) => (
+const LoadingIndicator = ({ classes, elapsed, t }) => (
   <div data-elapsed={elapsed} className={`flex items-center gap-2 text-sm ${classes.text}`}>
     <Loader size={18} className="animate-spin-slow" />
     {elapsed >= SLOW_HINT_SECONDS && (
-      <span className="text-xs opacity-60">
-        模型响应较慢，已等待 {elapsed} 秒…（可点右下角停止按钮取消）
-      </span>
+      <span className="text-xs opacity-60">{t('slowResponse', { s: elapsed })}</span>
     )}
   </div>
 );
 
-// 秒数 → m′s″ 展示
-const formatSeconds = (s) => (s >= 60 ? `${Math.floor(s / 60)} 分 ${s % 60} 秒` : `${s} 秒`);
+// 秒数 → m′s″ 展示（文案走 i18n）
+const formatSeconds = (s, t) =>
+  s >= 60 ? t('timeMinSec', { m: Math.floor(s / 60), s: s % 60 }) : t('timeSec', { s });
 
 // 操作栏里的小图标按钮
 const ActionButton = ({ title, onClick, isDark, children }) => (
@@ -56,6 +56,7 @@ const ChatMessage = React.memo(
     onDelete,
   }) => {
     const { isDark, classes } = useTheme();
+    const { t } = useLanguage();
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message);
@@ -184,7 +185,7 @@ const ChatMessage = React.memo(
                     isDark ? 'text-white/70 hover:bg-white/10' : 'text-black/60 hover:bg-black/5'
                   }`}
                 >
-                  取消
+                  {t('cancel')}
                 </button>
                 <button
                   type="button"
@@ -194,7 +195,7 @@ const ChatMessage = React.memo(
                     isDark ? 'bg-white text-[#212121]' : 'bg-[#1f1f1f] text-white'
                   }`}
                 >
-                  保存并重发
+                  {t('saveResend')}
                 </button>
               </div>
             </div>
@@ -248,7 +249,7 @@ const ChatMessage = React.memo(
                 {isError && (
                   <div className="flex items-center gap-2 mb-1 text-xs font-medium uppercase tracking-wide">
                     <AlertTriangle size={13} />
-                    <span>出错了</span>
+                    <span>{t('errorOccurred')}</span>
                   </div>
                 )}
                 {reasoning && (
@@ -272,8 +273,8 @@ const ChatMessage = React.memo(
                     >
                       <span>
                         {isTyping && !message
-                          ? `思考中（已 ${formatSeconds(elapsed)}）`
-                          : '思考过程'}
+                          ? t('thinking', { time: formatSeconds(elapsed, t) })
+                          : t('thinkingProcess')}
                       </span>
                       {isTyping && !message && (
                         <span className="inline-flex items-center gap-1">
@@ -289,7 +290,7 @@ const ChatMessage = React.memo(
                         </span>
                       )}
                       {isTyping && !message && elapsed >= 60 && (
-                        <span className="opacity-60">思考较长，可随时点停止按钮中断并保留已有内容</span>
+                        <span className="opacity-60">{t('thinkingHint')}</span>
                       )}
                       <ChevronDown
                         size={13}
@@ -310,7 +311,7 @@ const ChatMessage = React.memo(
                 {message && <MarkdownRenderer content={message} isTyping={isTyping} />}
               </>
             ) : (
-              isTyping && <LoadingIndicator classes={classes} elapsed={elapsed} />
+              isTyping && <LoadingIndicator classes={classes} elapsed={elapsed} t={t} />
             )}
           </div>
           {/* 操作栏：AI 最后一条常驻，其余消息 hover 时显示；生成中不显示 */}
@@ -320,36 +321,36 @@ const ChatMessage = React.memo(
                 !isUser && isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
               }`}
             >
-              <ActionButton title="复制" onClick={handleCopy} isDark={isDark}>
+              <ActionButton title={t('copy')} onClick={handleCopy} isDark={isDark}>
                 {copied ? <Check size={14} /> : <Copy size={14} />}
               </ActionButton>
               {isUser && !isStreaming && onEdit && (
-                <ActionButton title="编辑并重发" onClick={startEdit} isDark={isDark}>
+                <ActionButton title={t('editResend')} onClick={startEdit} isDark={isDark}>
                   <Pencil size={14} />
                 </ActionButton>
               )}
               {/* 外层守卫已排除 isStreaming && isLast，走到这里的 isLast 分支必然不在生成中 */}
               {!isUser && isLast && onRegenerate && (
-                <ActionButton title="重新生成" onClick={onRegenerate} isDark={isDark}>
+                <ActionButton title={t('regenerate')} onClick={onRegenerate} isDark={isDark}>
                   <RefreshCw size={14} />
                 </ActionButton>
               )}
               {!isUser && isLast && canContinue && onContinue && (
-                <ActionButton title="继续生成" onClick={onContinue} isDark={isDark}>
+                <ActionButton title={t('continueGen')} onClick={onContinue} isDark={isDark}>
                   <StepForward size={14} />
-                  <span>继续生成</span>
+                  <span>{t('continueGen')}</span>
                 </ActionButton>
               )}
               {onDelete && !isStreaming && (
                 <Popconfirm
-                  title="删除这条消息？"
-                  okText="删除"
-                  cancelText="取消"
+                  title={t('deleteMsgConfirm')}
+                  okText={t('delete')}
+                  cancelText={t('cancel')}
                   onConfirm={() => onDelete(messageId)}
                 >
                   <button
                     type="button"
-                    title="删除消息"
+                    title={t('deleteMsg')}
                     className={`flex items-center gap-1 rounded-md p-2 text-xs transition-colors ${
                       isDark ? 'text-white/50 hover:text-red-300 hover:bg-white/10' : 'text-black/40 hover:text-red-500 hover:bg-black/5'
                     }`}
