@@ -1,9 +1,10 @@
 name: Deploy Pages
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -17,10 +18,17 @@ concurrency:
 
 jobs:
   build:
+    # CI 完成事件里 push 到非 main 分支、以及 PR 触发的运行都会被 branches 过滤掉；
+    # 这里再兜底一层，只在 CI 成功、或手动触发时才构建部署
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 固定到触发这次部署的 CI 运行所对应的 commit，而不是 main 的最新 HEAD
+          # （workflow_run 场景下两者可能不是同一个）
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,6 +49,11 @@ jobs:
           fi
 
       - name: Build site
+        env:
+          # 可选：留空则保持纯前端 demo 模式（默认）。
+          # 如果之后把 server/ 部署到公网了，在仓库 Settings → Secrets and variables
+          # → Actions → Variables 里新建同名变量，Pages 构建就会自动指向那个后端。
+          VITE_WEBUI_BASE_URL: ${{ vars.VITE_WEBUI_BASE_URL }}
         run: npm run build -- --base="$VITE_BASE"
 
       - name: Configure Pages
