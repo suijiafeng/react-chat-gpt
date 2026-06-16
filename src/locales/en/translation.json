@@ -47,6 +47,9 @@
   "unpin": "Unpin",
   "noSearchResults": "No matching chats",
   "invalidCredentials": "Incorrect email or password",
+  "signOut": "Sign out",
+  "signOutConfirmTitle": "Sign out?",
+  "signOutConfirmDemoHint": "Signing out will permanently erase all data from this demo session (chats, model settings, nickname).",
   "systemPrompt": "System prompt",
   "systemPromptPlaceholder": "Set a system prompt for this chat, e.g. You are a senior translator, keep answers concise…",
   "tpl": {

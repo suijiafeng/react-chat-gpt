@@ -47,6 +47,9 @@
   "unpin": "取消置顶",
   "noSearchResults": "没有匹配的会话",
   "invalidCredentials": "邮箱或密码不正确",
+  "signOut": "退出登录",
+  "signOutConfirmTitle": "确定退出登录？",
+  "signOutConfirmDemoHint": "退出后将清空本次体验的全部数据（会话记录、模型配置、昵称），且无法恢复。",
   "systemPrompt": "系统提示词",
   "systemPromptPlaceholder": "为当前会话设置系统提示词，例如：你是一位资深翻译，回答保持简洁…",
   "tpl": {

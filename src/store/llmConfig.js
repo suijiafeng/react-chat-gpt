@@ -168,6 +168,18 @@ if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
 }
 
 /**
+ * 销毁当前账号的全部 LLM 配置（含加密的 API Key 密文）。
+ * 免登录体验账号退出时调用：体验数据是一次性的，退出即清。
+ * 只删当前账号命名空间下的键，不碰其他账号的数据。
+ */
+export const wipeCurrentAccountConfig = () => {
+  ACCOUNT_SCOPED_KEYS.forEach((key) => localStorage.removeItem(scopedKey(key)));
+  keyCache.clear();
+  snapshot = null;
+  notify();
+};
+
+/**
  * 账号切换（登录/免登录/退出）后调用：
  * 清空上一个账号的明文 key 内存缓存与配置快照，按新账号的命名空间重新解密加载。
  * 不调用的话，SPA 内切换账号会继续读到上一个账号的配置。

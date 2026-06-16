@@ -301,6 +301,17 @@ export const touchSession = async (sessionId) => {
   await db.put(SESSIONS_STORE, { ...session, updatedAt: new Date().toISOString() });
 };
 
+// 清空当前用户的全部会话与消息（个人设置里的数据管理功能）。
+// 按用户圈定范围：不 clear 整表，避免误删其他账号的数据
+export const clearAllSessions = async () => {
+  const db = await initDB();
+  const all = await db.getAll(SESSIONS_STORE);
+  const ownSessions = filterSessionsByUser(all, currentUserId());
+  for (const session of ownSessions) {
+    await deleteSession(session.id);
+  }
+};
+
 export const deleteSession = async (sessionId) => {
   const db = await initDB();
   const messages = await db.getAllFromIndex(MESSAGES_STORE, 'sessionId', sessionId);

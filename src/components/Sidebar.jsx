@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
-import { message as antdMessage } from 'antd';
+import { message as antdMessage, Modal } from 'antd';
 import {
   MessageSquare,
   X,
@@ -23,6 +23,7 @@ import { useLanguage } from '../hooks';
 import { userStore } from '../store';
 import { getAllSessions, deleteSession, updateSessionTitle, setSessionPinned } from '../store/db';
 import { userSignOut } from '../apis/auths';
+import { reloadForCurrentUser } from '../store/llmConfig';
 import { APP_NAME } from '../constants';
 
 const RECENT_CHATS_COLLAPSED_KEY = 'recent_chats_collapsed';
@@ -158,10 +159,24 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
 
   const handleSignOut = useCallback(() => {
     setIsUserMenuOpen(false);
-    userSignOut(); // 内部已同时清理 demo_mode 快捷登录标记
-    userStore.clearUser();
-    navigate('/login', { replace: true });
-  }, [navigate]);
+    // 免登录体验退出会销毁全部体验数据，确认文案必须把后果说清楚；
+    // 正常账号退出也需确认，防止误触（菜单项紧挨着其他入口）
+    const isGuestSession = localStorage.getItem('demo_mode') === 'true';
+    Modal.confirm({
+      title: t('signOutConfirmTitle'),
+      content: isGuestSession ? t('signOutConfirmDemoHint') : undefined,
+      okText: t('signOut'),
+      cancelText: t('cancel'),
+      okButtonProps: isGuestSession ? { danger: true } : undefined,
+      onOk: async () => {
+        // 内部会清理 demo_mode 标记；免登录体验退出时还会销毁该体验身份的全部数据
+        await userSignOut();
+        userStore.clearUser();
+        reloadForCurrentUser(); // 清掉该账号的配置内存缓存（明文 key 不留在内存里）
+        navigate('/login', { replace: true });
+      },
+    });
+  }, [navigate, t]);
 
   const toggleRecentChats = useCallback(() => {
     setIsRecentChatsCollapsed((prev) => {

@@ -1,6 +1,7 @@
 import request from './config';
 import { WEBUI_API_BASE_URL, USE_LOCAL_DATA } from '../constants';
-import { getUserByEmail, createUser, seedDemoUser } from '../store/db';
+import { getUserByEmail, createUser, seedDemoUser, clearAllSessions } from '../store/db';
+import { wipeCurrentAccountConfig } from '../store/llmConfig';
 import { DEMO_ACCOUNT } from '../constants';
 import i18n from '../locales/i18n';
 import { generateSalt, hashPassword, safeCompare } from '../utils/crypto';
@@ -106,13 +107,22 @@ export const userSignIn = async ({ email, password }) => {
 // 注销
 // ──────────────────────────────────────────────
 
-export const userSignOut = () => {
+export const userSignOut = async () => {
   // 后端模式下必须同时销毁服务端会话：httpOnly cookie 前端删不掉，
   // 只清 localStorage 的话 cookie 在 7 天有效期内依然能调 /llm/* 等受保护接口。
   // fire-and-forget：本地清理不应被网络失败阻塞（下线的兜底是被动 401 处理）。
   if (!USE_LOCAL_DATA) {
     request.post(`${WEBUI_API_BASE_URL}/auths/signout`).catch(() => {});
   }
+
+  // 免登录体验是一次性的：退出即销毁该体验身份的全部数据
+  // （会话与消息、LLM 配置及加密密钥密文），下次体验从零开始。
+  // 必须在清掉 demo_mode 标记之前执行——数据归属就是按这个标记解析的。
+  if (localStorage.getItem('demo_mode') === 'true') {
+    await clearAllSessions().catch(() => {});
+    wipeCurrentAccountConfig();
+  }
+
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem('demo_mode');
 };
