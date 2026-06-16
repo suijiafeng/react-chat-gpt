@@ -10,7 +10,7 @@ import { userSignIn, userSignUp } from '../apis/auths';
 import { userStore } from '../store';
 import { consumeExpiredFlag } from '../utils/session';
 import { reloadForCurrentUser } from '../store/llmConfig';
-import { USE_LOCAL_DATA, DEMO_ACCOUNT } from '../constants';
+import { USE_LOCAL_DATA, DEMO_ACCOUNT, GUEST_ACCOUNT } from '../constants';
 
 const MIN_PASSWORD_LENGTH = 6;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -109,13 +109,13 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
 
   // 免登录一键体验：不走任何账号校验，直接置 demo_mode 标记进入演示模式。
   // resolveAuthState 会在刷新后依据该标记还原演示用户；退出登录时 userSignOut 会清掉标记。
-  // 展示身份用「访客」而非 DEMO_ACCOUNT：这是与默认演示账号（demo@aichat.local）
+  // 展示身份用 GUEST_ACCOUNT 而非 DEMO_ACCOUNT：这是与默认演示账号（demo@aichat.local）
   // 刻意分开的另一个身份，数据不互通，界面上也不该看着像同一个账号。
   const handleDemoLogin = () => {
     localStorage.setItem('demo_mode', 'true');
     userStore.setUser({
-      email: '',
-      name: t('guestName'),
+      email: GUEST_ACCOUNT.email,
+      name: GUEST_ACCOUNT.name,
       profile_image_url: '',
     });
     reloadForCurrentUser(); // 切到演示账号的配置命名空间

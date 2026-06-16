@@ -37,5 +37,14 @@ export const DEMO_ACCOUNT = {
   name: 'Demo User',
 };
 
+// 免登录体验：点击即用，不需要输入邮箱密码，跟 DEMO_ACCOUNT 是两个不同的身份
+// （分别对应 store/db.js、store/llmConfig.js 里的 DEMO_USER_ID / GUEST_USER_ID），
+// 数据互不可见。这里只给它一个展示用的固定邮箱，没有 password 字段——
+// 因为这个身份从来不走密码校验，也没有对应的 IndexedDB 账号记录。
+export const GUEST_ACCOUNT = {
+  email: 'guest@aichat.local',
+  name: 'Guest',
+};
+
 export const DEFAULT_LLM_PROVIDER = import.meta.env.VITE_DEFAULT_LLM_PROVIDER || 'demo';
 export const DEFAULT_LLM_MODEL = import.meta.env.VITE_DEFAULT_LLM_MODEL || 'gpt-4o-mini';
