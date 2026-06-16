@@ -67,6 +67,8 @@
   "msgTooLong": "Message too long ({{len}} chars, limit {{max}}). Save long content as .txt and upload it, or split it into parts.",
   "srDone": "AI response completed",
   "srGenerating": "AI is generating a response",
+  "requestTimeout": "Request timed out: {{msg}}. Stopped automatically.",
+  "requestFailed": "Request failed. Please check your network or API settings. Error: {{msg}}",
   "copy": "Copy",
   "editResend": "Edit & resend",
   "regenerate": "Regenerate",

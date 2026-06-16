@@ -1,4 +1,5 @@
 import { providerRegistry } from './providers';
+import i18n from '../locales/i18n';
 // 演示/正式模式与 provider 的判断统一收敛在配置中心，这里只负责调用
 import { isDemoMode, resolveProviderName } from '../store/llmConfig';
 
@@ -19,8 +20,8 @@ export const generateChatCompletion = async (params, callback, signal) => {
     // 和"网络/配置问题"是两类不同的可能原因，分开提示更准确。
     const message =
       error.name === 'TimeoutError'
-        ? `请求超时：${error.message}，已自动停止。`
-        : '请求失败，请检查您的网络连接或 API 配置。错误信息: ' + error.message;
+        ? i18n.t('requestTimeout', { msg: error.message })
+        : i18n.t('requestFailed', { msg: error.message });
     callback(message, { isError: true });
     // provider 抛出异常时不会自己发出 [DONE]，这里补上，
     // 否则 useChat 里的流式状态（isStreaming/streamingRef）永远不会被正确清空。
@@ -29,19 +30,19 @@ export const generateChatCompletion = async (params, callback, signal) => {
 };
 
 // 标题兜底：直接截取用户首条消息的前 20 个字符
-const fallbackTitle = (prompt) => (prompt || '').trim().slice(0, 20) || '新对话';
+const fallbackTitle = (prompt) => (prompt || '').trim().slice(0, 20) || i18n.t('newChatTitle');
 
 // 自动标题生成：不再依赖 Open-WebUI 形状的后端接口（本项目服务端并未实现，
 // 后端模式下会 404），改为直接用当前配置的 provider 让模型起标题，
 // 任何失败（网络、配置、模型输出为空）都回退到截断兜底，调用方无感知。
 export const generateTitle = async (params) => {
   const { model, prompt, chat_id } = params;
-  const wrap = (title) => ({ statusText: 'OK', data: { title, chat_id, model } });
-  if (isDemoMode()) return wrap(fallbackTitle(prompt));
+  const buildTitleResult = (title) => ({ statusText: 'OK', data: { title, chat_id, model } });
+  if (isDemoMode()) return buildTitleResult(fallbackTitle(prompt));
 
   try {
     const provider = providerRegistry.getProvider(resolveProviderName());
-    let text = '';
+    let titleText = '';
     let hadError = false;
     await provider.complete(
       {
@@ -62,16 +63,16 @@ export const generateTitle = async (params) => {
         }
         // 思考流不属于标题正文
         if (meta?.isReasoning) return;
-        text += chunk;
+        titleText += chunk;
       }
     );
-    if (hadError) return wrap(fallbackTitle(prompt));
-    const title = text
+    if (hadError) return buildTitleResult(fallbackTitle(prompt));
+    const title = titleText
       .trim()
       .replace(/^["'「『《【]+|["'」』》】]+$/g, '')
       .slice(0, 30);
-    return wrap(title || fallbackTitle(prompt));
+    return buildTitleResult(title || fallbackTitle(prompt));
   } catch {
-    return wrap(fallbackTitle(prompt));
+    return buildTitleResult(fallbackTitle(prompt));
   }
 };
