@@ -1,9 +1,11 @@
 
 // ──────────────────────────────────────────────
-// 数据来源开关：true = 本地 Mock / IndexedDB，false = 真实后端接口
-// 后端就绪后，将此值改为 false 即可全量切换到真实 API
+// 数据来源开关：支持通过环境变量配置，默认为 true
+// true = 本地 Mock / IndexedDB，false = 真实后端接口
 // ──────────────────────────────────────────────
-export const USE_LOCAL_DATA = true;
+export const USE_LOCAL_DATA = import.meta.env.VITE_USE_LOCAL_DATA !== undefined
+  ? import.meta.env.VITE_USE_LOCAL_DATA === 'true'
+  : true;
 
 // 使用 window 对象来检测是否在浏览器环境中
 const isBrowser = typeof window !== 'undefined';
@@ -11,10 +13,13 @@ const isBrowser = typeof window !== 'undefined';
 // 假设开发环境使用特定的主机名或端口，你可以根据实际情况调整这个逻辑
 const isDev = isBrowser && (window.location.hostname === 'localhost' || window.location.port === '3000');
 
-export const APP_NAME = 'AI Chat';
+export const APP_NAME = import.meta.env.VITE_APP_NAME || 'AI Chat';
 
 export const WEBUI_HOSTNAME = isBrowser ? (isDev ? `${window.location.hostname}:3000` : '') : '';
-export const WEBUI_BASE_URL = isBrowser ? (isDev ? `http://${WEBUI_HOSTNAME}` : '') : '';
+export const WEBUI_BASE_URL = import.meta.env.VITE_WEBUI_BASE_URL !== undefined
+  ? import.meta.env.VITE_WEBUI_BASE_URL
+  : (isBrowser ? (isDev ? `http://${WEBUI_HOSTNAME}` : '') : '');
+
 export const WEBUI_API_BASE_URL = `${WEBUI_BASE_URL}/api/v1`;
 
 export const OLLAMA_API_BASE_URL = `${WEBUI_BASE_URL}/ollama`;

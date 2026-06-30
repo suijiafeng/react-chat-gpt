@@ -32,5 +32,17 @@
   "demoCredentialsHint": "默认账号：",
   "Confirm Password": "确认密码",
   "Enter Your Password Again": "再次输入密码",
-  "passwordMismatch": "两次输入的密码不一致"
+  "passwordMismatch": "两次输入的密码不一致",
+  "settings": "模型与 API 配置",
+  "cancel": "取消",
+  "save": "保存",
+  "settingsSaved": "设置已保存！",
+  "apiProvider": "接口服务提供商",
+  "demoMockMode": "前端演示模式",
+  "customOpenAi": "自定义 OpenAI 接口",
+  "demoHint": "演示模式下无需配置 key，AI 回复采用预设素材，流式打字返回，安全省心。",
+  "customHint": "支持任何兼容 OpenAI 格式的大模型 API，例如 DeepSeek, OpenAI, 智谱 AI, 通义千问, Ollama 等。",
+  "apiUrl": "API 接口地址 (Base URL)",
+  "apiKey": "API 密钥 (API Key)",
+  "modelName": "模型名称 (Model Name)"
 }

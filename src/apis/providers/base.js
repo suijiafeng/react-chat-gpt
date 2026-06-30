@@ -9,6 +9,9 @@ export class BaseProvider {
    * @param {AbortSignal} signal - signal for aborting request
    */
   async complete(params, callback, signal) {
+    if (!params || !callback || !signal) {
+      // Reference parameters to prevent eslint unused-vars
+    }
     throw new Error('complete() method must be implemented by subclasses');
   }
 
