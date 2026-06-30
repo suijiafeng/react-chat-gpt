@@ -77,7 +77,7 @@ const ModelSelector = React.memo(() => {
     <div className="relative">
       <button
         onClick={toggleOpen}
-        className={`flex items-center justify-between min-w-[160px] px-4 py-2 text-sm ${
+        className={`flex items-center justify-between min-w-[120px] sm:min-w-[160px] px-2.5 sm:px-4 py-2 text-sm ${
           isDark ? 'bg-[#2a2a2a] text-white border-white/10 hover:bg-zinc-800' : 'bg-white text-black border-gray-300 hover:bg-gray-50'
         } border rounded-xl ${classes.themeTransition}`}
       >
