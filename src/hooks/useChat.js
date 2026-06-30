@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { generateChatCompletion, generateTitle } from '../apis/chat';
 import {
   saveMessageToDB,
-  loadMessagesBySession,
   loadMessagesBySessionPaged,
   clearSessionMessages,
   updateSessionTitle,

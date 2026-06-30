@@ -167,7 +167,7 @@ export const loadMessagesBySessionPaged = async (sessionId, limit = 30, offset =
   if (offset > 0 && cursor) {
     try {
       await cursor.advance(offset);
-    } catch (e) {
+    } catch {
       cursor = null;
     }
   }
