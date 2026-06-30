@@ -1,11 +1,14 @@
-import React from 'react'
-import { Sun, Moon, Globe } from "lucide-react";
+import React, { useState } from 'react'
+import { Sun, Moon, Globe, Settings } from "lucide-react";
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
+import SettingsModal from './SettingsModal';
 
 const NavHeader = () => {
   const { isDark, toggleTheme, classes } = useTheme();
   const { language, changeLanguage } = useLanguage();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   return (
     <div
       className="flex items-center justify-between"
@@ -22,6 +25,16 @@ const NavHeader = () => {
           {language}
         </button>
         <button
+          onClick={() => setIsSettingsOpen(true)}
+          className={`${isDark
+            ? 'text-gray-300 hover:bg-white/5 hover:text-white'
+            : 'text-gray-500 hover:bg-black/5 hover:text-gray-700'
+            } ${classes.themeTransition} mr-2 rounded-lg p-2`}
+          title="Settings / 设置"
+        >
+          <Settings size={18} />
+        </button>
+        <button
           onClick={toggleTheme}
           className={`${isDark
             ? 'text-yellow-300 hover:bg-white/5 hover:text-yellow-100'
@@ -31,6 +44,7 @@ const NavHeader = () => {
           {isDark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
       </div>
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   )
 }

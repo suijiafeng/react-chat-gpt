@@ -20,9 +20,9 @@ const ChatHeader = ({ toggleSidebar }) => {
         </button>
       </div>
       <div className="flex items-center gap-3">
-        {/* <div className="hidden md:block">
+        <div className="hidden sm:block">
           <ModelSelector />
-        </div> */}
+        </div>
         <NavHeader />
       </div>
     </div>

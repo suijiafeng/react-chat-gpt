@@ -50,6 +50,120 @@ export const createNewChat = (params = {}) => {
 export const generateChatCompletion = async (params, callback,signal) => {
   const { chat_id, id, messages, model, options, session_id, stream } = params;
 
+  const provider = localStorage.getItem('llm_provider') || 'demo';
+  let customKey = localStorage.getItem('llm_api_key') || '';
+  if (customKey.startsWith('b64:')) {
+    try {
+      customKey = atob(customKey.slice(4));
+    } catch {
+      // fallback
+    }
+  }
+  const customUrl = localStorage.getItem('llm_api_url') || 'https://api.openai.com/v1';
+  const customModel = localStorage.getItem('llm_model') || 'gpt-4o-mini';
+
+  if (provider === 'custom' && customKey) {
+    try {
+      let url = customUrl.replace(/\/+$/, '');
+      if (!url.endsWith('/chat/completions')) {
+        url = `${url}/chat/completions`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + customKey,
+        },
+        body: JSON.stringify({
+          model: customModel,
+          messages: messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          stream: true,
+        }),
+        signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API 响应错误 (${response.status}): ${errorText}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        
+        // Keep last partial line
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const cleanedLine = line.trim();
+          if (!cleanedLine) continue;
+          if (cleanedLine === 'data: [DONE]') {
+            callback('[DONE]');
+            continue;
+          }
+          if (cleanedLine.startsWith('data: ')) {
+            try {
+              const dataStr = cleanedLine.slice(6);
+              if (dataStr === '[DONE]') {
+                callback('[DONE]');
+                continue;
+              }
+              const parsed = JSON.parse(dataStr);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                callback(content);
+              }
+            } catch (e) {
+              console.error('Error parsing SSE line:', e, cleanedLine);
+            }
+          }
+        }
+      }
+
+      // Check remaining buffer
+      if (buffer.trim()) {
+        const cleanedLine = buffer.trim();
+        if (cleanedLine.startsWith('data: ')) {
+          try {
+            const dataStr = cleanedLine.slice(6);
+            if (dataStr !== '[DONE]') {
+              const parsed = JSON.parse(dataStr);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                callback(content);
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      // Finally end stream
+      callback('[DONE]');
+      return;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('请求被取消');
+      } else {
+        callback('请求失败，请检查您的网络连接或 API 配置。错误信息: ' + error.message);
+        console.error('请求错误：', error);
+      }
+      return;
+    }
+  }
+
   if (isDemoMode()) {
     await streamDemoReply(buildDemoReply(messages), callback, signal);
     return;
