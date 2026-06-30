@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { observer } from 'mobx-react-lite';
 import {
   MessageSquare,
   X,
@@ -16,7 +17,7 @@ import { userSignOut } from '../apis/auths';
 import { logoutDemo } from '../hooks';
 import { APP_NAME } from '../constants';
 
-const Sidebar = React.memo(({ isOpen, onClose, refreshKey }) => {
+const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   const { classes, isDark } = useTheme();
   const { t } = useLanguage();
   const navigate = useNavigate();
