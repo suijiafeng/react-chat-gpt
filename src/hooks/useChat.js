@@ -4,6 +4,7 @@ import { generateChatCompletion, generateTitle } from '../apis/chat';
 import {
   saveMessageToDB,
   loadMessagesBySession,
+  loadMessagesBySessionPaged,
   clearSessionMessages,
   updateSessionTitle,
   touchSession,
@@ -15,6 +16,8 @@ const messagesReducer = (state, action) => {
       return action.payload;
     case 'ADD_MESSAGE':
       return [...state, action.payload];
+    case 'PREPEND_MESSAGES':
+      return [...action.payload, ...state];
     case 'UPDATE_MESSAGE':
       return state.map((msg) =>
         msg.id === action.id ? { ...msg, text: msg.text + action.payload } : msg
@@ -36,12 +39,21 @@ export const useChat = (currentModel, sessionId) => {
   // 新建会话首次发消息时，直接在内存里持有消息，跳过 DB 重读
   const skipNextLoadRef = useRef(false);
 
+  // 分页及滚动控制相关状态
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const skipScrollToBottomRef = useRef(false);
+
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 
   // 自动滚动到最新消息
   useEffect(() => {
+    if (skipScrollToBottomRef.current) {
+      skipScrollToBottomRef.current = false;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -49,19 +61,57 @@ export const useChat = (currentModel, sessionId) => {
   useEffect(() => {
     if (!sessionId) {
       dispatchMessages({ type: 'CLEAR_HISTORY' });
+      setHasMore(false);
       return;
     }
     // 新建会话首次发送时已在内存中持有消息，跳过 DB 重读避免竞态
     if (skipNextLoadRef.current) {
       skipNextLoadRef.current = false;
+      setHasMore(false);
       return;
     }
     const load = async () => {
-      const history = await loadMessagesBySession(sessionId);
-      dispatchMessages({ type: 'SET_MESSAGES', payload: history });
+      setIsLoadingMore(true);
+      try {
+        const PAGE_SIZE = 30;
+        const history = await loadMessagesBySessionPaged(sessionId, PAGE_SIZE, 0);
+        dispatchMessages({ type: 'SET_MESSAGES', payload: history });
+        if (history.length < PAGE_SIZE) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+      } catch (error) {
+        console.error('Error loading initial messages:', error);
+      } finally {
+        setIsLoadingMore(false);
+      }
     };
     load();
   }, [sessionId]);
+
+  // 加载更多历史消息
+  const loadMoreMessages = useCallback(async () => {
+    if (!sessionId || isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    try {
+      const PAGE_SIZE = 30;
+      const olderMessages = await loadMessagesBySessionPaged(sessionId, PAGE_SIZE, messages.length);
+      if (olderMessages.length < PAGE_SIZE) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+      }
+      if (olderMessages.length > 0) {
+        skipScrollToBottomRef.current = true;
+        dispatchMessages({ type: 'PREPEND_MESSAGES', payload: olderMessages });
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [sessionId, isLoadingMore, hasMore, messages.length]);
 
   // 组件卸载时中止请求
   useEffect(() => {
@@ -180,5 +230,8 @@ export const useChat = (currentModel, sessionId) => {
     messagesEndRef,
     cancelChatCompletion,
     clearHistory,
+    hasMore,
+    isLoadingMore,
+    loadMoreMessages,
   };
 };
