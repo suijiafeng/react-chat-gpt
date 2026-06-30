@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { generateSalt, hashPassword } from '../utils/crypto';
 
 const DB_NAME = 'chatDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const SESSIONS_STORE = 'chatSessions';
 const MESSAGES_STORE = 'chatMessages';
 const USERS_STORE = 'users';
@@ -14,7 +14,7 @@ const USERS_STORE = 'users';
 
 export const initDB = async () => {
   return await openDB(DB_NAME, DB_VERSION, {
-    async upgrade(db, oldVersion) {
+    async upgrade(db, oldVersion, newVersion, transaction) {
       // v1 → v2: 重建 messages 表（新增 sessionId 索引）
       if (oldVersion < 2) {
         if (db.objectStoreNames.contains(MESSAGES_STORE)) {
@@ -22,15 +22,18 @@ export const initDB = async () => {
         }
       }
 
+      let msgStore;
       if (!db.objectStoreNames.contains(SESSIONS_STORE)) {
         const sessionStore = db.createObjectStore(SESSIONS_STORE, { keyPath: 'id' });
         sessionStore.createIndex('updatedAt', 'updatedAt');
       }
 
       if (!db.objectStoreNames.contains(MESSAGES_STORE)) {
-        const msgStore = db.createObjectStore(MESSAGES_STORE, { keyPath: 'id' });
+        msgStore = db.createObjectStore(MESSAGES_STORE, { keyPath: 'id' });
         msgStore.createIndex('sessionId', 'sessionId');
         msgStore.createIndex('timestamp', 'timestamp');
+      } else {
+        msgStore = transaction.objectStore(MESSAGES_STORE);
       }
 
       // v2 → v3: 新增 users 表
@@ -38,6 +41,13 @@ export const initDB = async () => {
         if (!db.objectStoreNames.contains(USERS_STORE)) {
           const userStore = db.createObjectStore(USERS_STORE, { keyPath: 'id' });
           userStore.createIndex('email', 'email', { unique: true });
+        }
+      }
+
+      // v3 → v4: 新增 sessionId_timestamp 联合索引
+      if (oldVersion < 4) {
+        if (msgStore && !msgStore.indexNames.contains('sessionId_timestamp')) {
+          msgStore.createIndex('sessionId_timestamp', ['sessionId', 'timestamp']);
         }
       }
     },
@@ -145,6 +155,30 @@ export const loadMessagesBySession = async (sessionId) => {
   const db = await initDB();
   const messages = await db.getAllFromIndex(MESSAGES_STORE, 'sessionId', sessionId);
   return messages.sort((a, b) => (a.timestamp > b.timestamp ? 1 : -1));
+};
+
+export const loadMessagesBySessionPaged = async (sessionId, limit = 30, offset = 0) => {
+  const db = await initDB();
+  const tx = db.transaction(MESSAGES_STORE, 'readonly');
+  const index = tx.store.index('sessionId_timestamp');
+  const range = IDBKeyRange.bound([sessionId, ''], [sessionId, '\uffff']);
+  let cursor = await index.openCursor(range, 'prev');
+
+  if (offset > 0 && cursor) {
+    try {
+      await cursor.advance(offset);
+    } catch (e) {
+      cursor = null;
+    }
+  }
+
+  const messages = [];
+  while (cursor && messages.length < limit) {
+    messages.push(cursor.value);
+    cursor = await cursor.continue();
+  }
+
+  return messages.reverse();
 };
 
 export const clearSessionMessages = async (sessionId) => {
