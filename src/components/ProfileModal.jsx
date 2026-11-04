@@ -6,6 +6,7 @@ import { useLanguage } from '../hooks';
 import { userStore } from '../store';
 import { updateProfileName } from '../apis/auths';
 import { clearAllSessions } from '../store/db';
+import { shouldSubmitOnEnter } from '../utils/ime';
 
 // 个人设置弹窗：昵称修改 + 数据管理（导出全部 / 清空全部）。
 // 账号邮箱只读展示；改名按登录形态分别持久化（见 apis/auths.js updateProfileName）。
@@ -88,7 +89,9 @@ const ProfileModal = ({ isOpen, onClose, onChatsCleared }) => {
           <input
             value={nameDraft}
             onChange={(e) => setNameDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            onKeyDown={(e) => {
+              if (shouldSubmitOnEnter(e)) handleSave();
+            }}
             placeholder={t('Enter Your Full Name')}
             className={`w-full rounded-xl border px-3 py-2.5 text-base outline-none ${classes.input} ${classes.themeTransition}`}
           />
