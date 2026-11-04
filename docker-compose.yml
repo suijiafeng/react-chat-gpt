@@ -21,6 +21,14 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       LLM_RATE_WINDOW_MS: ${LLM_RATE_WINDOW_MS:-60000}
       LLM_RATE_MAX: ${LLM_RATE_MAX:-30}
+      # nginx 是唯一入口，登录限流按 X-Forwarded-For 里的客户端 IP 计数
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # 默认拒绝本机上游。需要容器访问宿主机推理服务时再显式设为 true
+      ALLOW_LOCAL_UPSTREAM: ${ALLOW_LOCAL_UPSTREAM:-false}
+      AUTH_SIGNIN_WINDOW_MS: ${AUTH_SIGNIN_WINDOW_MS:-900000}
+      AUTH_SIGNIN_MAX: ${AUTH_SIGNIN_MAX:-10}
+      AUTH_SIGNUP_WINDOW_MS: ${AUTH_SIGNUP_WINDOW_MS:-3600000}
+      AUTH_SIGNUP_MAX: ${AUTH_SIGNUP_MAX:-5}
     volumes:
       - server-data:/app/data
     restart: unless-stopped

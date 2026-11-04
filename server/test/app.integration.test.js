@@ -14,6 +14,10 @@ process.env.DB_PATH = tmpDb;
 process.env.ENCRYPTION_KEY = 'a'.repeat(64);
 process.env.SESSION_SECRET = 'test-secret';
 process.env.PORT = '0'; // 随机端口
+// 假上游跑在本机 http，需要显式打开本机上游；登录限流调高，避免用例互相挤占配额
+process.env.ALLOW_LOCAL_UPSTREAM = 'true';
+process.env.AUTH_SIGNIN_MAX = '1000';
+process.env.AUTH_SIGNUP_MAX = '1000';
 
 let base = '';
 let server;

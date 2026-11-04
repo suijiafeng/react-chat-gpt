@@ -148,6 +148,7 @@ npm run dev:all
 - 前端 `.env.local` 中的 `VITE_WEBUI_BASE_URL=http://localhost:3000`
 - 后端 `server/.env` 中的 `SESSION_SECRET`
 - 后端 `server/.env` 中的 `ENCRYPTION_KEY`，可用 `openssl rand -hex 32` 生成
+- 若要在服务器托管模式下连接本机 Ollama / LM Studio / vLLM，把 `server/.env` 里的 `ALLOW_LOCAL_UPSTREAM` 改为 `true`。默认是 `false`：服务端会代用户请求填写的地址，未显式打开时拒绝本机与明文 http，只允许 https 公网地址
 
 默认开发地址：
 
@@ -186,6 +187,8 @@ docker compose up -d --build
 - 前端由 nginx 提供，`/api` 反向代理到 server 容器（同源，无 CORS 问题，流式已关闭代理缓冲）
 - API Key 由服务端 AES-256-GCM 加密后存 SQLite（数据卷 `server-data` 持久化）
 - 对外端口可用 `.env` 里的 `WEB_PORT` 修改
+- `ALLOW_LOCAL_UPSTREAM` 默认 `false`（compose 里写死了这个默认值）。容器内的 localhost 是容器自己，一般不需要打开
+- `TRUST_PROXY` 默认 `1`：nginx 是唯一入口，登录限流按真实客户端 IP 计数。不要在服务端口直接暴露到公网时打开它，否则伪造 `X-Forwarded-For` 可以绕过限流
 
 ## 模型与 API 配置
 
@@ -231,6 +234,18 @@ docker compose up -d --build
 | `VITE_APP_NAME` | `AI Chat` | 页面标题和应用名 |
 | `VITE_DEFAULT_LLM_PROVIDER` | `demo` | 默认 provider，仅在用户尚未保存设置时生效 |
 | `VITE_DEFAULT_LLM_MODEL` | `gpt-4o-mini` | 默认模型名，仅在用户尚未保存设置时生效 |
+
+后端环境变量（完整样例见 `server/.env.example`，docker 见 `.env.docker.example`）：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `ALLOW_LOCAL_UPSTREAM` | `false` | 只有显式设为 `true` 才允许上游地址指向本机 `http://localhost`、`127.0.0.1`、`::1`（任意端口，给本地 Ollama / LM Studio / vLLM 用）。未设置或其他值一律拒绝本机与明文 http，只允许 https 公网地址。多用户部署不要打开。私有网段和 `169.254.169.254` 在两种模式下都拒绝 |
+| `AUTH_SIGNIN_MAX` / `AUTH_SIGNIN_WINDOW_MS` | `10` / `900000`（15 分钟） | 每个 IP 在窗口内最多尝试登录的次数 |
+| `AUTH_SIGNUP_MAX` / `AUTH_SIGNUP_WINDOW_MS` | `5` / `3600000`（1 小时） | 每个 IP 在窗口内最多注册的次数 |
+| `TRUST_PROXY` | 不启用 | 服务跑在一层可信反向代理后面时设为 `1`，登录限流才按客户端 IP 而不是代理 IP 计数。docker compose 默认 `1`。直接暴露服务端口时不要开 |
+| `LLM_RATE_MAX` / `LLM_RATE_WINDOW_MS` | `30` / `60000` | 每个已登录用户在窗口内最多发多少次模型请求 |
+
+限流计数在进程内存里，多实例部署时各进程各自计数。
 
 后端会额外提供两个接口给前端使用：
 

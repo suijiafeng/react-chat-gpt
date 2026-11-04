@@ -8,8 +8,32 @@ import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { findUserByEmail, findUserById, insertUser } from '../db.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { createRateLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
+
+const envInt = (name, fallback) => {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+};
+
+// 登录/注册没有会话，按来源 IP 做固定窗口限流，挡住在线爆破和批量开户。
+// 与模型代理共用同一套内存计数：单机够用；多实例各自计数，要全局生效需换成共享存储。
+// 直连时 req.ip 是对端地址。跑在反向代理后面时必须设 TRUST_PROXY=1，
+// 否则所有用户挤在代理 IP 上，一个人打满就把所有人锁在外面。
+const signinLimiter = createRateLimiter({
+  windowMs: envInt('AUTH_SIGNIN_WINDOW_MS', 15 * 60 * 1000),
+  max: envInt('AUTH_SIGNIN_MAX', 10),
+  keyFn: (req) => req.ip,
+  message: '登录尝试过于频繁',
+});
+
+const signupLimiter = createRateLimiter({
+  windowMs: envInt('AUTH_SIGNUP_WINDOW_MS', 60 * 60 * 1000),
+  max: envInt('AUTH_SIGNUP_MAX', 5),
+  keyFn: (req) => req.ip,
+  message: '注册尝试过于频繁',
+});
 
 const toPublicUser = (user) => ({
   id: user.id,
@@ -28,7 +52,7 @@ const establishSession = (req, res, user) => {
   });
 };
 
-router.post('/signup', async (req, res) => {
+router.post('/signup', signupLimiter, async (req, res) => {
   const { name, email, password, profile_image_url = '' } = req.body || {};
 
   if (!name?.trim()) return res.status(400).json({ message: '用户名不能为空' });
@@ -53,7 +77,7 @@ router.post('/signup', async (req, res) => {
   establishSession(req, res, user);
 });
 
-router.post('/signin', async (req, res) => {
+router.post('/signin', signinLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email?.trim()) return res.status(400).json({ message: '邮箱不能为空' });
   if (!password) return res.status(400).json({ message: '密码不能为空' });

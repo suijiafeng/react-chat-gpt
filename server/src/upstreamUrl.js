@@ -27,20 +27,20 @@ export class UpstreamUrlError extends Error {
   }
 }
 
-// 本机地址的取舍说明（这条是有意为之，不是漏了）：
+// 本机地址默认拒绝，必须显式 ALLOW_LOCAL_UPSTREAM=true 才放行。
 //
-// 默认放行 http://localhost:任意端口。理由是本项目的既定形态是「自部署、自己用」——
-// README 里明确支持本机 Ollama（http://localhost:11434/v1），而在单用户部署下
-// localhost 处在信任边界的同一侧：用户本来就能在自己机器上 curl 任何本地端口，
-// 服务端拦他访问 127.0.0.1:6379 挡不住任何真实攻击，只会让 LM Studio(1234)、
-// vLLM(8000) 这些自定义端口的用户配不上。端口白名单在这个场景里是安全剧场。
+// /api/v1/llm/* 会按用户填写的地址由服务端发起请求，并可能带上解密后的 API Key、
+// 把上游响应体回传。默认放开 localhost 等于给每个登录用户一条访问本机任意端口的通道
+// （Redis、管理端口、云元数据旁路等）。因此未设置、或值不是严格的 "true" 时，只允许
+// https 公网地址。
 //
-// 真正有风险的是「多用户 / 公开注册」的部署：那时别的用户的 localhost 就是你的内网。
-// 这种部署必须设 ALLOW_LOCAL_UPSTREAM=false，此时只允许 https 公网地址。
+// 本地开发对接 Ollama / LM Studio / vLLM 时，在 server/.env 里设
+// ALLOW_LOCAL_UPSTREAM=true，放行 http://localhost、127.0.0.1、::1（任意端口）。
+// 多用户或公开注册的部署不要打开。
 //
 // 无论哪种模式，非 localhost 的私有网段（10/8、172.16/12、192.168/16、169.254/16 等）
 // 一律拒绝——云元数据端点 169.254.169.254 在两种模式下都打不通。
-const ALLOW_LOCAL = process.env.ALLOW_LOCAL_UPSTREAM !== 'false';
+const ALLOW_LOCAL = process.env.ALLOW_LOCAL_UPSTREAM === 'true';
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 /** IPv4 是否落在私有/保留网段 */
@@ -127,7 +127,9 @@ export function parseUpstreamUrl(raw) {
 
   if (url.protocol === 'http:') {
     if (!ALLOW_LOCAL) {
-      throw new UpstreamUrlError('当前部署已关闭本机上游（ALLOW_LOCAL_UPSTREAM=false），只允许 https 地址');
+      throw new UpstreamUrlError(
+        '当前部署未开启本机上游（需显式设置 ALLOW_LOCAL_UPSTREAM=true），只允许 https 地址',
+      );
     }
     if (!isLocalHostname(host)) {
       throw new UpstreamUrlError('http 只允许用于本机地址（如 http://localhost:11434/v1），其余请使用 https');
