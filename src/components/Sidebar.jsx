@@ -194,17 +194,17 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   return (
     <div
       className={`fixed lg:relative top-0 left-0 flex flex-col h-full border-r ${classes.panel
-        } ${classes.text} ${classes.border} ${classes.themeTransition} transition-[width,background-color,border-color,color,box-shadow] duration-200 ease-out ${isOpen ? 'w-[308px]' : 'w-0'
+        } ${classes.text} ${classes.border} ${classes.themeTransition} transition-[width,background-color,border-color,color] duration-150 ease-out ${isOpen ? 'w-[280px]' : 'w-0'
         } overflow-hidden z-50`}
     >
-      <div className="w-[308px] flex-1 flex flex-col min-h-0">
+      <div className="w-[280px] flex-1 flex flex-col min-h-0">
         <div className="px-5 pt-4 pb-3 flex justify-between items-center flex-shrink-0">
           <AppLogo name={APP_NAME} />
           <button
             onClick={onClose}
-            className={`${classes.buttonText} ${classes.buttonHover} rounded-lg p-2 lg:hidden`}
+            className={`${classes.buttonText} ${classes.buttonHover} rounded-md p-2 lg:hidden`}
           >
-            <X size={18} />
+            <X size={16} strokeWidth={1.75} />
           </button>
         </div>
 
@@ -212,16 +212,17 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           <button
             type="button"
             onClick={handleNewChat}
-            className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-base ${classes.themeTransition} ${classes.buttonHover}`}
+            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm ${classes.themeTransition} ${classes.buttonHover}`}
           >
-            <PenSquare size={18} className="shrink-0" />
+            <PenSquare size={16} strokeWidth={1.75} className="shrink-0" />
             <span>{t('newChat')}</span>
           </button>
           {/* 会话搜索：客户端按标题过滤，Cmd/Ctrl+K 快速聚焦 */}
           <div className="relative">
             <Search
-              size={15}
-              className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${classes.mutedText}`}
+              size={16}
+              strokeWidth={1.75}
+              className={`absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${classes.mutedText}`}
             />
             <input
               ref={searchInputRef}
@@ -229,33 +230,32 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
               onChange={(e) => setSearchKeyword(e.target.value)}
               type="text"
               placeholder={`${t('searchChats')} (⌘K)`}
-              className={`w-full rounded-xl border pl-9 pr-3 py-2 text-sm outline-none ${classes.input} ${classes.themeTransition}`}
+              className={`w-full rounded-md border pl-8 pr-2.5 py-1.5 text-sm outline-none ${classes.input} ${classes.themeTransition}`}
             />
           </div>
         </div>
         <div className={`border-b h-[8px] ${isDark ? 'border-white/10' : 'border-black/10'}`}></div>
         <button
           onClick={toggleRecentChats}
-          className={`w-full px-5 pt-5 pb-2 flex items-center justify-between gap-2 text-sm font-medium uppercase tracking-[0.2em] ${classes.themeTransition} ${classes.buttonHover} rounded-lg`}
+          className={`w-full px-4 pt-4 pb-1 flex items-center justify-between gap-2 text-[13px] font-medium tracking-normal ${classes.mutedText} ${classes.themeTransition} ${classes.buttonHover} rounded-md`}
         >
-          <span className={isDark ? 'text-white/35' : 'text-black/35'}>
-            {t('recentChats')}
-          </span>
+          <span>{t('recentChats')}</span>
           <ChevronDown
             size={14}
-            className={`shrink-0 ${isDark ? 'text-white/35' : 'text-black/35'} ${classes.themeTransition} ${
+            strokeWidth={1.75}
+            className={`shrink-0 transition-transform duration-150 ease-out ${
               isRecentChatsCollapsed ? 'rotate-180' : ''
             }`}
           />
         </button>
 
-        <div className={`px-3 overflow-hidden flex-1 min-h-0 transition-all duration-200 ease-out ${
+        <div className={`px-2 overflow-hidden flex-1 min-h-0 transition-[padding] duration-150 ease-out ${
           isRecentChatsCollapsed ? 'pb-0' : 'py-4 overflow-y-auto'
         }`}>
           {!isRecentChatsCollapsed && (
             <>
               {sessions === null ? null : sessions.length === 0 ? (
-                <div className={`px-3 py-6 text-base ${classes.mutedText}`}>{t('noChats')}</div>
+                <div className={`px-2 py-6 text-sm ${classes.mutedText}`}>{t('noChats')}</div>
               ) : (
                 <div className="space-y-1">
                   {(() => {
@@ -265,15 +265,22 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                       : sessions;
                     if (keyword && visibleSessions.length === 0) {
                       return (
-                        <div className={`px-3 py-6 text-base ${classes.mutedText}`}>
-                          {t('noSearchResults')}
+                        <div className={`px-2 py-6 text-sm ${classes.mutedText}`}>
+                          <p>{t('noSearchResults')}</p>
+                          <button
+                            type="button"
+                            onClick={() => setSearchKeyword('')}
+                            className={`mt-2 text-sm underline underline-offset-4 ${classes.text}`}
+                          >
+                            {t('clearSearch')}
+                          </button>
                         </div>
                       );
                     }
                     return visibleSessions.map((session) => (
                     <div
                       key={session.id}
-                      className={`group relative flex items-center justify-between w-full rounded-xl text-base ${classes.themeTransition} ${chatId === session.id
+                      className={`group relative flex items-center justify-between w-full rounded-md text-sm ${classes.themeTransition} ${chatId === session.id
                         ? isDark
                           ? 'bg-white/[0.08] text-white'
                           : 'bg-black/[0.05] text-black'
@@ -282,7 +289,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                     >
                       {renamingId === session.id ? (
                         <div className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2">
-                          <MessageSquare size={16} className="shrink-0 opacity-70" />
+                          <MessageSquare size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
                           <input
                             autoFocus
                             value={renameDraft}
@@ -292,19 +299,19 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                               if (shouldSubmitOnEnter(e)) commitRename();
                               if (e.key === 'Escape') setRenamingId(null);
                             }}
-                            className={`w-full min-w-0 rounded-lg border px-2 py-1 text-base outline-none ${classes.input} ${classes.themeTransition}`}
+                            className={`w-full min-w-0 rounded-md border px-2 py-1 text-sm outline-none ${classes.input} ${classes.themeTransition}`}
                           />
                         </div>
                       ) : (
                         <button
                           type="button"
                           onClick={() => handleSelectSession(session.id)}
-                          className="flex flex-1 min-w-0 items-center gap-3 px-3 py-3 text-left"
+                          className="flex flex-1 min-w-0 items-center gap-2.5 px-2.5 py-2 text-left"
                         >
                           {session.pinned ? (
-                            <Pin size={16} className="shrink-0 opacity-70" />
+                            <Pin size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
                           ) : (
-                            <MessageSquare size={16} className="shrink-0 opacity-70" />
+                            <MessageSquare size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
                           )}
                           <span className="truncate">{session.title || t('newChatTitle')}</span>
                         </button>
@@ -316,66 +323,64 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                         }
                         aria-label={t('moreActions')}
                         title={t('moreActions')}
-                        className={`mr-2 shrink-0 rounded-md p-1 opacity-60 transition-opacity duration-200 ease-out hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 ${
+                        className={`mr-1 shrink-0 rounded-md p-1 opacity-60 transition-opacity duration-150 ease-out hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 ${
                           openMenuSessionId === session.id ? 'opacity-100' : ''
                         } ${isDark ? 'text-white/45 hover:bg-white/10 hover:text-white' : 'text-gray-400 hover:bg-black/5 hover:text-gray-700'
                           }`}
                       >
-                        <MoreHorizontal size={14} />
+                        <MoreHorizontal size={16} strokeWidth={1.75} />
                       </button>
                       {openMenuSessionId === session.id && (
                         <div
                           ref={sessionMenuRef}
-                          className={`absolute right-2 top-full mt-1 z-10 w-32 rounded-xl border p-1 shadow-lg ${classes.border} ${
-                            isDark ? 'bg-[#222222]' : 'bg-white'
-                          }`}
+                          className={`absolute right-2 top-full mt-1 z-10 w-36 rounded-lg p-1 ${classes.menu}`}
                         >
                           <button
                             type="button"
                             onClick={() => startRename(session)}
-                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-white'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
                             }`}
                           >
-                            <Pencil size={15} />
+                            <Pencil size={16} strokeWidth={1.75} />
                             <span>{t('rename')}</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleTogglePinned(session)}
-                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-white'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
                             }`}
                           >
-                            {session.pinned ? <PinOff size={15} /> : <Pin size={15} />}
+                            {session.pinned ? <PinOff size={16} strokeWidth={1.75} /> : <Pin size={16} strokeWidth={1.75} />}
                             <span>{session.pinned ? t('unpin') : t('pin')}</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDownloadSession(session.id)}
-                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-white'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
                             }`}
                           >
-                            <Download size={15} />
+                            <Download size={16} strokeWidth={1.75} />
                             <span>{t('download')}</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteSession(session.id)}
-                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-red-300'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-red-500'
                             }`}
                           >
-                            <Trash2 size={15} />
+                            <Trash2 size={16} strokeWidth={1.75} />
                             <span>{t('delete')}</span>
                           </button>
                         </div>
@@ -393,78 +398,81 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           <div className="p-2 flex-shrink-0 mt-auto">
             <div ref={userMenuRef} className="relative">
               <div
-                className={`pointer-events-none absolute inset-x-0 bottom-full mb-2 origin-bottom ${
-                  classes.themeTransition
-                } ${
-                  isUserMenuOpen
-                    ? 'translate-y-0 opacity-100'
-                    : 'translate-y-2 opacity-0'
+                className={`pointer-events-none absolute inset-x-0 bottom-full mb-2 transition-opacity duration-150 ease-out ${
+                  isUserMenuOpen ? 'opacity-100' : 'opacity-0'
                 }`}
               >
-                <div
-                  className={`pointer-events-auto rounded-xl border p-1 shadow-lg ${
-                    classes.border
-                  } ${isDark ? 'bg-[#222222]' : 'bg-white'}`}
-                >
+                <div className={`pointer-events-auto rounded-lg p-1 ${classes.menu}`}>
                   <button
                     type="button"
                     onClick={() => {
                       setIsUserMenuOpen(false);
                       setIsProfileOpen(true);
                     }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                    className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
                       isDark
                         ? 'text-white/70 hover:bg-white/10 hover:text-white'
                         : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
                     }`}
                   >
-                    <UserRound size={18} />
+                    <UserRound size={16} strokeWidth={1.75} />
                     <span>{t('profile')}</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-base ${classes.themeTransition} ${
+                    className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
                       isDark
                         ? 'text-white/70 hover:bg-white/10 hover:text-red-300'
                         : 'text-gray-600 hover:bg-black/5 hover:text-red-500'
                     }`}
                   >
-                    <LogOut size={18} />
+                    <LogOut size={16} strokeWidth={1.75} />
                     <span>{t('signOut')}</span>
                   </button>
                 </div>
               </div>
               <div
-                className={`border rounded-md px-3 py-3 ${classes.border} ${
-                  isDark ? 'bg-white/[0.04]' : 'bg-black/[0.02]'
+                className={`rounded-md px-2 py-2 ${
+                  isDark ? 'bg-white/[0.04]' : 'bg-zinc-50'
                 }`}
               >
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                className={`flex w-full items-center justify-between gap-3 rounded-md text-left ${classes.themeTransition} ${classes.buttonHover}`}
+                className={`flex w-full items-center justify-between gap-2 rounded-md text-left ${classes.themeTransition} ${classes.buttonHover}`}
               >
                 <div className="flex items-center min-w-0">
                   {userProfile?.profile_image_url ? (
                     <img
                       src={userProfile.profile_image_url}
-                      alt="User Avatar"
-                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                      alt=""
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none';
+                        const fallback = event.currentTarget.nextElementSibling;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                      className="h-8 w-8 rounded-full object-cover flex-shrink-0"
                     />
-                  ) : (
-                    <div className="rounded-full w-10 h-10 bg-[#c2410c] flex items-center justify-center flex-shrink-0 text-white text-sm font-semibold">
-                      {(userProfile.name || userProfile.email || 'U').slice(0, 2).toUpperCase()}
+                  ) : null}
+                  <div
+                    className={`h-8 w-8 items-center justify-center rounded-full flex-shrink-0 ${
+                      userProfile?.profile_image_url ? 'hidden' : 'flex'
+                    } ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-200 text-zinc-600'}`}
+                  >
+                    <UserRound size={16} strokeWidth={1.75} />
+                  </div>
+                  <div className="ml-2.5 min-w-0">
+                    <div className="truncate text-sm font-medium">
+                      {userProfile.name || userProfile.email?.split('@')[0] || '用户'}
                     </div>
-                  )}
-                  <div className="ml-3 min-w-0">
-                    <div className="truncate text-base font-medium">{userProfile.name || 'Demo User'}</div>
-                    <div className={`truncate text-sm ${classes.mutedText}`}>{userProfile.email}</div>
+                    <div className={`truncate text-[13px] ${classes.mutedText}`}>{userProfile.email}</div>
                   </div>
                 </div>
                 <ChevronUp
                   size={16}
-                  className={`${classes.mutedText} ${classes.themeTransition} ${isUserMenuOpen ? 'rotate-0' : 'rotate-180'}`}
+                  strokeWidth={1.75}
+                  className={`${classes.mutedText} transition-transform duration-150 ease-out ${isUserMenuOpen ? 'rotate-0' : 'rotate-180'}`}
                 />
               </button>
               </div>

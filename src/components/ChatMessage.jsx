@@ -15,7 +15,7 @@ const LoadingIndicator = ({ classes, elapsed, t }) => (
   <div data-elapsed={elapsed} className={`flex items-center gap-2 text-sm ${classes.text}`}>
     <Loader size={18} className="animate-spin-slow" />
     {elapsed >= SLOW_HINT_SECONDS && (
-      <span className="text-xs opacity-60">{t('slowResponse', { s: elapsed })}</span>
+      <span className={`text-[13px] tabular-nums ${classes.mutedText}`}>{t('slowResponse', { s: elapsed })}</span>
     )}
   </div>
 );
@@ -30,7 +30,7 @@ const ActionButton = ({ title, onClick, isDark, children }) => (
     type="button"
     title={title}
     onClick={onClick}
-    className={`flex items-center gap-1 rounded-md p-2 text-xs transition-colors ${
+    className={`flex items-center gap-1 rounded-md p-1.5 text-[13px] transition-colors duration-150 ease-out ${
       isDark ? 'text-white/50 hover:text-white hover:bg-white/10' : 'text-black/40 hover:text-black hover:bg-black/5'
     }`}
   >
@@ -141,12 +141,12 @@ const ChatMessage = React.memo(
       ${
         isUser
           ? isDark
-            ? 'rounded-[28px] bg-white/[0.06] text-white'
-            : 'rounded-[28px] bg-black/[0.04] text-black'
+            ? 'rounded-xl bg-white/[0.06] text-white'
+            : 'rounded-xl bg-black/[0.04] text-black'
           : isError
           ? isDark
-            ? 'rounded-2xl border border-red-500/30 bg-red-500/10 text-red-200'
-            : 'rounded-2xl border border-red-200 bg-red-50 text-red-700'
+            ? 'rounded-xl border border-red-500/30 bg-red-500/10 text-red-200'
+            : 'rounded-xl border border-red-200 bg-red-50 text-red-700'
           : 'bg-transparent text-inherit'
       }
     `;
@@ -157,7 +157,7 @@ const ChatMessage = React.memo(
         <div className={containerClasses}>
           <div className="flex flex-col items-stretch w-[min(720px,82%)]">
             <div
-              className={`rounded-[20px] border px-4 py-3 ${classes.border} ${
+              className={`rounded-xl border px-3 py-2.5 ${classes.border} ${
                 isDark ? 'bg-white/[0.06]' : 'bg-black/[0.04]'
               }`}
             >
@@ -183,7 +183,7 @@ const ChatMessage = React.memo(
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className={`rounded-full px-4 py-2 text-sm ${
+                  className={`rounded-md px-3 py-1.5 text-sm transition-colors duration-150 ease-out ${
                     isDark ? 'text-white/70 hover:bg-white/10' : 'text-black/60 hover:bg-black/5'
                   }`}
                 >
@@ -193,9 +193,7 @@ const ChatMessage = React.memo(
                   type="button"
                   onClick={submitEdit}
                   disabled={!editText.trim()}
-                  className={`rounded-full px-4 py-2 text-sm font-medium disabled:opacity-40 ${
-                    isDark ? 'bg-white text-[#212121]' : 'bg-[#1f1f1f] text-white'
-                  }`}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150 ease-out active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100 ${classes.accentBtn}`}
                 >
                   {t('saveResend')}
                 </button>
@@ -219,7 +217,7 @@ const ChatMessage = React.memo(
                     alt={img.name || `图片 ${i + 1}`}
                     loading="lazy"
                     decoding="async"
-                    className="max-h-48 max-w-[240px] rounded-2xl object-cover border border-black/10 dark:border-white/10"
+                    className="max-h-48 max-w-[240px] rounded-lg object-cover border border-black/10 dark:border-white/10"
                   />
                 </a>
               ))}
@@ -230,14 +228,14 @@ const ChatMessage = React.memo(
               {attachments.map((file, i) => (
                 <div
                   key={i}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 max-w-[240px] ${
+                  className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 max-w-[240px] ${
                     isDark ? 'border-white/10 bg-white/[0.04]' : 'border-black/10 bg-black/[0.03]'
                   }`}
                 >
                   <FileText size={16} className="shrink-0 opacity-60" />
                   <div className="min-w-0">
-                    <div className="truncate text-xs font-medium">{file.name}</div>
-                    <div className="text-xs opacity-50">{formatFileSize(file.size)}</div>
+                    <div className="truncate text-[13px] font-medium">{file.name}</div>
+                    <div className={`text-[13px] tabular-nums ${classes.mutedText}`}>{formatFileSize(file.size)}</div>
                   </div>
                 </div>
               ))}
@@ -249,21 +247,15 @@ const ChatMessage = React.memo(
             ) : message || reasoning ? (
               <>
                 {isError && (
-                  <div className="flex items-center gap-2 mb-1 text-xs font-medium uppercase tracking-wide">
+                  <div className="flex items-center gap-2 mb-1 text-[13px] font-medium tracking-normal">
                     <AlertTriangle size={13} />
                     <span>{t('errorOccurred')}</span>
                   </div>
                 )}
                 {reasoning && (
                   <div
-                    className={`mb-3 px-1 text-xs leading-5 ${
-                      message
-                        ? isDark
-                          ? 'text-white/35'
-                          : 'text-black/35'
-                        : isDark
-                        ? 'text-white/55'
-                        : 'text-black/55'
+                    className={`mb-3 px-1 text-[13px] leading-5 tabular-nums ${
+                      message ? 'text-zinc-500' : isDark ? 'text-zinc-400' : 'text-zinc-600'
                     }`}
                   >
                     <button
@@ -278,25 +270,12 @@ const ChatMessage = React.memo(
                           ? t('thinking', { time: formatSeconds(elapsed, t) })
                           : t('thinkingProcess')}
                       </span>
-                      {isTyping && !message && (
-                        <span className="inline-flex items-center gap-1">
-                          <span className="h-1 w-1 rounded-full bg-current animate-pulse" />
-                          <span
-                            className="h-1 w-1 rounded-full bg-current animate-pulse"
-                            style={{ animationDelay: '140ms' }}
-                          />
-                          <span
-                            className="h-1 w-1 rounded-full bg-current animate-pulse"
-                            style={{ animationDelay: '280ms' }}
-                          />
-                        </span>
-                      )}
                       {isTyping && !message && elapsed >= 60 && (
                         <span className="opacity-60">{t('thinkingHint')}</span>
                       )}
                       <ChevronDown
                         size={13}
-                        className={`transition-transform ${reasoningExpanded ? 'rotate-180' : 'rotate-0'}`}
+                        className={`transition-transform duration-150 ease-out ${reasoningExpanded ? 'rotate-180' : 'rotate-0'}`}
                       />
                     </button>
 
@@ -319,7 +298,7 @@ const ChatMessage = React.memo(
           {/* 操作栏：AI 最后一条常驻，其余消息 hover 时显示；生成中不显示 */}
           {!isTyping && !(isStreaming && isLast) && (message || images?.length > 0 || attachments?.length > 0) && (
             <div
-              className={`flex items-center gap-1 mt-1 px-2 transition-opacity ${
+              className={`flex items-center gap-1 mt-1 px-1 transition-opacity duration-150 ease-out ${
                 !isUser && isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
               }`}
             >
@@ -353,7 +332,7 @@ const ChatMessage = React.memo(
                   <button
                     type="button"
                     title={t('deleteMsg')}
-                    className={`flex items-center gap-1 rounded-md p-2 text-xs transition-colors ${
+                    className={`flex items-center gap-1 rounded-md p-1.5 text-[13px] transition-colors duration-150 ease-out ${
                       isDark ? 'text-white/50 hover:text-red-300 hover:bg-white/10' : 'text-black/40 hover:text-red-500 hover:bg-black/5'
                     }`}
                   >

@@ -34,7 +34,7 @@ export const OLLAMA_API_BASE_URL = `${WEBUI_BASE_URL}/ollama`;
 export const DEMO_ACCOUNT = {
   email: 'demo@aichat.local',
   password: 'Demo@2026',
-  name: 'Demo User',
+  name: '陈予安',
 };
 
 // 免登录体验：点击即用，不需要输入邮箱密码，跟 DEMO_ACCOUNT 是两个不同的身份
@@ -43,7 +43,7 @@ export const DEMO_ACCOUNT = {
 // 因为这个身份从来不走密码校验，也没有对应的 IndexedDB 账号记录。
 export const GUEST_ACCOUNT = {
   email: 'guest@aichat.local',
-  name: 'Guest',
+  name: '周衡',
 };
 
 export const DEFAULT_LLM_PROVIDER = import.meta.env.VITE_DEFAULT_LLM_PROVIDER || 'demo';

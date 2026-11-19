@@ -23,8 +23,8 @@ body,
 }
 
 html {
-  /* 兜底默认值，正常情况下 index.html 里的内联脚本会在这之前就设置好实际颜色 */
-  background: #f7f7f8;
+  /* 兜底默认值，正常情况下 theme-init.js 会在这之前就设置好实际颜色 */
+  background: #fafafa;
 }
 
 body {
@@ -34,17 +34,19 @@ body {
     "PingFang SC",
     "Helvetica Neue",
     sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   /* 背景色由 ThemeContext 通过 JS 动态设置，避免主题切换时残留错误颜色 */
   transition:
-    background-color 200ms ease-out,
-    color 200ms ease-out;
+    background-color 150ms ease-out,
+    color 150ms ease-out;
 }
 
 .settings-modal .ant-modal-content {
   overflow: hidden;
   padding: 0;
-  border-radius: 24px;
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .settings-modal .ant-modal-header {
@@ -61,23 +63,23 @@ body {
 .settings-modal .ant-modal-footer {
   margin-top: 0;
   padding: 16px 24px 24px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e4e4e7;
 }
 
 .settings-modal .ant-modal-close {
   top: 20px;
   inset-inline-end: 20px;
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
-/* 所有可输入控件统一：42px 高、8px 圆角、同一套内边距，
+/* 所有可输入控件统一：36px 高、6px 圆角、同一套内边距，
    避免 Input / Password / Select / InputNumber 各按各的默认值渲染而高低错落 */
 .settings-modal .ant-input,
 .settings-modal .ant-input-affix-wrapper,
 .settings-modal .ant-input-password,
 .settings-modal .ant-select-selector {
-  min-height: 42px;
-  border-radius: 8px !important;
+  min-height: 36px;
+  border-radius: 6px !important;
   box-shadow: none !important;
 }
 
@@ -88,7 +90,7 @@ body {
 
 .settings-modal .ant-input-number {
  padding:5px 0;
- border-radius: 8px;
+ border-radius: 6px;
 }
 
 /* 只给单选框撑行高让文字居中；多选/tags 模式的选项是一枚枚小胶囊，
@@ -125,7 +127,7 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 32px;
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .settings-modal .ant-radio-button-wrapper::before {
@@ -134,9 +136,9 @@ body {
 
 .settings-modal-light .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
 .settings-modal-light .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover {
-  color: #2563eb;
-  background: #eff6ff;
-  border-color: #3b82f6;
+  color: #fafafa;
+  background: #18181b;
+  border-color: #18181b;
 }
 
 .settings-modal-dark .ant-modal-content,
@@ -153,7 +155,7 @@ body {
 }
 
 .settings-modal-dark .ant-modal-content {
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .settings-modal-dark .ant-modal-close,
@@ -172,8 +174,8 @@ body {
 .settings-modal-dark .ant-select-selection-overflow,
 .settings-modal-dark .ant-select-selection-search-input {
   color: #f4f4f5 !important;
-  background: #121212 !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: #09090b !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .settings-modal-dark .ant-input:hover,
@@ -184,8 +186,8 @@ body {
 .settings-modal-dark .ant-input-number-focused,
 .settings-modal-dark .ant-select:not(.ant-select-disabled):hover .ant-select-selector,
 .settings-modal-dark .ant-select-focused .ant-select-selector {
-  background: #121212 !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: #09090b !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
   box-shadow: none !important;
 }
 
@@ -209,8 +211,8 @@ body {
 
 .settings-modal-dark .ant-radio-button-wrapper {
   color: #e4e4e7;
-  background: #121212;
-  border-color: rgba(255, 255, 255, 0.1);
+  background: #09090b;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .settings-modal-dark .ant-radio-button-wrapper:hover {
@@ -242,15 +244,15 @@ body {
 
 .settings-modal-dark .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
 .settings-modal-dark .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover {
-  color: #bfdbfe;
-  background: rgba(37, 99, 235, 0.18);
-  border-color: #60a5fa;
+  color: #18181b;
+  background: #fafafa;
+  border-color: #fafafa;
 }
 
 .settings-modal-dark .ant-btn-default {
   color: #e4e4e7;
-  background: #121212;
-  border-color: rgba(255, 255, 255, 0.1);
+  background: #09090b;
+  border-color: rgba(255, 255, 255, 0.08);
   box-shadow: none;
 }
 
@@ -265,31 +267,31 @@ body {
 .settings-modal-dark .ant-btn-default:disabled,
 .settings-modal-dark .ant-btn-default[disabled] {
   color: #71717a;
-  background: #121212;
+  background: #09090b;
   border-color: rgba(255, 255, 255, 0.08);
 }
 
 .settings-modal-dark .ant-btn-primary {
-  color: #ffffff;
-  background: #2563eb;
-  border-color: #2563eb;
+  color: #18181b;
+  background: #fafafa;
+  border-color: #fafafa;
   box-shadow: none;
 }
 
 .settings-modal-dark .ant-btn-primary:hover,
 .settings-modal-dark .ant-btn-primary:focus,
 .settings-modal-dark .ant-btn-primary:active {
-  color: #ffffff !important;
-  background: #3b82f6 !important;
-  border-color: #3b82f6 !important;
+  color: #18181b !important;
+  background: #e4e4e7 !important;
+  border-color: #e4e4e7 !important;
   box-shadow: none !important;
 }
 
 .settings-modal-dark .ant-btn-primary:disabled,
 .settings-modal-dark .ant-btn-primary[disabled] {
-  color: rgba(255, 255, 255, 0.5) !important;
-  background: rgba(37, 99, 235, 0.45) !important;
-  border-color: rgba(37, 99, 235, 0.45) !important;
+  color: rgba(24, 24, 27, 0.45) !important;
+  background: rgba(250, 250, 250, 0.35) !important;
+  border-color: transparent !important;
 }
 
 .settings-modal-dark .ant-switch {
@@ -301,7 +303,20 @@ body {
 }
 
 .settings-modal-dark .ant-switch.ant-switch-checked {
-  background: #2563eb;
+  background: #fafafa;
+}
+
+.settings-modal-dark .ant-switch.ant-switch-checked .ant-switch-handle::before {
+  background: #18181b;
+}
+
+.settings-modal-dark .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #fafafa !important;
+  border-color: #fafafa !important;
+}
+
+.settings-modal-dark .ant-checkbox-checked .ant-checkbox-inner::after {
+  border-color: #18181b !important;
 }
 
 .settings-modal-dropdown-dark {
@@ -359,13 +374,12 @@ select,
 svg,
 img {
   transition:
-    background-color 200ms ease-out,
-    border-color 200ms ease-out,
-    color 200ms ease-out,
-    fill 200ms ease-out,
-    stroke 200ms ease-out,
-    box-shadow 200ms ease-out,
-    opacity 200ms ease-out;
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    fill 150ms ease-out,
+    stroke 150ms ease-out,
+    opacity 150ms ease-out;
 }
 
 ::-webkit-scrollbar {
@@ -465,3 +479,16 @@ html:not(.dark-theme) .markdown-body .hljs-char.escape_, html:not(.dark-theme) .
 /* github-dark 的 .hljs 基础色是浅灰（#c9d1d9），浅色卡片上看不清；
    非 token 的普通代码文字在这里改回深色。 */
 html:not(.dark-theme) .markdown-body code.hljs { color: #24292e; }
+
+/* 宽表格在小屏横向滚动时钉住首列，避免只能靠一层粗糙的 overflow 辨认每一行 */
+.markdown-body th:first-child,
+.markdown-body td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--page-bg, #fafafa);
+}
+
+.markdown-body table {
+  font-variant-numeric: tabular-nums;
+}

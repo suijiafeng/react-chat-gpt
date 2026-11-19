@@ -10,9 +10,6 @@ const ChatInput = ({
   setInput,
   handleSubmit,
   isStreaming,
-  isEmpty = false,
-  suggestions = [],
-  onSuggestionClick,
   // 附件相关（由 ChatInterface 管理状态）
   pendingImages = [],
   pendingFiles = [],
@@ -74,30 +71,22 @@ const ChatInput = ({
 
   return (
     <div
-      className={`inset-x-0 z-20 px-4 ${classes.themeTransition} ${
-        isEmpty
-          ? 'absolute top-1/2 -translate-y-1/2'
-          : `absolute bottom-0 pb-6 bg-gradient-to-t ${
-                isDark
-                  ? 'from-[#212121] via-[#212121]/90 to-transparent'
-                  : 'from-[#f7f7f8] via-[#f7f7f8]/90 to-transparent'
-              }`
-      }`}
+      className={`absolute inset-x-0 bottom-0 z-20 border-t px-4 pb-4 pt-3 ${classes.bg} ${classes.border} ${classes.themeTransition}`}
     >
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
         {/* 视觉能力提示：软提醒，不拦截发送 */}
         {visionWarning && (
           <div
-            className={`mb-2 flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+            className={`mb-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
               isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-600'
             }`}
           >
-            <TriangleAlert size={13} />
+            <TriangleAlert size={16} strokeWidth={1.75} />
             {t('visionWarning')}
           </div>
         )}
         <div
-          className={`rounded-[28px] border px-4 py-2 ${classes.input} ${classes.border} ${classes.themeTransition}`}
+          className={`rounded-xl border px-3 py-1.5 ${classes.input} ${classes.border} ${classes.themeTransition}`}
         >
           {/* 附件预览区 */}
           {(hasAttachments || isReadingFiles) && (
@@ -107,12 +96,12 @@ const ChatInput = ({
                   <img
                     src={img.dataUrl}
                     alt={img.name}
-                    className="h-16 w-16 rounded-xl object-cover border border-black/10 dark:border-white/10"
+                    className="h-14 w-14 rounded-md object-cover border border-black/10 dark:border-white/10"
                   />
                   <button
                     type="button"
                     onClick={() => onRemoveImage?.(i)}
-                    className="absolute -top-2 -right-2 rounded-full bg-black/70 text-white p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                    className="absolute -top-1.5 -right-1.5 rounded-md bg-zinc-900 text-white p-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-150 ease-out"
                     title={t('removeImage')}
                   >
                     <X size={12} />
@@ -122,14 +111,14 @@ const ChatInput = ({
               {pendingFiles.map((file, i) => (
                 <div
                   key={i}
-                  className={`relative group/thumb flex items-center gap-2 rounded-xl border px-3 py-2 max-w-[220px] ${
+                  className={`relative group/thumb flex items-center gap-2 rounded-md border px-2.5 py-1.5 max-w-[220px] ${
                     isDark ? 'border-white/10 bg-white/[0.04]' : 'border-black/10 bg-black/[0.03]'
                   }`}
                 >
-                  <FileText size={16} className="shrink-0 opacity-60" />
+                  <FileText size={16} strokeWidth={1.75} className="shrink-0 opacity-60" />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{file.name}</div>
-                    <div className="text-sm opacity-50">
+                    <div className={`text-[13px] tabular-nums ${classes.mutedText}`}>
                       {formatFileSize(file.size)}
                       {file.truncated ? ` · ${t('truncatedTag')}` : ''}
                     </div>
@@ -137,7 +126,7 @@ const ChatInput = ({
                   <button
                     type="button"
                     onClick={() => onRemoveFile?.(i)}
-                    className="absolute -top-2 -right-2 rounded-full bg-black/70 text-white p-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                    className="absolute -top-1.5 -right-1.5 rounded-md bg-zinc-900 text-white p-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-150 ease-out"
                     title={t('removeFile')}
                   >
                     <X size={12} />
@@ -146,7 +135,7 @@ const ChatInput = ({
               ))}
               {isReadingFiles && (
                 <div className="flex items-center gap-2 px-2 text-sm opacity-60">
-                  <Loader2 size={14} className="animate-spin" /> {t('parsingFiles')}
+                  <Loader2 size={16} strokeWidth={1.75} className="animate-spin" /> {t('parsingFiles')}
                 </div>
               )}
             </div>
@@ -172,24 +161,23 @@ const ChatInput = ({
                 title={t('moreActions')}
                 aria-label={t('moreActions')}
                 aria-expanded={isPlusMenuOpen}
-                className={`rounded-full p-2 mb-1 ${
+                className={`rounded-md p-2 mb-0.5 transition-colors duration-150 ease-out ${
                   hasSystemPrompt
-                    ? 'text-blue-500 hover:bg-blue-500/10'
+                    ? classes.accentSoft
                     : isDark
-                      ? 'text-white/75 hover:bg-white/10'
-                      : 'text-gray-500 hover:bg-black/5'
+                      ? 'text-zinc-300 hover:bg-white/10'
+                      : 'text-zinc-500 hover:bg-black/5'
                 }`}
               >
                 <Plus
-                  size={18}
-                  className={`transform transition-transform duration-150 ${isPlusMenuOpen ? 'rotate-45' : ''}`}
+                  size={16}
+                  strokeWidth={1.75}
+                  className={`transform transition-transform duration-150 ease-out ${isPlusMenuOpen ? 'rotate-45' : ''}`}
                 />
               </button>
               {isPlusMenuOpen && (
                 <div
-                  className={`absolute bottom-full left-0 mb-2 z-30 w-44 rounded-xl border p-1 shadow-lg ${classes.border} ${
-                    isDark ? 'bg-[#222222]' : 'bg-white'
-                  }`}
+                  className={`absolute bottom-full left-0 mb-2 z-30 w-48 rounded-lg p-1 ${classes.menu}`}
                 >
                   <button
                     type="button"
@@ -197,13 +185,13 @@ const ChatInput = ({
                       setIsPlusMenuOpen(false);
                       fileInputRef.current?.click();
                     }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+                    className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150 ease-out ${
                       isDark
-                        ? 'text-white/70 hover:bg-white/10 hover:text-white'
-                        : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                        ? 'text-zinc-300 hover:bg-white/10 hover:text-white'
+                        : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
-                    <Paperclip size={15} />
+                    <Paperclip size={16} strokeWidth={1.75} />
                     <span>{t('addFiles')}</span>
                   </button>
                   {showSystemPrompt && (
@@ -213,15 +201,17 @@ const ChatInput = ({
                         setIsPlusMenuOpen(false);
                         onOpenSystemPrompt?.();
                       }}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+                      className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150 ease-out ${
                         hasSystemPrompt
-                          ? 'text-blue-500 hover:bg-blue-500/10'
+                          ? isDark
+                            ? 'text-zinc-100 hover:bg-white/10'
+                            : 'text-zinc-900 hover:bg-zinc-100'
                           : isDark
-                            ? 'text-white/70 hover:bg-white/10 hover:text-white'
-                            : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                            ? 'text-zinc-300 hover:bg-white/10 hover:text-white'
+                            : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
                       }`}
                     >
-                      <NotebookPen size={15} />
+                      <NotebookPen size={16} strokeWidth={1.75} />
                       <span>{t('systemPrompt')}</span>
                     </button>
                   )}
@@ -247,41 +237,20 @@ const ChatInput = ({
             <button
               type="submit"
               aria-label={isStreaming ? t('stopGen') : t('sendMsg')}
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${classes.themeTransition} ${
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors duration-150 ease-out active:scale-[0.98] ${
                 isStreaming || input.trim() || hasAttachments
-                  ? isDark
-                    ? 'bg-white text-[#212121]'
-                    : 'bg-[#1f1f1f] text-white'
+                  ? classes.accentBtn
                   : isDark
-                  ? 'bg-white/10 text-white/60'
-                  : 'bg-black/10 text-black/40'
+                  ? 'bg-white/10 text-white/50'
+                  : 'bg-zinc-200 text-zinc-400'
               }`}
             >
-              {isStreaming ? <CircleStop size={18} /> : <Send size={18} />}
+              {isStreaming ? <CircleStop size={16} strokeWidth={1.75} /> : <Send size={16} strokeWidth={1.75} />}
             </button>
           </div>
         </div>
-        {isEmpty && suggestions.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-            {suggestions.map((item) => (
-              <button
-                key={item.title}
-                type="button"
-                onClick={() => onSuggestionClick?.(item)}
-                className={`rounded-2xl border px-3 py-3 text-left text-base ${classes.border} ${classes.themeTransition} ${
-                  isDark
-                    ? 'bg-white/[0.03] text-white/80 hover:bg-white/10'
-                    : 'bg-white text-gray-600 hover:bg-black/5'
-                }`}
-              >
-                <item.icon size={14} className="mr-2 inline-block align-[-2px]" />
-                {item.title}
-              </button>
-            ))}
-          </div>
-        )}
         {/* 小屏收起免责提示，把纵向空间留给对话内容 */}
-        <div className={`mt-3 text-center text-sm hidden sm:block ${classes.mutedText}`}>
+        <div className={`mt-2 text-center text-[13px] hidden sm:block ${classes.mutedText}`}>
           {t('disclaimer')}
         </div>
       </form>

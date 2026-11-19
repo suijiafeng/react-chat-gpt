@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { message, Spin } from 'antd';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Info } from 'lucide-react';
 import NavHeader from '../components/NavHeader';
 import AppLogo from '../components/AppLogo';
 import { useLanguage, useAuth } from '../hooks';
@@ -35,9 +35,9 @@ const PasswordInput = ({ value, onChange, placeholder, autoComplete, classes, er
         value={value}
         onChange={onChange}
         type={visible ? 'text' : 'password'}
-        className={`px-5 py-3 pr-12 rounded-2xl w-full text-base outline-none border ${
+        className={`px-3 py-2 pr-10 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out ${
           error ? errorBorder : classes.input
-        } ${classes.themeTransition}`}
+        }`}
         placeholder={placeholder}
         autoComplete={autoComplete}
         aria-invalid={Boolean(error)}
@@ -46,9 +46,9 @@ const PasswordInput = ({ value, onChange, placeholder, autoComplete, classes, er
         type="button"
         tabIndex={-1}
         onClick={() => setVisible((v) => !v)}
-        className={`absolute right-4 top-1/2 -translate-y-1/2 ${classes.mutedText} hover:opacity-80`}
+        className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 ${classes.mutedText} hover:bg-zinc-500/10`}
       >
-        {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+        {visible ? <EyeOff size={16} strokeWidth={1.75} /> : <Eye size={16} strokeWidth={1.75} />}
       </button>
     </div>
   );
@@ -184,15 +184,16 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
             {/* noValidate：关掉浏览器原生校验气泡，改由下面的 validate() 统一出内联错误。
                 两套并存时原生气泡会先拦下提交（文案还是浏览器语言），我们的提示反而看不到 */}
             <form className="flex flex-col" onSubmit={handleSubmit} noValidate>
-              <div className="mb-1 text-center">
-                <div className="text-3xl font-medium">
+              <div className="mb-1">
+                <h1 className="text-2xl font-semibold tracking-normal">
                   {mode === 'signin'
                     ? t('signInTitle', { name: WEBUI_NAME })
                     : t('signUpTitle', { name: WEBUI_NAME })}
-                </div>
+                </h1>
                 {mode === 'signup' && (
-                  <div className={`mt-1 text-sm font-medium ${classes.mutedText}`}>
-                    ⓘ {t('localStorageNotice')}
+                  <div className={`mt-2 flex items-start gap-2 text-sm ${classes.mutedText}`}>
+                    <Info size={16} strokeWidth={1.75} className="mt-0.5 shrink-0" />
+                    <span>{t('localStorageNotice')}</span>
                   </div>
                 )}
               </div>
@@ -201,14 +202,14 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 用户名（仅注册） */}
                 {mode === 'signup' && (
                   <div>
-                    <div className="text-base font-medium text-left mb-2">{t('Name')}</div>
+                    <div className="text-sm font-medium text-left mb-1.5">{t('Name')}</div>
                     <input
                       value={name}
                       onChange={bind(setName, 'name')}
                       type="text"
-                      className={`px-5 py-3 rounded-2xl w-full text-base outline-none border ${
+                      className={`px-3 py-2 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out ${
                         errors.name ? errorBorder : classes.input
-                      } ${classes.themeTransition}`}
+                      }`}
                       autoComplete="name"
                       placeholder={t('Enter Your Full Name')}
                       aria-invalid={Boolean(errors.name)}
@@ -219,14 +220,14 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
 
                 {/* 邮箱 */}
                 <div>
-                  <div className="text-base font-medium text-left mb-2">{t('Email')}</div>
+                  <div className="text-sm font-medium text-left mb-1.5">{t('Email')}</div>
                   <input
                     value={email}
                     onChange={bind(setEmail, 'email')}
                     type="email"
-                    className={`px-5 py-3 rounded-2xl w-full text-base outline-none border ${
+                    className={`px-3 py-2 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out ${
                       errors.email ? errorBorder : classes.input
-                    } ${classes.themeTransition}`}
+                    }`}
                     autoComplete="email"
                     placeholder={t('Enter Your Email')}
                     aria-invalid={Boolean(errors.email)}
@@ -236,7 +237,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
 
                 {/* 密码 */}
                 <div>
-                  <div className="text-base font-medium text-left mb-2">{t('Password')}</div>
+                  <div className="text-sm font-medium text-left mb-1.5">{t('Password')}</div>
                   <PasswordInput
                     value={password}
                     onChange={bind(setPassword, 'password')}
@@ -254,7 +255,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 确认密码（仅注册） */}
                 {mode === 'signup' && (
                   <div>
-                    <div className="text-base font-medium text-left mb-2">{t('Confirm Password')}</div>
+                    <div className="text-sm font-medium text-left mb-1.5">{t('Confirm Password')}</div>
                     <PasswordInput
                       value={confirmPassword}
                       onChange={bind(setConfirmPassword, 'confirmPassword')}
@@ -272,7 +273,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 提交中禁用按钮并换文案：请求在飞的时候按钮仍可点会打出重复注册请求，
                     而 Spin 有 300ms 延迟，快网络下用户根本看不到任何反馈 */}
                 <button
-                  className={`bg-gray-950 hover:bg-gray-900 w-full rounded-2xl text-white font-medium text-base py-3 disabled:opacity-60 disabled:cursor-not-allowed ${classes.themeTransition}`}
+                  className={`w-full rounded-md font-medium text-sm py-2 transition-colors duration-150 ease-out active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${classes.accentBtn}`}
                   type="submit"
                   disabled={loading}
                 >
@@ -286,7 +287,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 免登录体验：最低门槛的上手入口，点一下直接进入演示模式聊天 */}
                 {mode === 'signin' && (
                   <button
-                    className={`mt-3 w-full rounded-2xl border font-medium text-base py-3 ${classes.input} ${classes.themeTransition} hover:opacity-80`}
+                    className={`mt-2 w-full rounded-md border font-medium text-sm py-2 transition-colors duration-150 ease-out active:scale-[0.98] disabled:opacity-60 ${classes.input} ${classes.buttonHover}`}
                     type="button"
                     onClick={handleDemoLogin}
                     disabled={loading}
@@ -295,7 +296,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                   </button>
                 )}
 
-                <div className="mt-4 text-base text-center">
+                <div className="mt-4 text-sm">
                   {mode === 'signin' ? t('Dont have an account?') : t('Already have an account?')}
                   <button
                     className="font-medium underline ml-1"
@@ -310,7 +311,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {mode === 'signin' && USE_LOCAL_DATA && (
                   <p className={`mt-5 text-center text-sm ${classes.mutedText}`}>
                     {t('demoCredentialsHint')}
-                    <span className="font-mono ml-1">
+                    <span className="font-mono tabular-nums ml-1">
                       {DEMO_ACCOUNT.email} / {DEMO_ACCOUNT.password}
                     </span>
                   </p>
