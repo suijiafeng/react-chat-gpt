@@ -4,11 +4,34 @@
 
 ## 界面
 
-桌面宽度 1440×900。下面是免登录体验，回复来自本地预设，不是真实模型。账号显示名是周衡。
+免登录体验里的本地预设回复，不是真实模型，也没有填入 API Key。桌面三张是 1120×700，窄屏是 390×720。账号显示名是周衡。
 
-![空会话：从一条消息开始](./docs/screenshots/chat-empty-zh-desktop.webp)
-
-![一条已完成的对话，含列表和表格](./docs/screenshots/chat-zh-desktop.webp)
+<table>
+  <tr>
+    <td align="center" valign="top">
+      <img src="docs/screenshots/highlight-streaming.webp" width="400" alt="流式生成中可以停止">
+      <br>
+      流式生成中可以停止
+    </td>
+    <td align="center" valign="top">
+      <img src="docs/screenshots/highlight-code.webp" width="400" alt="代码高亮，块顶可以复制">
+      <br>
+      代码高亮，块顶可以复制
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="docs/screenshots/highlight-settings.webp" width="400" alt="多家服务商，未填写密钥">
+      <br>
+      多家服务商，未填写密钥
+    </td>
+    <td align="center" valign="top">
+      <img src="docs/screenshots/highlight-mobile.webp" width="400" alt="窄屏下代码换行，输入框仍在底部">
+      <br>
+      窄屏下代码换行，输入框仍在底部
+    </td>
+  </tr>
+</table>
 
 ## 功能
 
