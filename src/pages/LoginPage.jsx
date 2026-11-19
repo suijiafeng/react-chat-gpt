@@ -172,7 +172,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
   return (
     <div className={`${classes.bg} ${classes.text} ${classes.themeTransition} min-h-screen w-full flex flex-col font-primary`}>
       {/* 顶部导航栏 */}
-      <div className={`h-16 border-b px-5 md:px-6 flex items-center justify-between flex-shrink-0 ${classes.bg} ${classes.border} ${classes.themeTransition}`}>
+      <div className={`h-16 border-b px-5 md:px-6 flex items-center justify-between flex-shrink-0 ${classes.bg} ${classes.hairline} ${classes.themeTransition}`}>
         <AppLogo name={WEBUI_NAME} />
         <NavHeader />
       </div>

@@ -87,6 +87,7 @@ export const ThemeProvider = ({ children }) => {
         ? 'bg-[#2f2f2f] text-[#ececec] border-white/10 placeholder:text-[#a1a1aa]'
         : 'bg-white text-black border-gray-300 placeholder:text-[#6b7280]',
       border: isDark ? 'border-white/10' : 'border-gray-200',
+      hairline: isDark ? 'border-white/[0.06]' : 'border-black/[0.06]',
       divide: isDark ? 'divide-white/10' : 'divide-gray-200',
       focusRing: 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]',
       iconBtn: 'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md',
