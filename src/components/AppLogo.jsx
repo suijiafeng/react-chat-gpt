@@ -1,13 +1,12 @@
 import { useTheme } from '../contexts/ThemeContext';
 
 /**
- * 品牌标识：单色对话气泡，两条短线表示正文。
+ * 品牌标识：说话气泡 + 内部四角星。
  * 几何与 public/favicon.svg 一致。改这里请同步改那边。
  */
 export const LogoMark = ({ size = 28, className = '' }) => {
   const { isDark } = useTheme();
-  const ink = isDark ? '#FAFAFA' : '#18181B';
-  const paper = isDark ? '#18181B' : '#FAFAFA';
+  const ink = isDark ? '#6366f1' : '#4f46e5';
 
   return (
     <svg
@@ -18,11 +17,14 @@ export const LogoMark = ({ size = 28, className = '' }) => {
       role="img"
       aria-label="logo"
     >
+      <g fill={ink}>
+        <rect x="1.5" y="2.5" width="29" height="21.5" rx="7.5" />
+        <polygon points="9,18 9,29 18.5,22.5" />
+      </g>
       <path
-        fill={ink}
-        d="M6 5h20a4 4 0 0 1 4 4v11a4 4 0 0 1-4 4H13.2L8 29.2V24H6a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4z"
+        fill="#fff"
+        d="M16 6.5 q1.92 5.18 7.40 7.00 q-5.48 1.82 -7.40 7.00 q-1.92 -5.18 -7.40 -7.00 q5.48 -1.82 7.40 -7.00Z"
       />
-      <path fill={paper} d="M9 12h14v1.6H9zM9 17h9v1.6H9z" />
     </svg>
   );
 };

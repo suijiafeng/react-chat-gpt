@@ -24,7 +24,7 @@ body,
 
 html {
   /* 兜底默认值，正常情况下 theme-init.js 会在这之前就设置好实际颜色 */
-  background: #fafafa;
+  background: #f7f7f8;
 }
 
 body {
@@ -63,7 +63,7 @@ body {
 .settings-modal .ant-modal-footer {
   margin-top: 0;
   padding: 16px 24px 24px;
-  border-top: 1px solid #e4e4e7;
+  border-top: 1px solid #e2e8f0;
 }
 
 .settings-modal .ant-modal-close {
@@ -136,9 +136,9 @@ body {
 
 .settings-modal-light .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
 .settings-modal-light .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover {
-  color: #fafafa;
-  background: #18181b;
-  border-color: #18181b;
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #3b82f6;
 }
 
 .settings-modal-dark .ant-modal-content,
@@ -174,8 +174,8 @@ body {
 .settings-modal-dark .ant-select-selection-overflow,
 .settings-modal-dark .ant-select-selection-search-input {
   color: #f4f4f5 !important;
-  background: #09090b !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: #121212 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .settings-modal-dark .ant-input:hover,
@@ -186,8 +186,8 @@ body {
 .settings-modal-dark .ant-input-number-focused,
 .settings-modal-dark .ant-select:not(.ant-select-disabled):hover .ant-select-selector,
 .settings-modal-dark .ant-select-focused .ant-select-selector {
-  background: #09090b !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: #121212 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
   box-shadow: none !important;
 }
 
@@ -211,8 +211,8 @@ body {
 
 .settings-modal-dark .ant-radio-button-wrapper {
   color: #e4e4e7;
-  background: #09090b;
-  border-color: rgba(255, 255, 255, 0.08);
+  background: #121212;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .settings-modal-dark .ant-radio-button-wrapper:hover {
@@ -244,15 +244,15 @@ body {
 
 .settings-modal-dark .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
 .settings-modal-dark .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled):hover {
-  color: #18181b;
-  background: #fafafa;
-  border-color: #fafafa;
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.18);
+  border-color: #60a5fa;
 }
 
 .settings-modal-dark .ant-btn-default {
   color: #e4e4e7;
-  background: #09090b;
-  border-color: rgba(255, 255, 255, 0.08);
+  background: #121212;
+  border-color: rgba(255, 255, 255, 0.1);
   box-shadow: none;
 }
 
@@ -267,31 +267,31 @@ body {
 .settings-modal-dark .ant-btn-default:disabled,
 .settings-modal-dark .ant-btn-default[disabled] {
   color: #71717a;
-  background: #09090b;
+  background: #121212;
   border-color: rgba(255, 255, 255, 0.08);
 }
 
 .settings-modal-dark .ant-btn-primary {
-  color: #18181b;
-  background: #fafafa;
-  border-color: #fafafa;
+  color: #ffffff;
+  background: #2563eb;
+  border-color: #2563eb;
   box-shadow: none;
 }
 
 .settings-modal-dark .ant-btn-primary:hover,
 .settings-modal-dark .ant-btn-primary:focus,
 .settings-modal-dark .ant-btn-primary:active {
-  color: #18181b !important;
-  background: #e4e4e7 !important;
-  border-color: #e4e4e7 !important;
+  color: #ffffff !important;
+  background: #3b82f6 !important;
+  border-color: #3b82f6 !important;
   box-shadow: none !important;
 }
 
 .settings-modal-dark .ant-btn-primary:disabled,
 .settings-modal-dark .ant-btn-primary[disabled] {
-  color: rgba(24, 24, 27, 0.45) !important;
-  background: rgba(250, 250, 250, 0.35) !important;
-  border-color: transparent !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  background: rgba(37, 99, 235, 0.45) !important;
+  border-color: rgba(37, 99, 235, 0.45) !important;
 }
 
 .settings-modal-dark .ant-switch {
@@ -303,20 +303,7 @@ body {
 }
 
 .settings-modal-dark .ant-switch.ant-switch-checked {
-  background: #fafafa;
-}
-
-.settings-modal-dark .ant-switch.ant-switch-checked .ant-switch-handle::before {
-  background: #18181b;
-}
-
-.settings-modal-dark .ant-checkbox-checked .ant-checkbox-inner {
-  background-color: #fafafa !important;
-  border-color: #fafafa !important;
-}
-
-.settings-modal-dark .ant-checkbox-checked .ant-checkbox-inner::after {
-  border-color: #18181b !important;
+  background: #2563eb;
 }
 
 .settings-modal-dropdown-dark {
@@ -486,7 +473,7 @@ html:not(.dark-theme) .markdown-body code.hljs { color: #24292e; }
   position: sticky;
   left: 0;
   z-index: 1;
-  background: var(--page-bg, #fafafa);
+  background: var(--page-bg, #f7f7f8);
 }
 
 .markdown-body table {

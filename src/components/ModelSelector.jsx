@@ -63,8 +63,8 @@ const ModelSelector = React.memo(() => {
         title={currentModel}
         /* 限宽：模型 id 可以很长（含日期/版本后缀），不限制会把顶栏撑变形，
            超出部分由内部 truncate 省略，hover 看完整名 */
-        className={`flex items-center justify-between min-w-[128px] sm:min-w-[168px] max-w-[180px] sm:max-w-[240px] px-2.5 py-1.5 text-sm leading-5 border rounded-md ${
-          isDark ? 'bg-zinc-900 text-zinc-100 border-white/[0.08] hover:bg-zinc-800' : 'bg-white text-zinc-900 border-zinc-200 hover:bg-zinc-50'
+        className={`flex h-10 items-center justify-between min-w-[128px] sm:min-w-[168px] max-w-[180px] sm:max-w-[240px] px-2.5 text-sm leading-5 border rounded-md ${classes.focusRing} ${
+          isDark ? 'bg-transparent text-[#ececec] border-white/10 hover:bg-white/5' : 'bg-transparent text-black border-black/10 hover:bg-black/[0.04]'
         } ${classes.themeTransition}`}
       >
         <span className="truncate mr-2 font-mono text-[13px] tabular-nums">{currentModel}</span>
@@ -104,8 +104,8 @@ const ModelItem = ({ model, isActive, onClick, isDark }) => (
     className={`flex min-h-[32px] w-full items-center justify-between text-left px-2.5 py-1.5 mb-0.5 last:mb-0 text-sm leading-5 rounded-md transition-colors duration-150 ease-out ${
       isActive
         ? isDark
-          ? 'bg-white/[0.08] text-zinc-100 font-medium'
-          : 'bg-zinc-100 text-zinc-900 font-medium'
+          ? 'bg-blue-500/15 text-blue-300 font-medium'
+          : 'bg-blue-50 text-blue-600 font-medium'
         : isDark
         ? 'text-zinc-200 hover:bg-white/5'
         : 'text-zinc-700 hover:bg-zinc-100/80'

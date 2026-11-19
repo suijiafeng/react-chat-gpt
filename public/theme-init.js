@@ -4,16 +4,14 @@
 (function () {
   try {
     var isDark = JSON.parse(localStorage.getItem('isDarkTheme') || 'false');
-    var page = isDark ? '#09090B' : '#FAFAFA';
+    var page = isDark ? '#212121' : '#f7f7f8';
     document.documentElement.style.background = page;
     document.documentElement.style.setProperty('--page-bg', page);
-    document.documentElement.style.setProperty('--ink', isDark ? '#FAFAFA' : '#18181B');
-    // 同步挂上 .dark-theme：Tailwind 的 dark: 变体依赖这个类（见 tailwind.config.js
-    // 的 darkMode 配置）。等 React 挂载后再加会先闪一帧亮色边框。
+    document.documentElement.style.setProperty('--ink', isDark ? '#ececec' : '#1f1f1f');
     if (isDark) document.documentElement.classList.add('dark-theme');
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', page);
+    if (meta) meta.setAttribute('content', '#3b82f6');
   } catch {
     // 读取失败按浅色主题处理，不影响后续 React 正常接管
   }

@@ -43,11 +43,11 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
 
   // 代码块跟随主题：浅色下是浅灰底，深色下用锌黑，不用一块突兀的黑板。
   const surface = isDark
-    ? 'bg-[#18181B] text-zinc-200 border-white/[0.08]'
-    : 'bg-zinc-50 text-zinc-900 border-zinc-200';
+    ? 'bg-[#1e1e1e] text-[#d4d4d4] border-white/10'
+    : 'bg-[#f6f8fa] text-[#24292e] border-black/10';
   const chrome = isDark
-    ? 'bg-zinc-900 text-zinc-400 hover:text-zinc-100'
-    : 'bg-zinc-100 text-zinc-500 hover:text-zinc-900';
+    ? 'bg-[#2d2d2d] text-gray-400 hover:text-white'
+    : 'bg-[#eaeef2] text-gray-500 hover:text-gray-900';
 
   const lineCount = codeText.split('\n').length;
   const collapsible = lineCount > CODE_COLLAPSE_LINES;
@@ -149,25 +149,25 @@ const components = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="underline underline-offset-2 decoration-current/40 break-words text-inherit"
+        className="text-[#3b82f6] hover:underline underline-offset-2 break-words"
       >
         {children}
       </a>
     );
   },
   h1: ({ children }) => (
-    <h1 className="text-2xl font-bold mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
+    <h1 className="text-2xl font-semibold leading-snug tracking-normal mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-xl font-bold mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
+    <h2 className="text-xl font-semibold leading-snug tracking-normal mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
       {children}
     </h2>
   ),
-  h3: ({ children }) => <h3 className="text-lg font-bold mt-4 mb-2 text-inherit">{children}</h3>,
+  h3: ({ children }) => <h3 className="text-lg font-semibold leading-snug tracking-normal mt-4 mb-2 text-inherit">{children}</h3>,
   h4: ({ children }) => <h4 className="text-base font-semibold mt-3 mb-2 text-inherit">{children}</h4>,
-  h5: ({ children }) => <h5 className="text-sm font-bold mt-3 mb-2 text-inherit">{children}</h5>,
+  h5: ({ children }) => <h5 className="text-sm font-semibold tracking-normal mt-3 mb-2 text-inherit">{children}</h5>,
   h6: ({ children }) => (
     <h6 className="text-sm font-semibold tracking-normal mt-3 mb-2 opacity-70 text-inherit">
       {children}
@@ -184,7 +184,7 @@ const components = {
   },
   hr: () => <hr className="my-6 border-t border-current/10" />,
   blockquote: ({ children }) => (
-    <blockquote className="border-l border-current/30 pl-3 my-3 italic text-inherit text-sm">
+    <blockquote className="border-l border-current/40 pl-3 my-3 leading-7 text-inherit text-sm">
       {children}
     </blockquote>
   ),

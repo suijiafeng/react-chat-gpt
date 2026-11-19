@@ -68,7 +68,7 @@ const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes
         : <Zap size={16} strokeWidth={1.75} className="inline" />
       }
       className={`flex items-center gap-2 ${classes.themeTransition} ${
-        isDark ? 'bg-[#09090B] text-zinc-100 border-white/[0.08] hover:bg-white/5' : 'border-zinc-200 text-zinc-700'
+        isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
       }`}
     >
       {state === 'testing' ? t('set.testing') : t('set.testConnection')}
@@ -694,14 +694,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
   // 扁平分区风格：不再用"卡片套卡片"的重边框方块，改成同一层级内用细分割线
   // 区隔各区块，减少不必要的留白与视觉重量，弹窗内容更紧凑
   const sectionCls = `pt-4 mt-4 border-t first:pt-0 first:mt-0 first:border-t-0 ${
-    isDark ? 'border-white/[0.08]' : 'border-zinc-200/80'
+    isDark ? 'border-white/10' : 'border-slate-200'
   }`;
   // 只覆盖圆角与配色，左右内边距交给 antd 自己——Input/Password/Select/InputNumber
   // 各自的内边距实现不同，一旦手写 px-* 就会互相错位、文字对不齐
   const inputCls = `text-sm tabular-nums ${classes.themeTransition} ${
     isDark
-      ? 'bg-[#09090B] text-zinc-100 border-white/[0.08] focus:bg-[#09090B] focus:border-zinc-500 focus:text-zinc-100 placeholder:text-zinc-500'
-      : 'bg-white text-zinc-900 border-zinc-200 placeholder:text-zinc-400'
+      ? 'bg-[#121212] text-white border-white/10 focus:bg-[#121212] focus:border-zinc-500 focus:text-white placeholder:text-zinc-600'
+      : 'bg-white text-slate-950 border-slate-200 placeholder:text-slate-400'
   }`;
   const successTextCls = isDark ? 'text-emerald-400' : 'text-emerald-700';
   const errorTextCls = isDark ? 'text-red-300' : 'text-red-600';
@@ -818,17 +818,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
       styles={{
         body: {
           backgroundColor: isDark ? '#18181b' : '#ffffff',
-          color: isDark ? '#f4f4f5' : '#18181b',
+          color: isDark ? '#f4f4f5' : '#0f172a',
           maxHeight: '70vh',
           overflowY: 'auto',
         },
         header: {
           backgroundColor: isDark ? '#18181b' : '#ffffff',
-          borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e4e4e7',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
           paddingBottom: '16px',
         },
         mask: {
-          backgroundColor: isDark ? 'rgba(0, 0, 0, 0.62)' : 'rgba(0, 0, 0, 0.4)',
+          backgroundColor: isDark ? 'rgba(0, 0, 0, 0.68)' : 'rgba(15, 23, 42, 0.36)',
         },
       }}
     >
@@ -845,20 +845,20 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       key={item.id}
                       type="button"
                       onClick={() => (item.isPreset ? applyPreset(item.preset) : setSelectedId(item.id))}
-                      className={`rounded-md border px-2.5 py-1 text-[13px] inline-flex items-center gap-1.5 transition-colors duration-150 ease-out ${
+                      className={`min-h-10 rounded-md border px-2.5 text-[13px] inline-flex items-center gap-1.5 transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
                         isActive
                           ? isDark
-                            ? 'border-zinc-100 bg-zinc-100 text-zinc-900'
-                            : 'border-zinc-900 bg-zinc-900 text-white'
+                            ? 'border-blue-400 bg-blue-500/10 text-blue-300'
+                            : 'border-blue-500 bg-blue-50 text-blue-600'
                           : isDark
-                          ? 'border-white/[0.08] bg-transparent text-zinc-300 hover:border-white/20 hover:text-zinc-100'
-                          : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900'
+                          ? 'border-white/10 bg-black/20 text-zinc-300 hover:border-zinc-500 hover:text-white'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
                       }`}
                     >
                       {/* 标识仅在"已选启用模型"时出现：实心点=有密钥，空心灰点=已选模型但未填密钥 */}
                       {item.hasEnabledModels && (
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${item.hasKey ? 'bg-current' : 'bg-zinc-400'}`}
+                          className={`h-1.5 w-1.5 rounded-full ${item.hasKey ? 'bg-emerald-400' : 'bg-stone-400'}`}
                           title={item.hasKey ? t('set.chipKeyAndModel') : t('set.chipModelNoKey')}
                         />
                       )}
@@ -872,7 +872,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   className={`rounded-md border border-dashed px-2.5 py-1 text-[13px] inline-flex items-center gap-1 transition-colors duration-150 ease-out ${
                     isDark
                       ? 'border-white/20 text-zinc-400 hover:border-zinc-400 hover:text-zinc-100'
-                      : 'border-zinc-300 text-zinc-500 hover:border-zinc-400 hover:text-zinc-800'
+                      : 'border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-800'
                   }`}
                 >
                   <Plus size={14} strokeWidth={1.75} /> {t('set.custom')}
@@ -900,7 +900,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`inline-flex items-center gap-1 text-[13px] underline underline-offset-4 ${
-                            isDark ? 'text-zinc-200 hover:text-white' : 'text-zinc-800 hover:text-zinc-950'
+                            isDark ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-500'
                           }`}
                         >
                           {t('set.getKey')} <ExternalLink size={12} strokeWidth={1.75} />
@@ -1079,7 +1079,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     value={opt.value}
                     className={`flex-1 text-center py-1 h-auto rounded-md ${classes.themeTransition} ${
                       isDark
-                        ? 'bg-[#09090B] text-zinc-200 border-white/[0.08] hover:text-white hover:border-zinc-500'
+                        ? 'bg-[#121212] text-zinc-200 border-white/10 hover:text-white hover:border-zinc-500'
                         : 'bg-white text-zinc-700 border-zinc-200 hover:text-zinc-950 hover:border-zinc-300'
                     }`}
                   >

@@ -30,8 +30,8 @@ const ActionButton = ({ title, onClick, isDark, children }) => (
     type="button"
     title={title}
     onClick={onClick}
-    className={`flex items-center gap-1 rounded-md p-1.5 text-[13px] transition-colors duration-150 ease-out ${
-      isDark ? 'text-white/50 hover:text-white hover:bg-white/10' : 'text-black/40 hover:text-black hover:bg-black/5'
+    className={`inline-flex h-10 min-w-10 items-center justify-center rounded-md px-2 text-[13px] transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
+      isDark ? 'text-[#a1a1aa] hover:text-white hover:bg-white/10' : 'text-[#6b7280] hover:text-black hover:bg-black/5'
     }`}
   >
     {children}
@@ -131,13 +131,13 @@ const ChatMessage = React.memo(
       }
     };
 
-    const containerClasses = `group message-row flex mb-8 ${isUser ? 'justify-end' : 'justify-start'}`;
+    const containerClasses = `group message-row flex mb-6 ${isUser ? 'justify-end' : 'justify-start'}`;
     // 小屏给消息更宽的可读区域（90%），桌面维持 82% 的留白节奏
     const contentContainerClasses = `flex flex-col max-w-[90%] sm:max-w-[min(720px,82%)] ${
       isUser ? 'items-end' : 'items-start'
     }`;
     const messageClasses = `
-      px-5 py-2 text-base leading-7
+      px-4 py-2 text-base leading-7
       ${
         isUser
           ? isDark
@@ -177,13 +177,13 @@ const ChatMessage = React.memo(
                   }
                   if (e.key === 'Escape') setIsEditing(false);
                 }}
-                className="w-full bg-transparent text-base leading-7 outline-none resize-none"
+                className="w-full bg-transparent text-base leading-7 outline-none resize-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
               />
               <div className="flex justify-end gap-2 mt-2">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className={`rounded-md px-3 py-1.5 text-sm transition-colors duration-150 ease-out ${
+                  className={`min-h-10 rounded-md px-3 text-sm transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
                     isDark ? 'text-white/70 hover:bg-white/10' : 'text-black/60 hover:bg-black/5'
                   }`}
                 >
@@ -193,7 +193,7 @@ const ChatMessage = React.memo(
                   type="button"
                   onClick={submitEdit}
                   disabled={!editText.trim()}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150 ease-out active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100 ${classes.accentBtn}`}
+                  className={`min-h-10 rounded-md px-3 text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100 ${classes.accentBtn}`}
                 >
                   {t('saveResend')}
                 </button>
@@ -298,27 +298,27 @@ const ChatMessage = React.memo(
           {/* 操作栏：AI 最后一条常驻，其余消息 hover 时显示；生成中不显示 */}
           {!isTyping && !(isStreaming && isLast) && (message || images?.length > 0 || attachments?.length > 0) && (
             <div
-              className={`flex items-center gap-1 mt-1 px-1 transition-opacity duration-150 ease-out ${
+              className={`flex items-center gap-0.5 mt-1 -ml-1.5 transition-opacity duration-150 ease-out max-sm:opacity-100 focus-within:opacity-100 ${
                 !isUser && isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
               }`}
             >
               <ActionButton title={t('copy')} onClick={handleCopy} isDark={isDark}>
-                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? <Check size={16} strokeWidth={1.75} /> : <Copy size={16} strokeWidth={1.75} />}
               </ActionButton>
               {isUser && !isStreaming && onEdit && (
                 <ActionButton title={t('editResend')} onClick={startEdit} isDark={isDark}>
-                  <Pencil size={14} />
+                  <Pencil size={16} strokeWidth={1.75} />
                 </ActionButton>
               )}
               {/* 外层守卫已排除 isStreaming && isLast，走到这里的 isLast 分支必然不在生成中 */}
               {!isUser && isLast && onRegenerate && (
                 <ActionButton title={t('regenerate')} onClick={onRegenerate} isDark={isDark}>
-                  <RefreshCw size={14} />
+                  <RefreshCw size={16} strokeWidth={1.75} />
                 </ActionButton>
               )}
               {!isUser && isLast && canContinue && onContinue && (
                 <ActionButton title={t('continueGen')} onClick={onContinue} isDark={isDark}>
-                  <StepForward size={14} />
+                  <StepForward size={16} strokeWidth={1.75} />
                   <span>{t('continueGen')}</span>
                 </ActionButton>
               )}
@@ -332,11 +332,11 @@ const ChatMessage = React.memo(
                   <button
                     type="button"
                     title={t('deleteMsg')}
-                    className={`flex items-center gap-1 rounded-md p-1.5 text-[13px] transition-colors duration-150 ease-out ${
-                      isDark ? 'text-white/50 hover:text-red-300 hover:bg-white/10' : 'text-black/40 hover:text-red-500 hover:bg-black/5'
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
+                      isDark ? 'text-[#a1a1aa] hover:text-red-300 hover:bg-white/10' : 'text-[#6b7280] hover:text-red-600 hover:bg-black/5'
                     }`}
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={16} strokeWidth={1.75} />
                   </button>
                 </Popconfirm>
               )}

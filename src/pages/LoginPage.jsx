@@ -35,7 +35,7 @@ const PasswordInput = ({ value, onChange, placeholder, autoComplete, classes, er
         value={value}
         onChange={onChange}
         type={visible ? 'text' : 'password'}
-        className={`px-3 py-2 pr-10 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out ${
+        className={`h-10 px-3 pr-10 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
           error ? errorBorder : classes.input
         }`}
         placeholder={placeholder}
@@ -172,7 +172,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
   return (
     <div className={`${classes.bg} ${classes.text} ${classes.themeTransition} min-h-screen w-full flex flex-col font-primary`}>
       {/* 顶部导航栏 */}
-      <div className={`h-16 border-b px-5 md:px-6 flex items-center justify-between flex-shrink-0 ${classes.bg} ${classes.border} ${classes.themeTransition}`}>
+      <div className={`h-16 border-b px-5 md:px-6 flex items-center justify-between flex-shrink-0 ${classes.bg} ${classes.hairline} ${classes.themeTransition}`}>
         <AppLogo name={WEBUI_NAME} />
         <NavHeader />
       </div>
@@ -207,7 +207,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                       value={name}
                       onChange={bind(setName, 'name')}
                       type="text"
-                      className={`px-3 py-2 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out ${
+                      className={`h-10 px-3 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
                         errors.name ? errorBorder : classes.input
                       }`}
                       autoComplete="name"
@@ -225,7 +225,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                     value={email}
                     onChange={bind(setEmail, 'email')}
                     type="email"
-                    className={`px-3 py-2 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out ${
+                    className={`h-10 px-3 rounded-md w-full text-sm outline-none border transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
                       errors.email ? errorBorder : classes.input
                     }`}
                     autoComplete="email"
@@ -273,7 +273,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 提交中禁用按钮并换文案：请求在飞的时候按钮仍可点会打出重复注册请求，
                     而 Spin 有 300ms 延迟，快网络下用户根本看不到任何反馈 */}
                 <button
-                  className={`w-full rounded-md font-medium text-sm py-2 transition-colors duration-150 ease-out active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${classes.accentBtn}`}
+                  className="min-h-10 w-full rounded-md bg-gray-950 text-white font-medium text-sm transition-colors duration-150 ease-out hover:bg-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
                   type="submit"
                   disabled={loading}
                 >
@@ -287,7 +287,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 免登录体验：最低门槛的上手入口，点一下直接进入演示模式聊天 */}
                 {mode === 'signin' && (
                   <button
-                    className={`mt-2 w-full rounded-md border font-medium text-sm py-2 transition-colors duration-150 ease-out active:scale-[0.98] disabled:opacity-60 ${classes.input} ${classes.buttonHover}`}
+                    className={`mt-2 min-h-10 w-full rounded-md border font-medium text-sm transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] active:scale-[0.98] disabled:opacity-60 ${classes.input} ${classes.buttonHover}`}
                     type="button"
                     onClick={handleDemoLogin}
                     disabled={loading}
