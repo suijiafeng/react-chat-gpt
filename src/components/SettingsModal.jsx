@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message, Popconfirm, Checkbox } from 'antd';
-import { Zap, CheckCircle2, XCircle, Loader2, ServerCog, Trash2, Plus, ExternalLink, X } from 'lucide-react';
+import { Zap, CheckCircle2, XCircle, Loader2, Trash2, Plus, ExternalLink, X } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { getConfig, saveConfig, saveProfiles } from '../store/llmConfig';
@@ -63,12 +63,12 @@ const TestConnection = ({ onTest, state, message: msg, disabled, isDark, classes
       disabled={disabled || state === 'testing'}
       icon={
         state === 'testing' ? <Loader2 size={14} className="animate-spin inline" />
-        : state === 'ok' ? <CheckCircle2 size={14} className="inline text-green-500" />
-        : state === 'fail' ? <XCircle size={14} className="inline text-red-500" />
-        : <Zap size={14} className="inline" />
+        : state === 'ok' ? <CheckCircle2 size={16} strokeWidth={1.75} className="inline text-emerald-600" />
+        : state === 'fail' ? <XCircle size={16} strokeWidth={1.75} className="inline text-red-600" />
+        : <Zap size={16} strokeWidth={1.75} className="inline" />
       }
-      className={`rounded-xl flex items-center gap-2 ${classes.themeTransition} ${
-        isDark ? 'bg-[#121212] text-white border-white/10 hover:bg-white/5' : 'border-slate-200 text-slate-700'
+      className={`flex items-center gap-2 ${classes.themeTransition} ${
+        isDark ? 'bg-[#09090B] text-zinc-100 border-white/[0.08] hover:bg-white/5' : 'border-zinc-200 text-zinc-700'
       }`}
     >
       {state === 'testing' ? t('set.testing') : t('set.testConnection')}
@@ -689,22 +689,22 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
   const modalThemeClass = isDark ? 'settings-modal settings-modal-dark' : 'settings-modal settings-modal-light';
   const dropdownPopupClass = isDark ? 'settings-modal-dropdown settings-modal-dropdown-dark' : 'settings-modal-dropdown';
-  const labelCls = `block text-base${isDark ? 'text-zinc-300' : 'text-slate-700'}`;
-  const helpTextCls = `text-sm leading-relaxed ${isDark ? 'text-zinc-500' : 'text-slate-500'}`;
+  const labelCls = `block text-sm font-medium ${isDark ? 'text-zinc-300' : 'text-zinc-700'}`;
+  const helpTextCls = `text-[13px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`;
   // 扁平分区风格：不再用"卡片套卡片"的重边框方块，改成同一层级内用细分割线
   // 区隔各区块，减少不必要的留白与视觉重量，弹窗内容更紧凑
   const sectionCls = `pt-4 mt-4 border-t first:pt-0 first:mt-0 first:border-t-0 ${
-    isDark ? 'border-white/10' : 'border-slate-200'
+    isDark ? 'border-white/[0.08]' : 'border-zinc-200/80'
   }`;
   // 只覆盖圆角与配色，左右内边距交给 antd 自己——Input/Password/Select/InputNumber
   // 各自的内边距实现不同，一旦手写 px-* 就会互相错位、文字对不齐
-  const inputCls = `text-base ${classes.themeTransition} ${
+  const inputCls = `text-sm tabular-nums ${classes.themeTransition} ${
     isDark
-      ? 'bg-[#121212] text-white border-white/10 focus:bg-[#121212] focus:border-zinc-500 focus:text-white placeholder:text-zinc-600'
-      : 'bg-white text-slate-950 border-slate-200 placeholder:text-slate-400'
+      ? 'bg-[#09090B] text-zinc-100 border-white/[0.08] focus:bg-[#09090B] focus:border-zinc-500 focus:text-zinc-100 placeholder:text-zinc-500'
+      : 'bg-white text-zinc-900 border-zinc-200 placeholder:text-zinc-400'
   }`;
-  const successTextCls = isDark ? 'text-emerald-300' : 'text-green-500';
-  const errorTextCls = isDark ? 'text-rose-300' : 'text-red-400';
+  const successTextCls = isDark ? 'text-emerald-400' : 'text-emerald-700';
+  const errorTextCls = isDark ? 'text-red-300' : 'text-red-600';
 
   const selectedPreset = selected ? PROVIDER_PRESETS.find((p) => p.id === selected.id) : null;
 
@@ -759,6 +759,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
             step={1000}
             size="small"
             disabled={nothingConfigured}
+            className="tabular-nums"
           />
         </div>
         <div className="flex items-center gap-3">
@@ -775,16 +776,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
   return (
     <Modal
       title={
-        <div className="flex items-center gap-3">
-          <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-            isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-50 text-blue-600'
-          }`}>
-            <ServerCog size={16} />
-          </span>
-          <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-950'}`}>
-            {t('settings')}
-          </span>
-        </div>
+        <span className={`text-base font-semibold tracking-normal ${isDark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+          {t('settings')}
+        </span>
       }
       open={isOpen}
       onCancel={handleRequestClose}
@@ -795,8 +789,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
       footer={
         <div className="flex items-center justify-between gap-3">
           <span
-            className={`inline-flex items-center gap-2 text-sm ${
-              dirty ? (isDark ? 'text-amber-300' : 'text-amber-600') : isDark ? 'text-zinc-500' : 'text-slate-400'
+            className={`inline-flex items-center gap-2 text-[13px] ${
+              dirty ? (isDark ? 'text-amber-300' : 'text-amber-700') : isDark ? 'text-zinc-500' : 'text-zinc-500'
             }`}
           >
             {dirty ? <span className="h-2 w-2 rounded-full bg-current" /> : <CheckCircle2 size={13} />}
@@ -810,7 +804,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
               type="primary"
               onClick={handleSave}
               disabled={!dirty}
-              className="bg-blue-600 hover:bg-blue-500 border-0 shadow-none"
+              className="shadow-none"
             >
               {t('save')}
             </Button>
@@ -824,17 +818,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
       styles={{
         body: {
           backgroundColor: isDark ? '#18181b' : '#ffffff',
-          color: isDark ? '#f4f4f5' : '#0f172a',
+          color: isDark ? '#f4f4f5' : '#18181b',
           maxHeight: '70vh',
           overflowY: 'auto',
         },
         header: {
           backgroundColor: isDark ? '#18181b' : '#ffffff',
-          borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e4e4e7',
           paddingBottom: '16px',
         },
         mask: {
-          backgroundColor: isDark ? 'rgba(0, 0, 0, 0.68)' : 'rgba(15, 23, 42, 0.36)',
+          backgroundColor: isDark ? 'rgba(0, 0, 0, 0.62)' : 'rgba(0, 0, 0, 0.4)',
         },
       }}
     >
@@ -851,20 +845,20 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       key={item.id}
                       type="button"
                       onClick={() => (item.isPreset ? applyPreset(item.preset) : setSelectedId(item.id))}
-                      className={`rounded-full border px-3 py-1 text-sm inline-flex items-center gap-1 ${classes.themeTransition} ${
+                      className={`rounded-md border px-2.5 py-1 text-[13px] inline-flex items-center gap-1.5 transition-colors duration-150 ease-out ${
                         isActive
                           ? isDark
-                            ? 'border-blue-400 bg-blue-500/10 text-blue-300'
-                            : 'border-blue-500 bg-blue-50 text-blue-600'
+                            ? 'border-zinc-100 bg-zinc-100 text-zinc-900'
+                            : 'border-zinc-900 bg-zinc-900 text-white'
                           : isDark
-                          ? 'border-white/10 bg-black/20 text-zinc-300 hover:border-zinc-500 hover:text-white'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
+                          ? 'border-white/[0.08] bg-transparent text-zinc-300 hover:border-white/20 hover:text-zinc-100'
+                          : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-900'
                       }`}
                     >
-                      {/* 标识仅在"已选启用模型"时出现：绿点=有密钥且已选模型，灰点=已选模型但未填密钥 */}
+                      {/* 标识仅在"已选启用模型"时出现：实心点=有密钥，空心灰点=已选模型但未填密钥 */}
                       {item.hasEnabledModels && (
                         <span
-                          className={`h-2 w-2 rounded-full ${item.hasKey ? 'bg-emerald-400' : 'bg-stone-400'}`}
+                          className={`h-1.5 w-1.5 rounded-full ${item.hasKey ? 'bg-current' : 'bg-zinc-400'}`}
                           title={item.hasKey ? t('set.chipKeyAndModel') : t('set.chipModelNoKey')}
                         />
                       )}
@@ -875,13 +869,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 <button
                   type="button"
                   onClick={addCustomProfile}
-                  className={`rounded-full border border-dashed px-3 py-1 text-sm inline-flex items-center gap-1 ${classes.themeTransition} ${
+                  className={`rounded-md border border-dashed px-2.5 py-1 text-[13px] inline-flex items-center gap-1 transition-colors duration-150 ease-out ${
                     isDark
-                      ? 'border-white/20 text-zinc-400 hover:border-zinc-400 hover:text-white'
-                      : 'border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-800'
+                      ? 'border-white/20 text-zinc-400 hover:border-zinc-400 hover:text-zinc-100'
+                      : 'border-zinc-300 text-zinc-500 hover:border-zinc-400 hover:text-zinc-800'
                   }`}
                 >
-                  <Plus size={12} /> {t('set.custom')}
+                  <Plus size={14} strokeWidth={1.75} /> {t('set.custom')}
                 </button>
               </div>
               {/* 没配任何服务商时当前实际跑的是演示回复。原来这句话挂在「前端演示模式」
@@ -905,11 +899,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           href={selectedPreset.docs}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1 text-sm ${
-                            isDark ? 'text-blue-300 hover:text-blue-200' : 'text-blue-600 hover:text-blue-500'
+                          className={`inline-flex items-center gap-1 text-[13px] underline underline-offset-4 ${
+                            isDark ? 'text-zinc-200 hover:text-white' : 'text-zinc-800 hover:text-zinc-950'
                           }`}
                         >
-                          {t('set.getKey')} <ExternalLink size={11} />
+                          {t('set.getKey')} <ExternalLink size={12} strokeWidth={1.75} />
                         </a>
                       )}
                       {/* 内置预设不可删除，只有自定义服务商能删除 */}
@@ -926,7 +920,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                               isDark ? 'text-rose-300 hover:text-rose-200' : 'text-rose-500 hover:text-rose-400'
                             }`}
                           >
-                            <Trash2 size={11} /> {t('delete')}
+                            <Trash2 size={14} strokeWidth={1.75} /> {t('delete')}
                           </button>
                         </Popconfirm>
                       )}
@@ -997,7 +991,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           setVerifyEachEnabled(e.target.checked);
                           if (!e.target.checked) setBatchResults({});
                         }}
-                        className={isDark ? 'text-zinc-300' : 'text-slate-600'}
+                        className={isDark ? 'text-zinc-300' : 'text-zinc-600'}
                       >
                         <span className="text-sm">{t('set.verifyAll')}</span>
                       </Checkbox>
@@ -1021,7 +1015,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           {result.status === 'testing' ? (
                             <Loader2 size={13} className="animate-spin shrink-0 opacity-60" />
                           ) : result.status === 'ok' ? (
-                            <CheckCircle2 size={13} className="shrink-0 text-green-500" />
+                            <CheckCircle2 size={14} strokeWidth={1.75} className="shrink-0 text-emerald-600" />
                           ) : result.status === 'fail' ? (
                             <XCircle size={13} className="shrink-0 text-red-500" />
                           ) : (
@@ -1029,7 +1023,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                           )}
                           <span className="truncate font-mono">{model}</span>
                           {result.status === 'ok' && (
-                            <span className={successTextCls}>{result.ms} ms</span>
+                            <span className={`${successTextCls} tabular-nums font-mono`}>{result.ms} ms</span>
                           )}
                           {result.status === 'fail' && (
                             <>
@@ -1083,10 +1077,10 @@ const SettingsModal = ({ isOpen, onClose }) => {
                   <Radio.Button
                     key={opt.value}
                     value={opt.value}
-                    className={`flex-1 text-center py-1 h-auto rounded-xl ${classes.themeTransition} ${
+                    className={`flex-1 text-center py-1 h-auto rounded-md ${classes.themeTransition} ${
                       isDark
-                        ? 'bg-[#121212] text-zinc-200 border-white/10 hover:text-white hover:border-zinc-500'
-                        : 'bg-white text-slate-700 border-slate-200 hover:text-slate-950 hover:border-slate-300'
+                        ? 'bg-[#09090B] text-zinc-200 border-white/[0.08] hover:text-white hover:border-zinc-500'
+                        : 'bg-white text-zinc-700 border-zinc-200 hover:text-zinc-950 hover:border-zinc-300'
                     }`}
                   >
                     {opt.label}

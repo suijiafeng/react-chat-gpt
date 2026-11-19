@@ -35,7 +35,7 @@ const SystemPromptModal = ({ isOpen, onClose, value, onSave }) => {
         onChange={(e) => setDraft(e.target.value)}
         rows={6}
         placeholder={t('systemPromptPlaceholder')}
-        className={`w-full rounded-xl border px-3 py-2 text-base outline-none resize-y ${classes.input} ${classes.themeTransition}`}
+        className={`w-full rounded-md border px-3 py-2 text-sm outline-none resize-y ${classes.input} ${classes.themeTransition}`}
       />
     </Modal>
   );

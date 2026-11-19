@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../hooks';
 
 // mermaid 体积很大（~1MB+），首次遇到 mermaid 代码块时才懒加载
 let mermaidPromise = null;
@@ -20,6 +21,7 @@ let renderSeq = 0;
  */
 const MermaidBlock = React.memo(({ code, isTyping }) => {
   const { isDark } = useTheme();
+  const { t } = useLanguage();
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
   const [showSource, setShowSource] = useState(false);
@@ -32,8 +34,29 @@ const MermaidBlock = React.memo(({ code, isTyping }) => {
       .then(async (mermaid) => {
         mermaid.initialize({
           startOnLoad: false,
-          theme: isDark ? 'dark' : 'default',
+          theme: 'base',
           securityLevel: 'strict',
+          themeVariables: isDark
+            ? {
+                background: '#18181B',
+                primaryColor: '#27272A',
+                primaryTextColor: '#FAFAFA',
+                primaryBorderColor: 'rgba(255,255,255,0.16)',
+                lineColor: '#A1A1AA',
+                secondaryColor: '#3F3F46',
+                tertiaryColor: '#18181B',
+                fontSize: '13px',
+              }
+            : {
+                background: '#FFFFFF',
+                primaryColor: '#F4F4F5',
+                primaryTextColor: '#18181B',
+                primaryBorderColor: '#E4E4E7',
+                lineColor: '#71717A',
+                secondaryColor: '#E4E4E7',
+                tertiaryColor: '#FAFAFA',
+                fontSize: '13px',
+              },
         });
         const { svg: rendered } = await mermaid.render(`mermaid-svg-${renderSeq++}`, code);
         if (!cancelled) setSvg(rendered);
@@ -54,22 +77,22 @@ const MermaidBlock = React.memo(({ code, isTyping }) => {
 
   return (
     <div
-      className={`my-4 overflow-hidden rounded-lg border shadow-sm ${
-        isDark ? 'border-gray-800 bg-[#1b1b1b] text-[#d4d4d4]' : 'border-gray-200 bg-white text-gray-800'
+      className={`my-4 overflow-hidden rounded-lg border ${
+        isDark ? 'border-white/[0.08] bg-[#18181B] text-zinc-200' : 'border-zinc-200 bg-white text-zinc-900'
       }`}
     >
       <div
-        className={`flex items-center justify-between px-4 py-2 text-xs select-none ${
-          isDark ? 'bg-[#2d2d2d] text-gray-400' : 'bg-gray-50 text-gray-500'
+        className={`flex items-center justify-between px-3 py-1.5 text-[12px] select-none ${
+          isDark ? 'bg-zinc-900 text-zinc-400' : 'bg-zinc-50 text-zinc-500'
         }`}
       >
-        <span className="uppercase font-semibold">mermaid</span>
+        <span className="font-mono font-medium tracking-normal">mermaid</span>
         {!isTyping && !error && svg && (
           <button
             onClick={() => setShowSource((v) => !v)}
-            className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-black'}`}
+            className={`transition-colors duration-150 ease-out ${isDark ? 'hover:text-white' : 'hover:text-black'}`}
           >
-            {showSource ? '查看图表' : '查看源码'}
+            {showSource ? t('mermaidChart') : t('mermaidSource')}
           </button>
         )}
       </div>
@@ -77,7 +100,7 @@ const MermaidBlock = React.memo(({ code, isTyping }) => {
         <>
           {sourceView}
           {error && !isTyping && (
-            <div className={`px-4 pb-3 text-xs ${isDark ? 'text-rose-300' : 'text-rose-500'}`}>
+            <div className={`px-4 pb-3 text-[13px] ${isDark ? 'text-red-300' : 'text-red-600'}`}>
               图表渲染失败：{error}
             </div>
           )}

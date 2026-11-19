@@ -16,9 +16,9 @@ const ChatHeader = ({ toggleSidebar }) => {
         <button
           onClick={toggleSidebar}
           aria-label="切换侧边栏"
-          className={`${classes.buttonText} ${classes.buttonHover} rounded-lg p-2`}
+          className={`${classes.buttonText} ${classes.buttonHover} rounded-md p-2 transition-colors duration-150 ease-out`}
         >
-          <Menu size={18} />
+          <Menu size={16} strokeWidth={1.75} />
         </button>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">

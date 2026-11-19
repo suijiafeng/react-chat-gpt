@@ -1,7 +1,17 @@
-const LoadingSpinner = () => (
-  <div className="flex justify-center items-center h-screen">
-    <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
-  </div>
-);
+import { useTheme } from '../contexts/ThemeContext';
+
+const LoadingSpinner = () => {
+  const { isDark, classes } = useTheme();
+
+  return (
+    <div className={`flex h-screen items-center justify-center ${classes.bg}`}>
+      <div
+        className={`h-5 w-5 animate-spin rounded-full border-2 ${
+          isDark ? 'border-zinc-700 border-t-zinc-100' : 'border-zinc-200 border-t-zinc-900'
+        }`}
+      />
+    </div>
+  );
+};
 
 export default LoadingSpinner;

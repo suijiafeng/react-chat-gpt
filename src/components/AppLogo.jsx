@@ -1,14 +1,13 @@
 import { useTheme } from '../contexts/ThemeContext';
 
 /**
- * 品牌标识：说话气泡 + 内部四角星（AI spark）。
- * 几何与 public/favicon.svg 完全一致——改这里请同步改那边，
- * 否则站内 logo 会和浏览器标签页图标长得不一样。
+ * 品牌标识：单色对话气泡，两条短线表示正文。
+ * 几何与 public/favicon.svg 一致。改这里请同步改那边。
  */
-export const LogoMark = ({ size = 32, className = '' }) => {
+export const LogoMark = ({ size = 28, className = '' }) => {
   const { isDark } = useTheme();
-  // 暗色下用 indigo-500，深底上比 indigo-600 更透气
-  const ink = isDark ? '#6366f1' : '#4f46e5';
+  const ink = isDark ? '#FAFAFA' : '#18181B';
+  const paper = isDark ? '#18181B' : '#FAFAFA';
 
   return (
     <svg
@@ -19,26 +18,19 @@ export const LogoMark = ({ size = 32, className = '' }) => {
       role="img"
       aria-label="logo"
     >
-      <g fill={ink}>
-        <rect x="1.5" y="2.5" width="29" height="21.5" rx="7.5" />
-        <polygon points="9,18 9,29 18.5,22.5" />
-      </g>
       <path
-        fill="#fff"
-        d="M16 6.5 q1.92 5.18 7.40 7.00 q-5.48 1.82 -7.40 7.00 q-1.92 -5.18 -7.40 -7.00 q5.48 -1.82 7.40 -7.00Z"
+        fill={ink}
+        d="M6 5h20a4 4 0 0 1 4 4v11a4 4 0 0 1-4 4H13.2L8 29.2V24H6a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4z"
       />
+      <path fill={paper} d="M9 12h14v1.6H9zM9 17h9v1.6H9z" />
     </svg>
   );
 };
 
-/**
- * Reusable app logo: brand mark + name label.
- * Adapts automatically to light / dark theme.
- */
 const AppLogo = ({ name }) => (
-  <div className="flex items-center gap-3">
-    <LogoMark size={32} />
-    {name && <div className="text-lg font-semibold tracking-tight">{name}</div>}
+  <div className="flex items-center gap-2.5 min-w-0">
+    <LogoMark size={28} className="shrink-0" />
+    {name && <div className="truncate text-base font-semibold tracking-normal">{name}</div>}
   </div>
 );
 

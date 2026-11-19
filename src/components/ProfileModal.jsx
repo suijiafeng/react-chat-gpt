@@ -57,8 +57,8 @@ const ProfileModal = ({ isOpen, onClose, onChatsCleared }) => {
     onChatsCleared?.();
   };
 
-  const dataActionRowClass = `flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-base ${classes.border} ${
-    isDark ? 'text-white/80 hover:bg-white/5' : 'text-gray-700 hover:bg-black/[0.03]'
+  const dataActionRowClass = `flex w-full items-center gap-2.5 px-1 py-2.5 text-sm transition-colors duration-150 ease-out ${
+    isDark ? 'text-zinc-200 hover:bg-white/5' : 'text-zinc-700 hover:bg-zinc-100/80'
   }`;
 
   return (
@@ -78,7 +78,7 @@ const ProfileModal = ({ isOpen, onClose, onChatsCleared }) => {
         {/* 账号信息 */}
         <div>
           <div className={`mb-2 text-sm font-medium ${classes.mutedText}`}>{t('Email')}</div>
-          <div className={`rounded-xl border px-3 py-2.5 text-base opacity-70 select-all ${classes.border}`}>
+          <div className={`rounded-md border px-3 py-2 text-sm select-all ${classes.border} ${classes.mutedText}`}>
             {profile?.email}
           </div>
         </div>
@@ -93,7 +93,7 @@ const ProfileModal = ({ isOpen, onClose, onChatsCleared }) => {
               if (shouldSubmitOnEnter(e)) handleSave();
             }}
             placeholder={t('Enter Your Full Name')}
-            className={`w-full rounded-xl border px-3 py-2.5 text-base outline-none ${classes.input} ${classes.themeTransition}`}
+            className={`w-full rounded-md border px-3 py-2 text-sm outline-none ${classes.input} ${classes.themeTransition}`}
           />
         </div>
 
@@ -101,8 +101,9 @@ const ProfileModal = ({ isOpen, onClose, onChatsCleared }) => {
         <div>
           <div className={`mb-2 text-sm font-medium ${classes.mutedText}`}>{t('dataManagement')}</div>
           <div className="flex flex-col gap-2">
+            <div className={`divide-y border-y ${classes.divide} ${classes.border}`}>
             <button type="button" onClick={handleExportAll} className={dataActionRowClass}>
-              <Download size={16} />
+              <Download size={16} strokeWidth={1.75} />
               <span>{t('exportAll')}</span>
             </button>
             <Popconfirm
@@ -114,14 +115,15 @@ const ProfileModal = ({ isOpen, onClose, onChatsCleared }) => {
             >
               <button
                 type="button"
-                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-base ${classes.border} ${
-                  isDark ? 'text-red-300 hover:bg-red-500/10' : 'text-red-500 hover:bg-red-50'
+                className={`flex w-full items-center gap-2.5 px-1 py-2.5 text-sm transition-colors duration-150 ease-out ${
+                  isDark ? 'text-red-300 hover:bg-red-500/10' : 'text-red-600 hover:bg-red-50'
                 }`}
               >
-                <Trash2 size={16} />
+                <Trash2 size={16} strokeWidth={1.75} />
                 <span>{t('clearAll')}</span>
               </button>
             </Popconfirm>
+            </div>
           </div>
         </div>
       </div>

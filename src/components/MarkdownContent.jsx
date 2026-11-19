@@ -5,7 +5,9 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlightLite from './markdown/rehypeHighlightLite';
 import MermaidBlock from './markdown/MermaidBlock';
+import { ChevronDown } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../hooks';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github-dark.css';
 
@@ -35,17 +37,17 @@ const CODE_COLLAPSE_LINES = 30;
 // 带复制按钮的代码块组件；超长代码默认折叠，可展开
 const CodeBlock = React.memo(({ lang, codeText, children }) => {
   const { isDark } = useTheme();
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  // 代码块跟随主题：浅色下是浅灰卡片（配 global.css 里作用域化的 github 亮色高亮），
-  // 深色下才用深底。以前两种主题都写死深色，浅色页面上是一块突兀的黑板。
+  // 代码块跟随主题：浅色下是浅灰底，深色下用锌黑，不用一块突兀的黑板。
   const surface = isDark
-    ? 'bg-[#1e1e1e] text-[#d4d4d4] border-white/10'
-    : 'bg-[#f6f8fa] text-[#24292e] border-black/10';
+    ? 'bg-[#18181B] text-zinc-200 border-white/[0.08]'
+    : 'bg-zinc-50 text-zinc-900 border-zinc-200';
   const chrome = isDark
-    ? 'bg-[#2d2d2d] text-gray-400 hover:text-white'
-    : 'bg-[#eaeef2] text-gray-500 hover:text-gray-900';
+    ? 'bg-zinc-900 text-zinc-400 hover:text-zinc-100'
+    : 'bg-zinc-100 text-zinc-500 hover:text-zinc-900';
 
   const lineCount = codeText.split('\n').length;
   const collapsible = lineCount > CODE_COLLAPSE_LINES;
@@ -58,14 +60,14 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
   };
 
   return (
-    <div className={`my-4 overflow-hidden rounded-lg border shadow-sm font-mono text-sm ${surface}`}>
-      <div className={`flex items-center justify-between px-4 py-2 text-xs select-none ${chrome}`}>
-        <span className="uppercase font-semibold">{lang || 'text'}</span>
+    <div className={`my-4 overflow-hidden rounded-lg border font-mono text-sm ${surface}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 text-[12px] select-none ${chrome}`}>
+        <span className="font-medium tracking-normal">{lang || 'text'}</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 transition-colors"
+          className="flex items-center gap-1 transition-colors duration-150 ease-out"
         >
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? t('codeCopied') : t('copy')}
         </button>
       </div>
       <div
@@ -76,9 +78,14 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
       {collapsible && (
         <button
           onClick={() => setExpanded((v) => !v)}
-          className={`w-full px-4 py-2 text-xs transition-colors text-center select-none ${chrome}`}
+          className={`flex w-full items-center justify-center gap-1 px-3 py-1.5 text-[12px] transition-colors duration-150 ease-out select-none tabular-nums ${chrome}`}
         >
-          {collapsed ? `展开全部 ${lineCount} 行 ▾` : '收起 ▴'}
+          {collapsed ? t('codeExpand', { n: lineCount }) : t('codeCollapse')}
+          <ChevronDown
+            size={14}
+            strokeWidth={1.75}
+            className={`transition-transform duration-150 ease-out ${collapsed ? '' : 'rotate-180'}`}
+          />
         </button>
       )}
     </div>
@@ -142,7 +149,7 @@ const components = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[#3b82f6] hover:underline underline-offset-2 break-words"
+        className="underline underline-offset-2 decoration-current/40 break-words text-inherit"
       >
         {children}
       </a>
@@ -162,7 +169,7 @@ const components = {
   h4: ({ children }) => <h4 className="text-base font-semibold mt-3 mb-2 text-inherit">{children}</h4>,
   h5: ({ children }) => <h5 className="text-sm font-bold mt-3 mb-2 text-inherit">{children}</h5>,
   h6: ({ children }) => (
-    <h6 className="text-sm font-semibold uppercase tracking-wide mt-3 mb-2 opacity-70 text-inherit">
+    <h6 className="text-sm font-semibold tracking-normal mt-3 mb-2 opacity-70 text-inherit">
       {children}
     </h6>
   ),
@@ -177,7 +184,7 @@ const components = {
   },
   hr: () => <hr className="my-6 border-t border-current/10" />,
   blockquote: ({ children }) => (
-    <blockquote className="border-l-4 border-current/25 pl-4 py-2 my-3 bg-current/[0.04] rounded-r italic text-inherit opacity-85 text-base">
+    <blockquote className="border-l border-current/30 pl-3 my-3 italic text-inherit text-sm">
       {children}
     </blockquote>
   ),

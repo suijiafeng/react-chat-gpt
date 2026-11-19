@@ -15,25 +15,18 @@ const NavHeader = () => {
         onClick={() => changeLanguage(isZh ? 'en' : 'zh')}
         aria-label={isZh ? 'Switch to English' : '切换到中文'}
         title={isZh ? 'English' : '中文'}
-        className={`${classes.buttonText} ${classes.buttonHover} ${classes.themeTransition} rounded-lg p-2`}
+        className={`${classes.buttonText} ${classes.buttonHover} ${classes.themeTransition} rounded-md p-2`}
       >
-        <span
-          className={`grid h-[18px] w-[18px] place-items-center select-none font-semibold leading-none ${
-            isZh ? 'text-[13px]' : 'text-[10px] tracking-tight'
-          }`}
-        >
+        <span className="grid h-4 w-4 place-items-center select-none text-[13px] font-medium leading-none tracking-normal">
           {isZh ? '中' : 'EN'}
         </span>
       </button>
       <button
         onClick={toggleTheme}
         aria-label={isDark ? '切换到浅色主题' : '切换到深色主题'}
-        className={`${isDark
-          ? 'text-yellow-300 hover:bg-white/5 hover:text-yellow-100'
-          : 'text-gray-500 hover:bg-black/5 hover:text-gray-700'
-          } ${classes.themeTransition} rounded-lg p-2`}
+        className={`${classes.buttonText} ${classes.buttonHover} ${classes.themeTransition} rounded-md p-2`}
       >
-        {isDark ? <Sun size={18} /> : <Moon size={18} />}
+        {isDark ? <Sun size={16} strokeWidth={1.75} /> : <Moon size={16} strokeWidth={1.75} />}
       </button>
     </div>
   )

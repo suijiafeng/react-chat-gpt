@@ -63,23 +63,24 @@ const ModelSelector = React.memo(() => {
         title={currentModel}
         /* 限宽：模型 id 可以很长（含日期/版本后缀），不限制会把顶栏撑变形，
            超出部分由内部 truncate 省略，hover 看完整名 */
-        className={`flex items-center justify-between min-w-[128px] sm:min-w-[168px] max-w-[180px] sm:max-w-[240px] px-3 sm:px-4 py-2 text-base leading-5 ${
-          isDark ? 'bg-[#2a2a2a] text-white border-white/10 hover:bg-zinc-800' : 'bg-white text-black border-gray-300 hover:bg-gray-50'
-        } border rounded-xl ${classes.themeTransition}`}
+        className={`flex items-center justify-between min-w-[128px] sm:min-w-[168px] max-w-[180px] sm:max-w-[240px] px-2.5 py-1.5 text-sm leading-5 border rounded-md ${
+          isDark ? 'bg-zinc-900 text-zinc-100 border-white/[0.08] hover:bg-zinc-800' : 'bg-white text-zinc-900 border-zinc-200 hover:bg-zinc-50'
+        } ${classes.themeTransition}`}
       >
-        <span className="truncate mr-2 font-medium">{currentModel}</span>
+        <span className="truncate mr-2 font-mono text-[13px] tabular-nums">{currentModel}</span>
         <ChevronDown
           size={16}
-          className={`transform transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          strokeWidth={1.75}
+          className={`transform transition-transform duration-150 ease-out shrink-0 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {isOpen && (
         <div
           /* 面板右对齐按钮：按钮限宽后若仍从左边缘展开，260px 的面板会顶出视口右侧 */
-          className={`absolute right-0 mt-2 w-[260px] max-w-[calc(100vw-24px)] max-h-[440px] flex flex-col z-50 transition-colors duration-300 ${
-            isDark ? 'bg-[#1e1e1e] text-white border-zinc-800' : 'bg-white text-black border-gray-200'
-          } border rounded-2xl shadow-xl overflow-hidden ${classes.themeTransition}`}
+          className={`absolute right-0 mt-2 w-[260px] max-w-[calc(100vw-24px)] max-h-[440px] flex flex-col z-50 overflow-hidden rounded-lg ${classes.menu} ${
+            isDark ? 'text-zinc-100' : 'text-zinc-900'
+          }`}
         >
           <ModelList
             providerName={providerName}
@@ -100,18 +101,18 @@ const ModelSelector = React.memo(() => {
 const ModelItem = ({ model, isActive, onClick, isDark }) => (
   <button
     onClick={onClick}
-    className={`flex min-h-[36px] w-full items-center justify-between text-left px-3 py-2 mb-1 last:mb-0 text-base leading-5 rounded-lg transition-colors duration-150 ${
+    className={`flex min-h-[32px] w-full items-center justify-between text-left px-2.5 py-1.5 mb-0.5 last:mb-0 text-sm leading-5 rounded-md transition-colors duration-150 ease-out ${
       isActive
         ? isDark
-          ? 'bg-blue-500/15 text-blue-300 font-medium'
-          : 'bg-blue-50 text-blue-600 font-medium'
+          ? 'bg-white/[0.08] text-zinc-100 font-medium'
+          : 'bg-zinc-100 text-zinc-900 font-medium'
         : isDark
         ? 'text-zinc-200 hover:bg-white/5'
-        : 'text-gray-700 hover:bg-black/[0.035]'
+        : 'text-zinc-700 hover:bg-zinc-100/80'
     }`}
   >
-    <span className="truncate">{model}</span>
-    {isActive && <Check size={14} className="shrink-0 ml-2" />}
+    <span className="truncate font-mono text-[13px] tabular-nums">{model}</span>
+    {isActive && <Check size={16} strokeWidth={1.75} className="shrink-0 ml-2" />}
   </button>
 );
 
@@ -124,17 +125,26 @@ const GroupLabel = ({ name, isDark, first }) => (
       first ? 'pt-0' : `pt-3 mt-2 border-t ${isDark ? 'border-white/[0.06]' : 'border-black/[0.05]'}`
     }`}
   >
-    <span className={`text-sm font-semibold uppercase tracking-wider select-none truncate ${
-      isDark ? 'text-zinc-500' : 'text-gray-400'
+    <span className={`text-[13px] font-medium tracking-normal select-none truncate ${
+      isDark ? 'text-zinc-500' : 'text-zinc-500'
     }`}>
       {name}
     </span>
   </div>
 );
 
-const EmptyHint = ({ isDark, children }) => (
-  <div className={`px-3 py-4 text-base text-center ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
-    {children}
+const EmptyHint = ({ isDark, children, onClear, clearLabel }) => (
+  <div className={`px-3 py-4 text-sm text-center ${isDark ? 'text-zinc-500' : 'text-zinc-500'}`}>
+    <p>{children}</p>
+    {onClear && (
+      <button
+        type="button"
+        onClick={onClear}
+        className={`mt-2 text-sm underline underline-offset-4 ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}
+      >
+        {clearLabel}
+      </button>
+    )}
   </div>
 );
 
@@ -208,7 +218,11 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
         return <EmptyHint isDark={isDark}>{t('noModelsCustom')}</EmptyHint>;
       }
       if (!filteredGroups || filteredGroups.length === 0) {
-        return <EmptyHint isDark={isDark}>{t('noMatchModels')}</EmptyHint>;
+        return (
+          <EmptyHint isDark={isDark} onClear={() => setQuery('')} clearLabel={t('clearSearch')}>
+            {t('noMatchModels')}
+          </EmptyHint>
+        );
       }
       return filteredGroups.map((profile, idx) => (
         <div key={profile.id}>
@@ -230,7 +244,11 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
       return <EmptyHint isDark={isDark}>{t('noModelsFlat')}</EmptyHint>;
     }
     if (!filteredFlat || filteredFlat.length === 0) {
-      return <EmptyHint isDark={isDark}>{t('noMatchModels')}</EmptyHint>;
+      return (
+        <EmptyHint isDark={isDark} onClear={() => setQuery('')} clearLabel={t('clearSearch')}>
+          {t('noMatchModels')}
+        </EmptyHint>
+      );
     }
     return filteredFlat.map((model) => (
       <ModelItem
@@ -256,7 +274,7 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
             isDark ? 'bg-white/5' : 'bg-black/[0.035]'
           }`}
         >
-          <Search size={13} className={isDark ? 'text-zinc-500' : 'text-gray-400'} />
+          <Search size={16} strokeWidth={1.75} className={isDark ? 'text-zinc-500' : 'text-zinc-400'} />
           <input
             autoFocus
             value={query}
@@ -276,7 +294,7 @@ const ModelList = ({ providerName, config, currentModel, onSelect, onProfileSele
             isDark ? 'text-zinc-400 hover:bg-white/10 hover:text-white' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800'
           }`}
         >
-          <Settings size={16} />
+          <Settings size={16} strokeWidth={1.75} />
         </button>
       </div>
       <div className="px-2 py-2 overflow-y-auto">{body}</div>

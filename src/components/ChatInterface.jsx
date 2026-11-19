@@ -382,6 +382,8 @@ const ChatInterface = () => {
     };
   }, [autoFollowRef]);
 
+  const suggestions = resolveProviderName() === 'demo' ? DEMO_PROMPTS : getPromptTemplates(t);
+
   if (isSidebarOpen === null) return null;
 
   return (
@@ -401,18 +403,31 @@ const ChatInterface = () => {
       <div className="relative flex-1 flex flex-col overflow-hidden min-w-0">
         <ChatHeader toggleSidebar={toggleSidebar} />
         <div className="relative flex-1 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_28%)] pointer-events-none" />
           <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 md:px-8">
-            <div className="max-w-3xl mx-auto min-h-full pt-10 pb-44">
+            <div className="max-w-3xl mx-auto min-h-full pt-8 pb-32 flex flex-col">
             {/* 加载更多的哨兵元素：只在首屏加载完成后渲染。
                 首屏加载期间它会在消息上方占位，加载完成后消失导致内容上移（抖动） */}
             {initialLoaded && hasMore && <div ref={sentinelRef} className="h-px" />}
             {showEmptyState && (
-              <div className="flex min-h-[50vh] items-center justify-center px-4">
-                <div className="text-center select-none">
-                  <div className={`text-xl md:text-4xl leading-relaxed ${classes.mutedText}`}>
-                    {t('welcome')}
-                  </div>
+              <div className="flex flex-1 items-start pt-10 md:pt-16">
+                <div className="w-full select-none">
+                  <h1 className="text-2xl font-semibold tracking-normal">{t('welcome')}</h1>
+                  <p className={`mt-2 text-sm ${classes.mutedText}`}>{t('welcomeHint')}</p>
+                  {suggestions.length > 0 && (
+                    <div className={`mt-6 border-y ${classes.border} divide-y ${classes.divide}`}>
+                      {suggestions.map((item) => (
+                        <button
+                          key={item.title}
+                          type="button"
+                          onClick={() => handlePromptClick(item)}
+                          className={`flex w-full min-w-0 items-center gap-3 px-1 py-2.5 text-left text-sm transition-colors duration-150 ease-out ${classes.buttonHover}`}
+                        >
+                          <item.icon size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
+                          <span className="min-w-0 truncate">{item.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -444,9 +459,6 @@ const ChatInterface = () => {
             setInput={setInput}
             handleSubmit={handleSubmit}
             isStreaming={isStreaming}
-            isEmpty={showEmptyState}
-            suggestions={resolveProviderName() === 'demo' ? DEMO_PROMPTS : getPromptTemplates(t)}
-            onSuggestionClick={handlePromptClick}
             pendingImages={pendingImages}
             pendingFiles={pendingFiles}
             onAddFiles={addFiles}
