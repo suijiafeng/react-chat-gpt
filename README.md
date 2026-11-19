@@ -211,11 +211,26 @@ GitHub Pages 工作流还会按仓库名写入 `VITE_BASE`（用户站是 `/`，
 | `npm run dev:server` | 只起后端（`node --watch`） |
 | `npm run dev:all` | 前端和后端一起起 |
 | `npm test` | 前端 Vitest |
-| `npm run test:server` | 服务端 `node --test`，含登录、限流、加密和代理集成测试 |
-| `npm run test:all` | 上面两项 |
+| `npm run test:server` | 服务端 `node --test`，含登录、限流、加密和代理集成测试。依赖在 `server/node_modules`，先执行下面的校验命令 |
+| `npm run test:all` | 上面两项。同样要先装好 `server/` 的依赖 |
 | `npm run lint` | ESLint 9 flat config，前后端一起查 |
 | `npm run build` | 产出 `dist/` |
 | `npm run preview` | 预览构建结果 |
+
+### 校验命令
+
+仓库根目录的 `npm ci` 只安装前端依赖。服务端测试通过 `server/src/index.js` 加载 `dotenv`，这份依赖和 `better-sqlite3`、`express` 一样装在 `server/node_modules`。校验时把服务端安装写进同一段命令：
+
+```bash
+npm ci
+npm ci --prefix server
+npm run lint
+npm test
+npm run test:server
+npm run build
+```
+
+`npm ci --prefix server` 与 `npm install --prefix server` 都是在装这一份依赖；本仓库有 `server/package-lock.json`，这里和 CI 一样用 `npm ci`。顺序与 `.github/workflows/ci.yml` 一致。`npm run test:all` 是前端测试加服务端测试，同样先执行 `npm ci --prefix server`。
 
 ### 部署
 
