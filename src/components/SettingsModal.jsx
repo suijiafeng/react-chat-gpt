@@ -845,7 +845,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       key={item.id}
                       type="button"
                       onClick={() => (item.isPreset ? applyPreset(item.preset) : setSelectedId(item.id))}
-                      className={`rounded-md border px-2.5 py-1 text-[13px] inline-flex items-center gap-1.5 transition-colors duration-150 ease-out ${
+                      className={`min-h-10 rounded-md border px-2.5 text-[13px] inline-flex items-center gap-1.5 transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
                         isActive
                           ? isDark
                             ? 'border-blue-400 bg-blue-500/10 text-blue-300'

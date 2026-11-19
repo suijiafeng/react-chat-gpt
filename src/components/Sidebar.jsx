@@ -202,7 +202,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           <AppLogo name={APP_NAME} />
           <button
             onClick={onClose}
-            className={`${classes.buttonText} ${classes.buttonHover} rounded-md p-2 lg:hidden`}
+            className={`${classes.iconBtn} ${classes.focusRing} ${classes.buttonText} ${classes.buttonHover} lg:hidden`}
           >
             <X size={16} strokeWidth={1.75} />
           </button>
@@ -212,7 +212,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           <button
             type="button"
             onClick={handleNewChat}
-            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm ${classes.themeTransition} ${classes.buttonHover}`}
+            className={`flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm ${classes.focusRing} ${classes.themeTransition} ${classes.buttonHover}`}
           >
             <PenSquare size={16} strokeWidth={1.75} className="shrink-0" />
             <span>{t('newChat')}</span>
@@ -230,11 +230,11 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
               onChange={(e) => setSearchKeyword(e.target.value)}
               type="text"
               placeholder={`${t('searchChats')} (⌘K)`}
-              className={`w-full rounded-md border pl-8 pr-2.5 py-1.5 text-sm outline-none ${classes.input} ${classes.themeTransition}`}
+              className={`h-10 w-full rounded-md border pl-8 pr-2.5 text-sm outline-none ${classes.focusRing} ${classes.input} ${classes.themeTransition}`}
             />
           </div>
         </div>
-        <div className={`border-b h-[8px] ${isDark ? 'border-white/10' : 'border-black/10'}`}></div>
+        <div className={`mx-3 mt-3 border-t ${classes.border}`}></div>
         <button
           onClick={toggleRecentChats}
           className={`w-full px-4 pt-4 pb-1 flex items-center justify-between gap-2 text-[13px] font-medium tracking-normal ${classes.mutedText} ${classes.themeTransition} ${classes.buttonHover} rounded-md`}
@@ -306,7 +306,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                         <button
                           type="button"
                           onClick={() => handleSelectSession(session.id)}
-                          className="flex flex-1 min-w-0 items-center gap-2.5 px-2.5 py-2 text-left"
+                          className={`flex min-h-10 flex-1 min-w-0 items-center gap-2.5 px-2.5 text-left ${classes.focusRing}`}
                         >
                           {session.pinned ? (
                             <Pin size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
@@ -323,9 +323,9 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                         }
                         aria-label={t('moreActions')}
                         title={t('moreActions')}
-                        className={`mr-1 shrink-0 rounded-md p-1 opacity-60 transition-opacity duration-150 ease-out hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 ${
+                        className={`mr-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md opacity-70 transition-opacity duration-150 ease-out hover:opacity-100 focus-visible:opacity-100 max-sm:opacity-100 group-hover:opacity-100 ${classes.focusRing} ${
                           openMenuSessionId === session.id ? 'opacity-100' : ''
-                        } ${isDark ? 'text-white/45 hover:bg-white/10 hover:text-white' : 'text-gray-400 hover:bg-black/5 hover:text-gray-700'
+                        } ${isDark ? 'text-[#a1a1aa] hover:bg-white/10 hover:text-white' : 'text-[#6b7280] hover:bg-black/5 hover:text-gray-900'
                           }`}
                       >
                         <MoreHorizontal size={16} strokeWidth={1.75} />
@@ -338,7 +338,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                           <button
                             type="button"
                             onClick={() => startRename(session)}
-                            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-2.5 rounded-md min-h-10 px-2.5 text-sm ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-white'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
@@ -350,7 +350,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                           <button
                             type="button"
                             onClick={() => handleTogglePinned(session)}
-                            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-2.5 rounded-md min-h-10 px-2.5 text-sm ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-white'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
@@ -362,7 +362,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                           <button
                             type="button"
                             onClick={() => handleDownloadSession(session.id)}
-                            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-2.5 rounded-md min-h-10 px-2.5 text-sm ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-white'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
@@ -374,7 +374,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                           <button
                             type="button"
                             onClick={() => handleDeleteSession(session.id)}
-                            className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
+                            className={`flex w-full items-center gap-2.5 rounded-md min-h-10 px-2.5 text-sm ${classes.themeTransition} ${
                               isDark
                                 ? 'text-white/70 hover:bg-white/10 hover:text-red-300'
                                 : 'text-gray-600 hover:bg-black/5 hover:text-red-500'
@@ -409,7 +409,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                       setIsUserMenuOpen(false);
                       setIsProfileOpen(true);
                     }}
-                    className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
+                    className={`flex w-full items-center gap-2.5 rounded-md min-h-10 px-2.5 text-sm ${classes.themeTransition} ${
                       isDark
                         ? 'text-white/70 hover:bg-white/10 hover:text-white'
                         : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
@@ -421,7 +421,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${classes.themeTransition} ${
+                    className={`flex w-full items-center gap-2.5 rounded-md min-h-10 px-2.5 text-sm ${classes.themeTransition} ${
                       isDark
                         ? 'text-white/70 hover:bg-white/10 hover:text-red-300'
                         : 'text-gray-600 hover:bg-black/5 hover:text-red-500'

@@ -10,13 +10,13 @@ const ChatHeader = ({ toggleSidebar }) => {
 
   return (
     <div
-      className={`h-16 border-b px-5 md:px-6 flex items-center justify-between ${classes.bg} ${classes.border} ${classes.themeTransition}`}
+      className={`h-16 border-b px-2 md:px-6 flex items-center justify-between ${classes.bg} ${classes.border} ${classes.themeTransition}`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center">
         <button
           onClick={toggleSidebar}
           aria-label="切换侧边栏"
-          className={`${classes.buttonText} ${classes.buttonHover} rounded-md p-2 transition-colors duration-150 ease-out`}
+          className={`${classes.iconBtn} ${classes.focusRing} ${classes.buttonText} ${classes.buttonHover} transition-colors duration-150 ease-out`}
         >
           <Menu size={16} strokeWidth={1.75} />
         </button>

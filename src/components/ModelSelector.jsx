@@ -63,7 +63,7 @@ const ModelSelector = React.memo(() => {
         title={currentModel}
         /* 限宽：模型 id 可以很长（含日期/版本后缀），不限制会把顶栏撑变形，
            超出部分由内部 truncate 省略，hover 看完整名 */
-        className={`flex items-center justify-between min-w-[128px] sm:min-w-[168px] max-w-[180px] sm:max-w-[240px] px-2.5 py-1.5 text-sm leading-5 border rounded-md ${
+        className={`flex h-10 items-center justify-between min-w-[128px] sm:min-w-[168px] max-w-[180px] sm:max-w-[240px] px-2.5 text-sm leading-5 border rounded-md ${classes.focusRing} ${
           isDark ? 'bg-[#2a2a2a] text-white border-white/10 hover:bg-zinc-800' : 'bg-white text-black border-gray-300 hover:bg-gray-50'
         } ${classes.themeTransition}`}
       >

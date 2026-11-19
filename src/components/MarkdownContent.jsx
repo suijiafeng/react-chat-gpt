@@ -156,18 +156,18 @@ const components = {
     );
   },
   h1: ({ children }) => (
-    <h1 className="text-2xl font-bold mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
+    <h1 className="text-2xl font-semibold leading-snug tracking-normal mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-xl font-bold mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
+    <h2 className="text-xl font-semibold leading-snug tracking-normal mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
       {children}
     </h2>
   ),
-  h3: ({ children }) => <h3 className="text-lg font-bold mt-4 mb-2 text-inherit">{children}</h3>,
+  h3: ({ children }) => <h3 className="text-lg font-semibold leading-snug tracking-normal mt-4 mb-2 text-inherit">{children}</h3>,
   h4: ({ children }) => <h4 className="text-base font-semibold mt-3 mb-2 text-inherit">{children}</h4>,
-  h5: ({ children }) => <h5 className="text-sm font-bold mt-3 mb-2 text-inherit">{children}</h5>,
+  h5: ({ children }) => <h5 className="text-sm font-semibold tracking-normal mt-3 mb-2 text-inherit">{children}</h5>,
   h6: ({ children }) => (
     <h6 className="text-sm font-semibold tracking-normal mt-3 mb-2 opacity-70 text-inherit">
       {children}
@@ -184,7 +184,7 @@ const components = {
   },
   hr: () => <hr className="my-6 border-t border-current/10" />,
   blockquote: ({ children }) => (
-    <blockquote className="border-l border-current/30 pl-3 my-3 italic text-inherit text-sm">
+    <blockquote className="border-l border-current/40 pl-3 my-3 leading-7 text-inherit text-sm">
       {children}
     </blockquote>
   ),

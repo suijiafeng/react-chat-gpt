@@ -71,7 +71,7 @@ const ChatInput = ({
 
   return (
     <div
-      className={`absolute inset-x-0 bottom-0 z-20 border-t px-4 pb-4 pt-3 ${classes.bg} ${classes.border} ${classes.themeTransition}`}
+      className={`absolute inset-x-0 bottom-0 z-20 border-t px-3 pt-3 md:px-8 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${classes.bg} ${classes.border} ${classes.themeTransition}`}
     >
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
         {/* 视觉能力提示：软提醒，不拦截发送 */}
@@ -86,7 +86,7 @@ const ChatInput = ({
           </div>
         )}
         <div
-          className={`rounded-xl border px-3 py-1.5 ${classes.input} ${classes.border} ${classes.themeTransition}`}
+          className={`rounded-xl border px-2 py-1 focus-within:border-[#2563eb] ${classes.input} ${classes.border} ${classes.themeTransition}`}
         >
           {/* 附件预览区 */}
           {(hasAttachments || isReadingFiles) && (
@@ -161,7 +161,7 @@ const ChatInput = ({
                 title={t('moreActions')}
                 aria-label={t('moreActions')}
                 aria-expanded={isPlusMenuOpen}
-                className={`rounded-md p-2 mb-0.5 transition-colors duration-150 ease-out ${
+                className={`${classes.iconBtn} ${classes.focusRing} mb-0.5 transition-colors duration-150 ease-out ${
                   hasSystemPrompt
                     ? 'text-blue-500 hover:bg-blue-500/10'
                     : isDark
@@ -185,7 +185,7 @@ const ChatInput = ({
                       setIsPlusMenuOpen(false);
                       fileInputRef.current?.click();
                     }}
-                    className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150 ease-out ${
+                    className={`flex w-full items-center gap-2.5 rounded-md min-h-10 px-2.5 text-sm transition-colors duration-150 ease-out ${
                       isDark
                         ? 'text-zinc-300 hover:bg-white/10 hover:text-white'
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -201,7 +201,7 @@ const ChatInput = ({
                         setIsPlusMenuOpen(false);
                         onOpenSystemPrompt?.();
                       }}
-                      className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150 ease-out ${
+                      className={`flex w-full items-center gap-2.5 rounded-md min-h-10 px-2.5 text-sm transition-colors duration-150 ease-out ${
                         hasSystemPrompt
                           ? 'text-blue-500 hover:bg-blue-500/10'
                           : isDark
@@ -228,19 +228,22 @@ const ChatInput = ({
                 e.preventDefault();
                 handleSubmit(e);
               }}
-              className="flex-1 bg-transparent text-base outline-none resize-none overflow-y-auto py-2 h-[24px]"
+              className={`flex-1 bg-transparent text-base leading-6 outline-none resize-none overflow-y-auto py-2 min-h-10 ${
+                isDark ? 'placeholder:text-[#a1a1aa]' : 'placeholder:text-[#6b7280]'
+              }`}
               placeholder={t('enterMessage')}
               style={{ maxHeight: '160px' }}
             />
             <button
               type="submit"
               aria-label={isStreaming ? t('stopGen') : t('sendMsg')}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors duration-150 ease-out active:scale-[0.98] ${
+              disabled={!isStreaming && !input.trim() && !hasAttachments}
+              className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors duration-150 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 ${classes.focusRing} ${
                 isStreaming || input.trim() || hasAttachments
                   ? classes.accentBtn
                   : isDark
-                  ? 'bg-white/10 text-white/60'
-                  : 'bg-black/10 text-black/40'
+                  ? 'bg-white/10 text-white/45'
+                  : 'bg-black/10 text-black/35'
               }`}
             >
               {isStreaming ? <CircleStop size={16} strokeWidth={1.75} /> : <Send size={16} strokeWidth={1.75} />}

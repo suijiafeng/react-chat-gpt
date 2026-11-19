@@ -84,10 +84,12 @@ export const ThemeProvider = ({ children }) => {
       buttonText: isDark ? 'text-gray-300' : 'text-gray-500',
       buttonHover: isDark ? 'hover:bg-white/5 hover:text-white' : 'hover:bg-black/5 hover:text-gray-700',
       input: isDark
-        ? 'bg-[#2f2f2f] text-[#ececec] border-white/10 placeholder:text-[#8e8ea0]'
-        : 'bg-white text-black border-gray-300 placeholder:text-gray-400',
+        ? 'bg-[#2f2f2f] text-[#ececec] border-white/10 placeholder:text-[#a1a1aa]'
+        : 'bg-white text-black border-gray-300 placeholder:text-[#6b7280]',
       border: isDark ? 'border-white/10' : 'border-gray-200',
       divide: isDark ? 'divide-white/10' : 'divide-gray-200',
+      focusRing: 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]',
+      iconBtn: 'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md',
       menu: isDark
         ? 'border border-white/10 bg-[#222222] shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
         : 'border border-gray-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]',

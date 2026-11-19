@@ -420,7 +420,7 @@ const ChatInterface = () => {
                           key={item.title}
                           type="button"
                           onClick={() => handlePromptClick(item)}
-                          className={`flex w-full min-w-0 items-center gap-3 px-1 py-2.5 text-left text-sm transition-colors duration-150 ease-out ${classes.buttonHover}`}
+                          className={`flex min-h-11 w-full min-w-0 items-center gap-3 px-1 text-left text-sm transition-colors duration-150 ease-out ${classes.focusRing} ${classes.buttonHover}`}
                         >
                           <item.icon size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
                           <span className="min-w-0 truncate">{item.title}</span>
