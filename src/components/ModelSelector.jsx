@@ -12,15 +12,6 @@ import {
   DEMO_MODELS,
 } from '../store/llmConfig';
 
-// 服务商分组前的小圆点颜色：按服务商名字哈希出一个固定色相，
-// 同一服务商每次打开颜色都一致，纯视觉区分，不需要额外配置或存储
-const hueOf = (str) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  return Math.abs(hash) % 360;
-};
-const dotColor = (str) => `hsl(${hueOf(str)}, 62%, 58%)`;
-
 const ModelSelector = React.memo(() => {
   const { isDark, classes } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -124,7 +115,7 @@ const ModelItem = ({ model, isActive, onClick, isDark }) => (
   </button>
 );
 
-// 分组标题：服务商名 + 哈希色小圆点，组间用细分割线区隔，层次更清晰。
+// 分组标题：服务商名，组间用细分割线区隔。
 // 每组是独立的 wrapper div，GroupLabel 在自己容器里恒为第一个子元素，
 // 不能靠 Tailwind 的 first: 伪类判断"是不是列表里第一组"，要靠显式 first 参数
 const GroupLabel = ({ name, isDark, first }) => (
