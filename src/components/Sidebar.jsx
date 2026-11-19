@@ -27,6 +27,7 @@ import { getAllSessions, deleteSession, updateSessionTitle, setSessionPinned } f
 import { userSignOut } from '../apis/auths';
 import { reloadForCurrentUser } from '../store/llmConfig';
 import { APP_NAME } from '../constants';
+import { shouldSubmitOnEnter } from '../utils/ime';
 
 const RECENT_CHATS_COLLAPSED_KEY = 'recent_chats_collapsed';
 
@@ -288,7 +289,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                             onChange={(e) => setRenameDraft(e.target.value)}
                             onBlur={commitRename}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') commitRename();
+                              if (shouldSubmitOnEnter(e)) commitRename();
                               if (e.key === 'Escape') setRenamingId(null);
                             }}
                             className={`w-full min-w-0 rounded-lg border px-2 py-1 text-base outline-none ${classes.input} ${classes.themeTransition}`}

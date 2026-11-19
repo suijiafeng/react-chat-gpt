@@ -10,6 +10,12 @@ const app = express();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// 只信任紧邻的一层反向代理（docker compose 里的 nginx 会写 X-Forwarded-For）。
+// 不默认开启：服务直接暴露时，客户端可以伪造该头，把登录限流拆成无数个桶绕过去。
+if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
+
 // Session 签名密钥：绝不能在生产环境用代码里写死的兜底值，否则任何人都能用公开的
 // 密钥伪造会话 cookie 冒充其它用户（且会话已持久化到 SQLite，伪造后重启依旧有效）。
 // 生产环境未配置直接启动失败；开发环境允许临时密钥但打印告警。

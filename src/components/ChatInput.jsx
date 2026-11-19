@@ -3,6 +3,7 @@ import { Send, CircleStop, Plus, X, FileText, Loader2, TriangleAlert, NotebookPe
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { IMAGE_ACCEPT, FILE_ACCEPT, formatFileSize } from '../utils/attachments';
+import { shouldSubmitOnEnter } from '../utils/ime';
 
 const ChatInput = ({
   input,
@@ -234,10 +235,10 @@ const ChatInput = ({
               onChange={(e) => setInput(e.target.value)}
               onPaste={handlePaste}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
+                // 输入法组字中的 Enter 只确认候选，不能当成发送
+                if (!shouldSubmitOnEnter(e)) return;
+                e.preventDefault();
+                handleSubmit(e);
               }}
               className="flex-1 bg-transparent text-base outline-none resize-none overflow-y-auto py-2 h-[24px]"
               placeholder={t('enterMessage')}

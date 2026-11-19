@@ -186,7 +186,9 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
             <form className="flex flex-col" onSubmit={handleSubmit} noValidate>
               <div className="mb-1 text-center">
                 <div className="text-3xl font-medium">
-                  {mode === 'signin' ? t('Sign in') : t('Sign up')} {t('to')} {WEBUI_NAME}
+                  {mode === 'signin'
+                    ? t('signInTitle', { name: WEBUI_NAME })
+                    : t('signUpTitle', { name: WEBUI_NAME })}
                 </div>
                 {mode === 'signup' && (
                   <div className={`mt-1 text-sm font-medium ${classes.mutedText}`}>

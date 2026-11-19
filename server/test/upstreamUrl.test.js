@@ -17,7 +17,8 @@ test('放行正常的 https 上游', () => {
 });
 
 test('拦截云厂商元数据端点（SSRF 的头号目标）', () => {
-  rejects('http://169.254.169.254/latest/meta-data/', /本机地址|内网/);
+  // 默认未开启本机上游时，明文 http 在协议这一层就被拒绝
+  rejects('http://169.254.169.254/latest/meta-data/', /ALLOW_LOCAL_UPSTREAM=true|内网|本机地址/);
   rejects('https://169.254.169.254/latest/meta-data/', /内网或本机/);
 });
 
@@ -50,30 +51,50 @@ test('172.16/12 的边界判定正确（172.15 与 172.32 属于公网）', () =
   assert.equal(isPrivateAddress('172.32.0.1'), false);
 });
 
-test('默认模式下本机地址放行任意端口（Ollama / LM Studio / vLLM 端口各不相同）', () => {
+test('默认（未设置 ALLOW_LOCAL_UPSTREAM）拒绝本机 http，只放行公网 https', () => {
+  for (const url of [
+    'http://localhost:11434/v1',
+    'http://127.0.0.1:11434/v1',
+    'http://localhost:1234/v1',
+    'http://[::1]:8000/v1',
+  ]) {
+    rejects(url, /ALLOW_LOCAL_UPSTREAM=true/);
+  }
+  assert.ok(parseUpstreamUrl('https://api.openai.com/v1'));
+});
+
+test('非本机的明文 http 一律拒绝', () => {
+  rejects('http://api.openai.com/v1', /ALLOW_LOCAL_UPSTREAM=true|本机地址/);
+});
+
+test('ALLOW_LOCAL_UPSTREAM 只有严格等于 true 才放行本机，内网与明文公网仍然拒绝', async () => {
+  // 同一个测试里顺序改环境变量，避免并行用例互相覆盖 process.env
+  for (const value of ['false', '1', 'yes', '']) {
+    process.env.ALLOW_LOCAL_UPSTREAM = value;
+    const strict = await import(`../src/upstreamUrl.js?strict=${encodeURIComponent(value)}-${Date.now()}`);
+    assert.throws(
+      () => strict.parseUpstreamUrl('http://localhost:11434/v1'),
+      /ALLOW_LOCAL_UPSTREAM=true/,
+      `value=${JSON.stringify(value)}`,
+    );
+    assert.ok(strict.parseUpstreamUrl('https://api.openai.com/v1'));
+  }
+
+  process.env.ALLOW_LOCAL_UPSTREAM = 'true';
+  const loose = await import(`../src/upstreamUrl.js?local=${Date.now()}`);
   for (const url of [
     'http://localhost:11434/v1',
     'http://127.0.0.1:11434/v1',
     'http://localhost:1234/v1',
     'http://127.0.0.1:8000/v1',
   ]) {
-    assert.ok(parseUpstreamUrl(url), url);
+    assert.ok(loose.parseUpstreamUrl(url), url);
   }
-});
-
-test('非本机的明文 http 一律拒绝', () => {
-  rejects('http://api.openai.com/v1', /本机地址/);
-});
-
-test('ALLOW_LOCAL_UPSTREAM=false（多用户部署）时连本机也拒绝，但公网 https 照常', async () => {
-  process.env.ALLOW_LOCAL_UPSTREAM = 'false';
-  // 模块级常量在首次 import 时求值，需要独立的模块实例
-  const strict = await import(`../src/upstreamUrl.js?strict=${Date.now()}`);
-  assert.throws(
-    () => strict.parseUpstreamUrl('http://localhost:11434/v1'),
-    /ALLOW_LOCAL_UPSTREAM=false/,
-  );
-  assert.ok(strict.parseUpstreamUrl('https://api.openai.com/v1'));
+  assert.throws(() => loose.parseUpstreamUrl('http://169.254.169.254/latest/meta-data/'), /本机地址/);
+  assert.throws(() => loose.parseUpstreamUrl('http://10.0.0.5/v1'), /本机地址/);
+  assert.throws(() => loose.parseUpstreamUrl('http://api.openai.com/v1'), /本机地址/);
+  assert.throws(() => loose.parseUpstreamUrl('https://127.0.0.1/v1'), /内网或本机/);
+  assert.ok(loose.parseUpstreamUrl('https://api.openai.com/v1'));
   delete process.env.ALLOW_LOCAL_UPSTREAM;
 });
 

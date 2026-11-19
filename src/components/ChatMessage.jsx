@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Loader, Copy, Check, RefreshCw, Pencil, StepForward, AlertTriangle, ChevronDown, Trash2, FileText } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { formatFileSize } from '../utils/attachments';
+import { shouldSubmitOnEnter } from '../utils/ime';
 import { useLanguage } from '../hooks';
 
 // 还没收到第一个字符前展示的等待动画；等待较久时升级为文字提示，
@@ -169,7 +170,8 @@ const ChatMessage = React.memo(
                   e.target.style.height = `${Math.min(e.target.scrollHeight, 240)}px`;
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  // 输入法组字中的 Enter 只确认候选，不能当成保存并重发
+                  if (shouldSubmitOnEnter(e)) {
                     e.preventDefault();
                     submitEdit();
                   }
