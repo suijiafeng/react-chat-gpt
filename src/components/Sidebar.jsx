@@ -198,7 +198,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
         } overflow-hidden z-50`}
     >
       <div className="w-[280px] flex-1 flex flex-col min-h-0">
-        <div className="px-5 pt-4 pb-3 flex justify-between items-center flex-shrink-0">
+        <div className={`h-16 px-5 flex justify-between items-center flex-shrink-0 border-b ${classes.hairline}`}>
           <AppLogo name={APP_NAME} />
           <button
             onClick={onClose}
