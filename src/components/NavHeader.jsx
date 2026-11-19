@@ -24,7 +24,10 @@ const NavHeader = () => {
       <button
         onClick={toggleTheme}
         aria-label={isDark ? '切换到浅色主题' : '切换到深色主题'}
-        className={`${classes.buttonText} ${classes.buttonHover} ${classes.themeTransition} rounded-md p-2`}
+        className={`${isDark
+          ? 'text-yellow-300 hover:bg-white/5 hover:text-yellow-100'
+          : `${classes.buttonText} ${classes.buttonHover}`
+        } ${classes.themeTransition} rounded-md p-2`}
       >
         {isDark ? <Sun size={16} strokeWidth={1.75} /> : <Moon size={16} strokeWidth={1.75} />}
       </button>

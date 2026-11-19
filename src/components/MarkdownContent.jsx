@@ -43,11 +43,11 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
 
   // 代码块跟随主题：浅色下是浅灰底，深色下用锌黑，不用一块突兀的黑板。
   const surface = isDark
-    ? 'bg-[#18181B] text-zinc-200 border-white/[0.08]'
-    : 'bg-zinc-50 text-zinc-900 border-zinc-200';
+    ? 'bg-[#1e1e1e] text-[#d4d4d4] border-white/10'
+    : 'bg-[#f6f8fa] text-[#24292e] border-black/10';
   const chrome = isDark
-    ? 'bg-zinc-900 text-zinc-400 hover:text-zinc-100'
-    : 'bg-zinc-100 text-zinc-500 hover:text-zinc-900';
+    ? 'bg-[#2d2d2d] text-gray-400 hover:text-white'
+    : 'bg-[#eaeef2] text-gray-500 hover:text-gray-900';
 
   const lineCount = codeText.split('\n').length;
   const collapsible = lineCount > CODE_COLLAPSE_LINES;
@@ -149,7 +149,7 @@ const components = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="underline underline-offset-2 decoration-current/40 break-words text-inherit"
+        className="text-[#3b82f6] hover:underline underline-offset-2 break-words"
       >
         {children}
       </a>

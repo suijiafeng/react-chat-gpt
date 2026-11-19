@@ -273,7 +273,7 @@ const LoginSignupForm = ({ WEBUI_NAME }) => {
                 {/* 提交中禁用按钮并换文案：请求在飞的时候按钮仍可点会打出重复注册请求，
                     而 Spin 有 300ms 延迟，快网络下用户根本看不到任何反馈 */}
                 <button
-                  className={`w-full rounded-md font-medium text-sm py-2 transition-colors duration-150 ease-out active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 ${classes.accentBtn}`}
+                  className="w-full rounded-md bg-gray-950 text-white font-medium text-sm py-2 transition-colors duration-150 ease-out hover:bg-gray-900 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
                   type="submit"
                   disabled={loading}
                 >

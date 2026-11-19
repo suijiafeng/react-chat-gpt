@@ -434,7 +434,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
               </div>
               <div
                 className={`rounded-md px-2 py-2 ${
-                  isDark ? 'bg-white/[0.04]' : 'bg-zinc-50'
+                  isDark ? 'bg-white/[0.04]' : 'bg-black/[0.02]'
                 }`}
               >
               <button
@@ -456,11 +456,11 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                     />
                   ) : null}
                   <div
-                    className={`h-8 w-8 items-center justify-center rounded-full flex-shrink-0 ${
+                    className={`h-8 w-8 items-center justify-center rounded-full flex-shrink-0 bg-[#c2410c] text-sm font-semibold text-white ${
                       userProfile?.profile_image_url ? 'hidden' : 'flex'
-                    } ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-zinc-200 text-zinc-600'}`}
+                    }`}
                   >
-                    <UserRound size={16} strokeWidth={1.75} />
+                    {(userProfile.name || userProfile.email || 'U').slice(0, 2).toUpperCase()}
                   </div>
                   <div className="ml-2.5 min-w-0">
                     <div className="truncate text-sm font-medium">

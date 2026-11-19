@@ -101,7 +101,7 @@ const ChatInput = ({
                   <button
                     type="button"
                     onClick={() => onRemoveImage?.(i)}
-                    className="absolute -top-1.5 -right-1.5 rounded-md bg-zinc-900 text-white p-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-150 ease-out"
+                    className="absolute -top-1.5 -right-1.5 rounded-md bg-black/70 text-white p-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-150 ease-out"
                     title={t('removeImage')}
                   >
                     <X size={12} />
@@ -126,7 +126,7 @@ const ChatInput = ({
                   <button
                     type="button"
                     onClick={() => onRemoveFile?.(i)}
-                    className="absolute -top-1.5 -right-1.5 rounded-md bg-zinc-900 text-white p-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-150 ease-out"
+                    className="absolute -top-1.5 -right-1.5 rounded-md bg-black/70 text-white p-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-150 ease-out"
                     title={t('removeFile')}
                   >
                     <X size={12} />
@@ -163,7 +163,7 @@ const ChatInput = ({
                 aria-expanded={isPlusMenuOpen}
                 className={`rounded-md p-2 mb-0.5 transition-colors duration-150 ease-out ${
                   hasSystemPrompt
-                    ? classes.accentSoft
+                    ? 'text-blue-500 hover:bg-blue-500/10'
                     : isDark
                       ? 'text-zinc-300 hover:bg-white/10'
                       : 'text-zinc-500 hover:bg-black/5'
@@ -203,9 +203,7 @@ const ChatInput = ({
                       }}
                       className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150 ease-out ${
                         hasSystemPrompt
-                          ? isDark
-                            ? 'text-zinc-100 hover:bg-white/10'
-                            : 'text-zinc-900 hover:bg-zinc-100'
+                          ? 'text-blue-500 hover:bg-blue-500/10'
                           : isDark
                             ? 'text-zinc-300 hover:bg-white/10 hover:text-white'
                             : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
@@ -241,8 +239,8 @@ const ChatInput = ({
                 isStreaming || input.trim() || hasAttachments
                   ? classes.accentBtn
                   : isDark
-                  ? 'bg-white/10 text-white/50'
-                  : 'bg-zinc-200 text-zinc-400'
+                  ? 'bg-white/10 text-white/60'
+                  : 'bg-black/10 text-black/40'
               }`}
             >
               {isStreaming ? <CircleStop size={16} strokeWidth={1.75} /> : <Send size={16} strokeWidth={1.75} />}
