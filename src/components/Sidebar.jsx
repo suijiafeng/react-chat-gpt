@@ -198,7 +198,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
         } overflow-hidden z-50`}
     >
       <div className="w-[280px] flex-1 flex flex-col min-h-0">
-        <div className="px-5 pt-4 pb-3 flex justify-between items-center flex-shrink-0">
+        <div className={`h-16 px-5 flex justify-between items-center flex-shrink-0 border-b ${classes.hairline}`}>
           <AppLogo name={APP_NAME} />
           <button
             onClick={onClose}
@@ -212,7 +212,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           <button
             type="button"
             onClick={handleNewChat}
-            className={`flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm ${classes.focusRing} ${classes.themeTransition} ${classes.buttonHover}`}
+            className={`flex min-h-10 w-full items-center gap-2.5 rounded-md px-2 text-sm ${classes.focusRing} ${classes.themeTransition} ${classes.buttonHover}`}
           >
             <PenSquare size={16} strokeWidth={1.75} className="shrink-0" />
             <span>{t('newChat')}</span>
@@ -222,7 +222,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
             <Search
               size={16}
               strokeWidth={1.75}
-              className={`absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${classes.mutedText}`}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none ${classes.mutedText}`}
             />
             <input
               ref={searchInputRef}
@@ -237,7 +237,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
         <div className={`mx-3 mt-3 border-t ${classes.border}`}></div>
         <button
           onClick={toggleRecentChats}
-          className={`w-full px-4 pt-4 pb-1 flex items-center justify-between gap-2 text-[13px] font-medium tracking-normal ${classes.mutedText} ${classes.themeTransition} ${classes.buttonHover} rounded-md`}
+          className={`mx-3 flex w-[calc(100%-1.5rem)] items-center justify-between gap-2 rounded-md px-2 pt-4 pb-1 text-[13px] font-medium tracking-normal ${classes.mutedText} ${classes.themeTransition} ${classes.buttonHover}`}
         >
           <span>{t('recentChats')}</span>
           <ChevronDown
@@ -249,8 +249,8 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           />
         </button>
 
-        <div className={`px-2 overflow-hidden flex-1 min-h-0 transition-[padding] duration-150 ease-out ${
-          isRecentChatsCollapsed ? 'pb-0' : 'py-4 overflow-y-auto'
+        <div className={`min-h-0 flex-1 overflow-hidden px-3 transition-[padding] duration-150 ease-out ${
+          isRecentChatsCollapsed ? 'pb-0' : 'overflow-y-auto pt-1 pb-4'
         }`}>
           {!isRecentChatsCollapsed && (
             <>
@@ -288,7 +288,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                         }`}
                     >
                       {renamingId === session.id ? (
-                        <div className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2">
+                        <div className="flex min-w-0 flex-1 items-center gap-3 px-2 py-2">
                           <MessageSquare size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />
                           <input
                             autoFocus
@@ -306,7 +306,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
                         <button
                           type="button"
                           onClick={() => handleSelectSession(session.id)}
-                          className={`flex min-h-10 flex-1 min-w-0 items-center gap-2.5 px-2.5 text-left ${classes.focusRing}`}
+                          className={`flex min-h-10 min-w-0 flex-1 items-center gap-2.5 px-2 text-left ${classes.focusRing}`}
                         >
                           {session.pinned ? (
                             <Pin size={16} strokeWidth={1.75} className="shrink-0 opacity-70" />

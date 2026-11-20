@@ -10,7 +10,7 @@ const ChatHeader = ({ toggleSidebar }) => {
 
   return (
     <div
-      className={`h-16 border-b px-2 md:px-6 flex items-center justify-between ${classes.bg} ${classes.hairline} ${classes.themeTransition}`}
+      className={`h-16 border-b px-2 md:px-6 flex items-center justify-between ${classes.panel} ${classes.hairline} ${classes.themeTransition}`}
     >
       <div className="flex items-center">
         <button

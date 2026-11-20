@@ -60,7 +60,7 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
   };
 
   return (
-    <div className={`my-4 overflow-hidden rounded-lg border font-mono text-sm ${surface}`}>
+    <div className={`my-4 min-w-0 max-w-full overflow-hidden rounded-lg border font-mono text-sm ${surface}`}>
       <div className={`flex items-center justify-between px-3 py-1.5 text-[12px] select-none ${chrome}`}>
         <span className="font-medium tracking-normal">{lang || 'text'}</span>
         <button
@@ -71,9 +71,9 @@ const CodeBlock = React.memo(({ lang, codeText, children }) => {
         </button>
       </div>
       <div
-        className={`overflow-x-auto p-4 leading-6 ${collapsed ? 'max-h-[26rem] overflow-y-hidden' : ''}`}
+        className={`min-w-0 overflow-x-auto p-4 leading-6 ${collapsed ? 'max-h-[26rem] overflow-y-hidden' : ''}`}
       >
-        <pre className="!bg-transparent !p-0 !m-0">{children}</pre>
+        <pre className="!m-0 w-max min-w-full !bg-transparent !p-0">{children}</pre>
       </div>
       {collapsible && (
         <button
@@ -121,12 +121,15 @@ const buildPre = (isTyping) =>
     );
   };
 
-// 整个文件的取色原则：一律用 text-inherit / border-current / bg-current 搭配
-// 透明度，不用 text-gray-xxx dark:text-gray-xxx 这类写死的灰度色。
-// 原因：本项目暗色模式是手动状态切换（ThemeContext 的 isDark 驱动 className），
-// 不是 Tailwind 默认的 prefers-color-scheme 媒体查询策略，dark: 前缀在这里
-// 不跟随应用内主题——固定灰度色在深浅主题下都可能撞色、对比度过低看不清。
-// currentColor 系方案则始终和消息气泡的真实文字颜色保持一致，天然跟随主题。
+// 分隔线和底纹跟文字走同一套中性色。Tailwind 3.4 不会生成
+// border-current/10、bg-current/[0.09] 这类 current 透明度，暗色会掉回亮灰。
+// 主题类是 .dark-theme（见 tailwind.config.js），dark: 前缀会跟着应用内主题走。
+const line = 'border-black/10 dark:border-white/10';
+const lineStrong = 'border-black/30 dark:border-white/30';
+const wash = 'bg-black/[0.05] dark:bg-white/10';
+const washSoft = 'bg-black/[0.03] dark:bg-white/[0.06]';
+const washHover = 'hover:bg-black/[0.03] dark:hover:bg-white/[0.05]';
+
 const components = {
   // 行内代码（块级代码由上面的 `pre` 处理，保留 hljs 高亮类名）
   code({ className, children, ...props }) {
@@ -138,7 +141,7 @@ const components = {
       );
     }
     return (
-      <code className="bg-current/[0.09] px-2 py-1 rounded-md text-sm font-mono text-inherit">
+      <code className={`rounded-md px-1.5 py-0.5 font-mono text-[0.9em] text-inherit ${wash}`}>
         {children}
       </code>
     );
@@ -156,12 +159,12 @@ const components = {
     );
   },
   h1: ({ children }) => (
-    <h1 className="text-2xl font-semibold leading-snug tracking-normal mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
+    <h1 className={`mt-5 mb-3 border-b pb-2 text-2xl font-semibold leading-snug tracking-normal text-inherit ${line}`}>
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-xl font-semibold leading-snug tracking-normal mt-5 mb-3 pb-2 border-b border-current/10 text-inherit">
+    <h2 className={`mt-5 mb-3 border-b pb-2 text-xl font-semibold leading-snug tracking-normal text-inherit ${line}`}>
       {children}
     </h2>
   ),
@@ -182,33 +185,37 @@ const components = {
       </p>
     );
   },
-  hr: () => <hr className="my-6 border-t border-current/10" />,
+  hr: () => <hr className={`my-6 border-t ${line}`} />,
   blockquote: ({ children }) => (
-    <blockquote className="border-l border-current/40 pl-3 my-3 leading-7 text-inherit text-sm">
+    <blockquote className={`my-3 border-l pl-3 leading-7 text-inherit ${lineStrong}`}>
       {children}
     </blockquote>
   ),
-  ul: ({ children }) => <ul className="list-disc pl-6 space-y-1 my-2 marker:text-current/40">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-6 space-y-1 my-2 marker:text-current/40">{children}</ol>,
-  li: ({ children }) => <li className="leading-7 pl-1">{children}</li>,
+  ul: ({ children }) => (
+    <ul className="my-2 list-disc space-y-1 pl-6 marker:text-black/40 dark:marker:text-white/40">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-2 list-decimal space-y-1 pl-6 marker:text-black/40 dark:marker:text-white/40">{children}</ol>
+  ),
+  li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
   table: ({ children }) => (
-    <div className="my-4 overflow-x-auto rounded-lg border border-current/10">
+    <div className={`my-4 min-w-0 max-w-full overflow-x-auto rounded-lg border ${line}`}>
       <table className="w-full border-collapse text-left">{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead className="bg-current/[0.045]">{children}</thead>,
+  thead: ({ children }) => <thead className={washSoft}>{children}</thead>,
   tr: ({ children }) => (
-    <tr className="border-b border-current/10 last:border-b-0 hover:bg-current/[0.025]">
+    <tr className={`border-b last:border-b-0 ${line} ${washHover}`}>
       {children}
     </tr>
   ),
   th: ({ children }) => (
-    <th className="px-4 py-2 text-sm font-semibold border-r border-current/10 last:border-r-0">
+    <th className={`border-r px-4 py-2 text-sm font-semibold last:border-r-0 ${line}`}>
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="px-4 py-2 text-sm border-r border-current/10 last:border-r-0 align-top">
+    <td className={`border-r px-4 py-2 align-top text-sm last:border-r-0 ${line}`}>
       {children}
     </td>
   ),
@@ -219,7 +226,7 @@ const components = {
     <img
       src={src}
       alt={alt}
-      className="max-w-full rounded-lg my-2 border border-current/10"
+      className={`my-2 max-w-full rounded-lg border ${line}`}
       loading="lazy"
     />
   ),
@@ -237,7 +244,7 @@ const MarkdownContent = ({ content, isTyping }) => {
 
   return (
     <div
-      className="markdown-body space-y-1 text-inherit leading-7 break-words"
+      className="markdown-body min-w-0 max-w-full break-words text-inherit leading-7"
     >
       <ReactMarkdown
         remarkPlugins={remarkPlugins}

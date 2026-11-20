@@ -63,7 +63,7 @@ body {
 .settings-modal .ant-modal-footer {
   margin-top: 0;
   padding: 16px 24px 24px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e5e5e5;
 }
 
 .settings-modal .ant-modal-close {
@@ -288,10 +288,28 @@ body {
 }
 
 .settings-modal-dark .ant-btn-primary:disabled,
-.settings-modal-dark .ant-btn-primary[disabled] {
-  color: rgba(255, 255, 255, 0.5) !important;
-  background: rgba(37, 99, 235, 0.45) !important;
-  border-color: rgba(37, 99, 235, 0.45) !important;
+.settings-modal-dark .ant-btn-primary[disabled],
+.settings-modal-dark .ant-btn-primary:disabled:hover,
+.settings-modal-dark .ant-btn-primary[disabled]:hover {
+  color: rgba(255, 255, 255, 0.35) !important;
+  background: #2a2a2a !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+}
+
+.settings-modal-dark .ant-input:disabled,
+.settings-modal-dark .ant-input-disabled,
+.settings-modal-dark .ant-input-affix-wrapper-disabled,
+.settings-modal-dark .ant-input-affix-wrapper-disabled > .ant-input,
+.settings-modal-dark .ant-input-number-disabled,
+.settings-modal-dark .ant-input-number-disabled .ant-input-number-input,
+.settings-modal-dark .ant-select-disabled .ant-select-selector {
+  color: rgba(255, 255, 255, 0.35) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.35);
+  background: #141414 !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  cursor: not-allowed;
 }
 
 .settings-modal-dark .ant-switch {
@@ -416,8 +434,7 @@ img {
 /* 浅色主题下的代码高亮：全局引入的是 github-dark，这里用 github 亮色主题的 token 配色按 :not(.dark-theme) 覆盖。
    本段由 highlight.js/styles/github.css 转换生成，勿手改。 */
 html:not(.dark-theme) .markdown-body pre code.hljs { display: block;
-  overflow-x: auto;
-  padding: 1em }
+  overflow-x: auto; }
 html:not(.dark-theme) .markdown-body /*!
   Theme: GitHub
   Description: Light theme as seen on github.com

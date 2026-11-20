@@ -56,8 +56,8 @@ const MermaidBlock = React.memo(({ code, isTyping }) => {
 
   return (
     <div
-      className={`my-4 overflow-hidden rounded-lg border ${
-        isDark ? 'border-gray-800 bg-[#1b1b1b] text-[#d4d4d4]' : 'border-gray-200 bg-white text-gray-800'
+      className={`my-4 min-w-0 max-w-full overflow-hidden rounded-lg border ${
+        isDark ? 'border-white/10 bg-[#1b1b1b] text-[#d4d4d4]' : 'border-black/10 bg-white text-gray-800'
       }`}
     >
       <div
