@@ -144,12 +144,12 @@ const ChatMessage = React.memo(
     };
 
     const containerClasses = `group message-row flex mb-6 min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`;
-    // 小屏给消息更宽的可读区域（90%），桌面维持 82% 的留白节奏。
-    // AI 回复固定占满这条上限：短回复不再缩成一条，长代码也不会把列撑破（min-w-0）。
+    // 窄屏 AI 回复占满消息列（左右都是滚动区的 px-4）。桌面仍是 82% / 720px。
+    // min-w-0 让宽代码在代码块内横滑，而不是把页面撑出横向滚动。
     const contentContainerClasses = `relative flex min-w-0 flex-col ${
       isUser
         ? 'max-w-[90%] items-end sm:max-w-[min(720px,82%)]'
-        : 'w-full max-w-[90%] items-stretch sm:max-w-[min(720px,82%)]'
+        : 'w-full items-stretch sm:max-w-[min(720px,82%)]'
     }`;
     const messageClasses = `
       min-w-0 max-w-full py-2 text-base leading-7
