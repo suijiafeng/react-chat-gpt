@@ -26,9 +26,9 @@
       多家服务商，未填写密钥
     </td>
     <td align="center" valign="top">
-      <img src="docs/screenshots/highlight-mobile.webp" width="400" alt="窄屏下代码换行，输入框仍在底部">
+      <img src="docs/screenshots/highlight-mobile.webp" width="400" alt="窄屏下代码在块内横滑，输入框仍在底部">
       <br>
-      窄屏下代码换行，输入框仍在底部
+      窄屏下代码在块内横滑，输入框仍在底部
     </td>
   </tr>
 </table>

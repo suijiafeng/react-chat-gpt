@@ -63,11 +63,11 @@ const ModelSelector = React.memo(() => {
         title={currentModel}
         /* 限宽：模型 id 可以很长（含日期/版本后缀），不限制会把顶栏撑变形，
            超出部分由内部 truncate 省略，hover 看完整名 */
-        className={`flex h-10 items-center justify-between min-w-[128px] sm:min-w-[168px] max-w-[180px] sm:max-w-[240px] px-2.5 text-sm leading-5 border rounded-md ${classes.focusRing} ${
-          isDark ? 'bg-transparent text-[#ececec] border-white/10 hover:bg-white/5' : 'bg-transparent text-black border-black/10 hover:bg-black/[0.04]'
+        className={`flex h-10 max-w-[180px] items-center justify-between rounded-md px-2.5 text-sm leading-5 sm:max-w-[240px] ${classes.focusRing} ${
+          isDark ? 'bg-transparent text-[#ececec] hover:bg-white/5' : 'bg-transparent text-black hover:bg-black/[0.04]'
         } ${classes.themeTransition}`}
       >
-        <span className="truncate mr-2 font-mono text-[13px] tabular-nums">{currentModel}</span>
+        <span className="mr-2 truncate text-sm">{currentModel}</span>
         <ChevronDown
           size={16}
           strokeWidth={1.75}

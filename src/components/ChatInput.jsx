@@ -49,7 +49,7 @@ const ChatInput = ({
       // 输入框会永久顶到 160px 上限
       if (!el.clientWidth) return;
       el.style.height = 'auto';
-      el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+      el.style.height = `${el.scrollHeight}px`;
     };
     fit();
     window.addEventListener('resize', fit);
@@ -216,24 +216,26 @@ const ChatInput = ({
                 </div>
               )}
             </div>
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onPaste={handlePaste}
-              onKeyDown={(e) => {
-                // 输入法组字中的 Enter 只确认候选，不能当成发送
-                if (!shouldSubmitOnEnter(e)) return;
-                e.preventDefault();
-                handleSubmit(e);
-              }}
-              className={`flex-1 bg-transparent text-base leading-6 outline-none resize-none overflow-y-auto py-2 min-h-10 ${
-                isDark ? 'placeholder:text-[#a1a1aa]' : 'placeholder:text-[#6b7280]'
-              }`}
-              placeholder={t('enterMessage')}
-              style={{ maxHeight: '160px' }}
-            />
+            {/* 滚动发生在外层：超过 8 行时内边距留在视口里，第一行不会被上边框切掉 */}
+            <div className="min-w-0 flex-1 overflow-y-auto py-2" style={{ maxHeight: 'calc(8 * 1.5rem + 1rem)' }}>
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onPaste={handlePaste}
+                onKeyDown={(e) => {
+                  // 输入法组字中的 Enter 只确认候选，不能当成发送
+                  if (!shouldSubmitOnEnter(e)) return;
+                  e.preventDefault();
+                  handleSubmit(e);
+                }}
+                className={`block w-full resize-none overflow-hidden bg-transparent text-base leading-6 outline-none ${
+                  isDark ? 'placeholder:text-[#a1a1aa]' : 'placeholder:text-[#6b7280]'
+                }`}
+                placeholder={t('enterMessage')}
+              />
+            </div>
             <button
               type="submit"
               aria-label={isStreaming ? t('stopGen') : t('sendMsg')}

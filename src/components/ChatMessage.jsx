@@ -62,8 +62,11 @@ const ChatMessage = React.memo(
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message);
     const [reasoningExpanded, setReasoningExpanded] = useState(false);
+    // 手机没有 hover：点消息或长按才展开这一条的操作，避免每条都常驻三个图标
+    const [actionsOpen, setActionsOpen] = useState(false);
     const editRef = useRef(null);
     const reasoningScrollRef = useRef(null);
+    const rowRef = useRef(null);
 
     // 正文出现前的等待/思考计时：驱动"响应较慢"提示与思考耗时展示
     const waiting = isTyping && !message;
@@ -112,6 +115,15 @@ const ChatMessage = React.memo(
       });
     }, [reasoningExpanded, reasoning]);
 
+    useEffect(() => {
+      if (!actionsOpen) return;
+      const onPointer = (e) => {
+        if (!rowRef.current?.contains(e.target)) setActionsOpen(false);
+      };
+      document.addEventListener('pointerdown', onPointer);
+      return () => document.removeEventListener('pointerdown', onPointer);
+    }, [actionsOpen]);
+
     const handleCopy = () => {
       navigator.clipboard.writeText(message);
       setCopied(true);
@@ -131,23 +143,26 @@ const ChatMessage = React.memo(
       }
     };
 
-    const containerClasses = `group message-row flex mb-6 ${isUser ? 'justify-end' : 'justify-start'}`;
-    // 小屏给消息更宽的可读区域（90%），桌面维持 82% 的留白节奏
-    const contentContainerClasses = `flex flex-col max-w-[90%] sm:max-w-[min(720px,82%)] ${
-      isUser ? 'items-end' : 'items-start'
+    const containerClasses = `group message-row flex mb-6 min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`;
+    // 小屏给消息更宽的可读区域（90%），桌面维持 82% 的留白节奏。
+    // AI 回复固定占满这条上限：短回复不再缩成一条，长代码也不会把列撑破（min-w-0）。
+    const contentContainerClasses = `relative flex min-w-0 flex-col ${
+      isUser
+        ? 'max-w-[90%] items-end sm:max-w-[min(720px,82%)]'
+        : 'w-full max-w-[90%] items-stretch sm:max-w-[min(720px,82%)]'
     }`;
     const messageClasses = `
-      px-4 py-2 text-base leading-7
+      min-w-0 max-w-full py-2 text-base leading-7
       ${
         isUser
-          ? isDark
-            ? 'rounded-xl bg-white/[0.06] text-white'
-            : 'rounded-xl bg-black/[0.04] text-black'
+          ? `px-4 ${isDark ? 'rounded-xl bg-white/[0.06] text-white' : 'rounded-xl bg-black/[0.04] text-black'}`
           : isError
-          ? isDark
-            ? 'rounded-xl border border-red-500/30 bg-red-500/10 text-red-200'
-            : 'rounded-xl border border-red-200 bg-red-50 text-red-700'
-          : 'bg-transparent text-inherit'
+          ? `px-4 ${
+              isDark
+                ? 'rounded-xl border border-red-500/30 bg-red-500/10 text-red-200'
+                : 'rounded-xl border border-red-200 bg-red-50 text-red-700'
+            }`
+          : 'w-full bg-transparent px-0 text-inherit'
       }
     `;
 
@@ -205,7 +220,22 @@ const ChatMessage = React.memo(
     }
 
     return (
-      <div className={containerClasses}>
+      <div
+        ref={rowRef}
+        className={containerClasses}
+        onClick={(e) => {
+          if (e.target.closest('button, a, input, textarea')) return;
+          if (window.getSelection?.()?.toString()) return;
+          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+          setActionsOpen((open) => !open);
+        }}
+        onContextMenu={(e) => {
+          if (e.target.closest('button, a, input, textarea')) return;
+          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+          e.preventDefault();
+          setActionsOpen(true);
+        }}
+      >
         <div className={contentContainerClasses}>
           {/* 用户消息的附件：图片缩略与文件卡片展示在气泡上方 */}
           {isUser && images?.length > 0 && (
@@ -295,11 +325,18 @@ const ChatMessage = React.memo(
               isTyping && <LoadingIndicator classes={classes} elapsed={elapsed} t={t} />
             )}
           </div>
-          {/* 操作栏：AI 最后一条常驻，其余消息 hover 时显示；生成中不显示 */}
+          {/* 操作栏：最后一条常驻。更早的消息桌面 hover 显示，手机点按/长按显示。
+              隐藏时绝对定位，不再占 40px 把消息间距撑开。 */}
           {!isTyping && !(isStreaming && isLast) && (message || images?.length > 0 || attachments?.length > 0) && (
             <div
-              className={`flex items-center gap-0.5 mt-1 -ml-1.5 transition-opacity duration-150 ease-out max-sm:opacity-100 focus-within:opacity-100 ${
-                !isUser && isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              className={`flex items-center gap-0.5 transition-opacity duration-150 ease-out ${
+                isLast
+                  ? `mt-1 opacity-100 ${isUser ? '' : '-ml-3'}`
+                  : `absolute z-10 top-[calc(100%-0.5rem)] ${isUser ? 'right-0' : 'left-0 -ml-3'} ${
+                      actionsOpen
+                        ? 'pointer-events-auto opacity-100'
+                        : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100'
+                    }`
               }`}
             >
               <ActionButton title={t('copy')} onClick={handleCopy} isDark={isDark}>

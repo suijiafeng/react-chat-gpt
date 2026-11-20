@@ -110,6 +110,7 @@
   "signOutConfirmDemoHint": "Signing out will permanently erase all data from this demo session (chats, model settings, nickname).",
   "demoParamsDisabled": "Demo replies don't use these settings. Connect a real model provider to enable them.",
   "set": {
+    "demoProvider": "Demo",
     "testConnection": "Test connection",
     "testing": "Testing…",
     "loginFirstForBackend": "Sign in first to configure server-hosted mode",

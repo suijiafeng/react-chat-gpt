@@ -3,7 +3,7 @@ import { Modal, Input, Radio, Button, Select, InputNumber, Switch, message, Popc
 import { Zap, CheckCircle2, XCircle, Loader2, Trash2, Plus, ExternalLink, X } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
-import { getConfig, saveConfig, saveProfiles } from '../store/llmConfig';
+import { getConfig, saveConfig, saveProfiles, resolveProviderName } from '../store/llmConfig';
 import { getBackendLlmConfig, saveBackendLlmConfig, testBackendLlmConfig } from '../apis/llm';
 import { USE_LOCAL_DATA } from '../constants';
 import { PROVIDER_PRESETS } from '../constants/providerPresets';
@@ -113,6 +113,8 @@ const newCustomId = () => `custom-${Date.now()}-${customSeq++}`;
 // 现在 tab 去掉了，它降级成服务商列表里的一张卡片——用户只需要回答"用哪家模型服务"
 // 这一个问题，而不是先选模式、再选服务商。
 const BACKEND_ID = '__backend__';
+// 演示模式不是一张可配置的服务商卡，但打开设置时需要有明确的当前项
+const DEMO_CHIP_ID = '__demo__';
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const { isDark, classes } = useTheme();
@@ -185,10 +187,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
       enabledModels: [...(p.enabledModels || [])],
     }));
     // 上次用的是服务器托管，就直接选中那张卡；否则选中上次激活的服务商
-    const nextSelectedId =
+    let nextSelectedId =
       config.provider === 'backend' && !USE_LOCAL_DATA
         ? BACKEND_ID
         : config.activeProfileId || config.profiles[0]?.id || '';
+    // 演示回复没有对应的服务商卡，空选会让人以为还没进入任何模式
+    if (!nextSelectedId && resolveProviderName() === 'demo') nextSelectedId = DEMO_CHIP_ID;
     const nextProvider = nextSelectedId === BACKEND_ID ? 'backend' : 'custom';
     setProfiles(nextProfiles);
     setSelectedId(nextSelectedId);
@@ -729,18 +733,31 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
   // 「服务器托管」跟在服务商列表末尾，只在接了真实后端的部署下出现。
   // 固定收尾，跟在模型服务商后面
-  const providerChips = USE_LOCAL_DATA
-    ? chipItems
-    : [
-        ...chipItems,
-        {
-          id: BACKEND_ID,
-          isBackend: true,
-          name: t('backendHosted'),
-          hasKey: backendHasApiKey,
-          hasEnabledModels: Boolean(backendModel),
-        },
-      ];
+  const providerChips = [
+    ...(resolveProviderName() === 'demo' || selectedId === DEMO_CHIP_ID
+      ? [
+          {
+            id: DEMO_CHIP_ID,
+            isDemo: true,
+            name: t('set.demoProvider'),
+            hasKey: false,
+            hasEnabledModels: false,
+          },
+        ]
+      : []),
+    ...chipItems,
+    ...(!USE_LOCAL_DATA
+      ? [
+          {
+            id: BACKEND_ID,
+            isBackend: true,
+            name: t('backendHosted'),
+            hasKey: backendHasApiKey,
+            hasEnabledModels: Boolean(backendModel),
+          },
+        ]
+      : []),
+  ];
 
   // 通用参数一行：上下文预算靠左，展示思考过程贴右。
   // 免登录/演示回复状态（没有任何可用服务商）下这两个参数不会被消费——
@@ -824,7 +841,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
         },
         header: {
           backgroundColor: isDark ? '#18181b' : '#ffffff',
-          borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e5e5e5',
           paddingBottom: '16px',
         },
         mask: {
@@ -844,7 +861,16 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => (item.isPreset ? applyPreset(item.preset) : setSelectedId(item.id))}
+                      onClick={() => {
+                        if (item.isDemo) {
+                          setSelectedId(DEMO_CHIP_ID);
+                          setTestState('idle');
+                          setTestMessage('');
+                          return;
+                        }
+                        if (item.isPreset) applyPreset(item.preset);
+                        else setSelectedId(item.id);
+                      }}
                       className={`min-h-10 rounded-md border px-2.5 text-[13px] inline-flex items-center gap-1.5 transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] ${
                         isActive
                           ? isDark

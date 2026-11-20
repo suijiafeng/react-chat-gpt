@@ -110,6 +110,7 @@
   "signOutConfirmDemoHint": "退出后将清空本次体验的全部数据（会话记录、模型配置、昵称），且无法恢复。",
   "demoParamsDisabled": "演示回复不使用这些参数，接入真实模型服务商后即可调整。",
   "set": {
+    "demoProvider": "演示",
     "testConnection": "测试连接",
     "testing": "测试中...",
     "loginFirstForBackend": "请先登录后再配置服务器托管模式",

@@ -23,6 +23,13 @@ const buildAntdTheme = (isDark) => ({
     colorBorder: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
     colorText: isDark ? '#ECECEC' : '#1F1F1F',
     colorTextSecondary: isDark ? '#A1A1AA' : '#6B7280',
+    // 深色算法下禁用主按钮仍是饱和蓝、禁用输入和可编辑态几乎一样
+    ...(isDark
+      ? {
+          colorTextDisabled: 'rgba(255,255,255,0.35)',
+          colorBgContainerDisabled: '#141414',
+        }
+      : {}),
     borderRadius: 6,
     borderRadiusLG: 12,
     fontFamily: FONT_FAMILY,
@@ -105,7 +112,7 @@ export const ThemeProvider = ({ children }) => {
 
   return (
     <ThemeContext.Provider value={theme}>
-      <ConfigProvider theme={antdThemeConfig}>
+      <ConfigProvider theme={antdThemeConfig} button={{ autoInsertSpace: false }}>
         <AntdApp>{children}</AntdApp>
       </ConfigProvider>
     </ThemeContext.Provider>
