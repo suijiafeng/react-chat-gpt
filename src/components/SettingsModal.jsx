@@ -7,6 +7,7 @@ import { getConfig, saveConfig, saveProfiles, resolveProviderName } from '../sto
 import { getBackendLlmConfig, saveBackendLlmConfig, testBackendLlmConfig } from '../apis/llm';
 import { USE_LOCAL_DATA } from '../constants';
 import { PROVIDER_PRESETS } from '../constants/providerPresets';
+import { WebCryptoUnavailableError } from '../utils/keyVault';
 
 // 从任意 OpenAI 兼容平台拉取模型 id 列表（浏览器直连，用于 custom 模式）。
 const fetchOpenAiModelIds = async (baseUrl, apiKey) => {
@@ -619,7 +620,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
         normalized.find((p) => p.id === selectedId && p.enabledModels.length) ||
         normalized.find((p) => p.enabledModels.length) ||
         null;
-      await saveProfiles(normalized, active?.id || '');
+      try {
+        await saveProfiles(normalized, active?.id || '');
+      } catch (error) {
+        message.error(t(error instanceof WebCryptoUnavailableError ? 'secureChatRequired' : 'set.saveLocallyFailed'));
+        return;
+      }
       saveConfig(
         active
           ? {

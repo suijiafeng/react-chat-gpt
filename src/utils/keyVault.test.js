@@ -1,11 +1,24 @@
-import { describe, it, expect } from 'vitest';
-import { encryptString, decryptString, encryptJson, decryptJson, isEncrypted } from './keyVault';
+import { describe, it, expect, vi } from 'vitest';
+import { encryptString, decryptString, encryptJson, decryptJson, isEncrypted, WebCryptoUnavailableError } from './keyVault';
 
 // node 环境没有 IndexedDB，直接生成密钥注入（与浏览器主密钥同参数）
 const genKey = () =>
   crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 
 describe('keyVault AES-GCM 加解密', () => {
+  it('Web Crypto 不可用时返回明确的加密错误，不尝试访问 IndexedDB', async () => {
+    const open = vi.fn();
+    vi.stubGlobal('crypto', {});
+    vi.stubGlobal('indexedDB', { open });
+    try {
+      await expect(encryptString('synthetic-test-key')).rejects.toBeInstanceOf(WebCryptoUnavailableError);
+      expect(open).not.toHaveBeenCalled();
+      await expect(encryptString('')).resolves.toBe('');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('加密后为 enc: 前缀格式，且不含明文', async () => {
     const key = await genKey();
     const stored = await encryptString('sk-secret-123456', key);
