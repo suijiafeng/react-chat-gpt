@@ -4,6 +4,8 @@ README 里的 `npm ci` 与 `npm run dev` 只起前端。这里是对接后端、
 
 ## 前后端一起跑
 
+先用 `node -v` 确认当前终端使用 Node.js 22。服务端的 SQLite 依赖包含原生绑定。切换 Node 版本或在不同平台安装后，请在当前环境重新执行 `npm ci --prefix server`。如果安装日志提示下载不到预编译绑定，请安装 Python 3 和本机 C/C++ 编译工具后重新安装。macOS 可以通过 `xcode-select --install` 安装命令行工具。
+
 ```bash
 npm ci
 npm ci --prefix server
