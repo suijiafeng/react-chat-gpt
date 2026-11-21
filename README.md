@@ -63,6 +63,8 @@ npm ci
 npm run dev
 ```
 
+在手机或其他设备上访问时，请使用 HTTPS。非 localhost 的 HTTP 地址无法使用浏览器的会话加密功能。
+
 登录页可以点「免登录体验」，或用预置账号 `demo@aichat.local` / `Demo@2026`（显示名陈予安）。这组口令写在源码里，只适合本地演示。
 
 同时跑后端、环境变量和 Docker 见 [docs/setup.md](./docs/setup.md)。

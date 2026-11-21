@@ -37,6 +37,8 @@
   "settings": "模型与 API 配置",
   "cancel": "取消",
   "save": "保存",
+  "secureChatRequired": "会话存储需要 HTTPS 或 localhost。请切换到安全地址后重试。",
+  "sendChatFailed": "消息发送失败，请稍后重试。",
   "settingsSaved": "设置已保存！",
   "backendHosted": "服务器托管",
   "demoHint": "无需密钥，AI 回复采用预设素材。",

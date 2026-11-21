@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Popconfirm, message as antdMessage } from 'antd';
-import { Download, Trash2 } from 'lucide-react';
+import { Download, Settings, Trash2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../hooks';
 import { userStore } from '../store';
@@ -10,7 +10,7 @@ import { shouldSubmitOnEnter } from '../utils/ime';
 
 // 个人设置弹窗：昵称修改 + 数据管理（导出全部 / 清空全部）。
 // 账号邮箱只读展示；改名按登录形态分别持久化（见 apis/auths.js updateProfileName）。
-const ProfileModal = ({ isOpen, onClose, onChatsCleared }) => {
+const ProfileModal = ({ isOpen, onClose, onChatsCleared, onOpenModelSettings }) => {
   const { classes, isDark } = useTheme();
   const { t } = useLanguage();
   const profile = userStore.userProfile;
@@ -96,6 +96,11 @@ const ProfileModal = ({ isOpen, onClose, onChatsCleared }) => {
             className={`w-full rounded-md border px-3 py-2 text-sm outline-none ${classes.input} ${classes.themeTransition}`}
           />
         </div>
+
+        <button type="button" onClick={onOpenModelSettings} className={dataActionRowClass}>
+          <Settings size={16} strokeWidth={1.75} />
+          <span>{t('settings')}</span>
+        </button>
 
         {/* 数据管理 */}
         <div>

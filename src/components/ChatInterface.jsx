@@ -159,32 +159,41 @@ const ChatInterface = () => {
         return;
       }
 
-      // 如果是新对话，先在 DB 创建 session 再跳转
-      let activeSessionId = sessionId;
-      let isNewSession = false;
-      if (!activeSessionId) {
-        const session = await createSession('新对话', currentModel);
-        activeSessionId = session.id;
-        isNewSession = true;
-        // 跳转到持久化 URL（路由变化会触发 useEffect 更新 sessionId state）
-        navigate(`/c/${activeSessionId}`, { replace: true });
-        setSidebarRefreshKey((k) => k + 1);
+      if (!globalThis.crypto?.subtle) {
+        antdMessage.error(t('secureChatRequired'));
+        return;
       }
 
-      const conversation = [
-        ...toConversation(messages),
-        { role: 'user', content: buildUserContent(text, pendingImages, pendingFiles) },
-      ];
+      try {
+        // 如果是新对话，先在 DB 创建 session 再跳转
+        let activeSessionId = sessionId;
+        let isNewSession = false;
+        if (!activeSessionId) {
+          const session = await createSession('新对话', currentModel);
+          activeSessionId = session.id;
+          isNewSession = true;
+          // 跳转到持久化 URL（路由变化会触发 useEffect 更新 sessionId state）
+          navigate(`/c/${activeSessionId}`, { replace: true });
+          setSidebarRefreshKey((k) => k + 1);
+        }
 
-      // 发送新消息时无条件恢复滚动跟随
-      autoFollowRef.current = true;
-      // 新建会话时直接传入 activeSessionId，绕过 state 异步更新避免竞态
-      handleChatCompletion(text, conversation, isNewSession ? activeSessionId : undefined, {
-        images: pendingImages,
-        attachments: pendingFiles,
-      });
-      setPendingImages([]);
-      setPendingFiles([]);
+        const conversation = [
+          ...toConversation(messages),
+          { role: 'user', content: buildUserContent(text, pendingImages, pendingFiles) },
+        ];
+
+        // 发送新消息时无条件恢复滚动跟随
+        autoFollowRef.current = true;
+        // 新建会话时直接传入 activeSessionId，绕过 state 异步更新避免竞态
+        await handleChatCompletion(text, conversation, isNewSession ? activeSessionId : undefined, {
+          images: pendingImages,
+          attachments: pendingFiles,
+        });
+        setPendingImages([]);
+        setPendingFiles([]);
+      } catch {
+        antdMessage.error(t('sendChatFailed'));
+      }
     },
     [
       messages,

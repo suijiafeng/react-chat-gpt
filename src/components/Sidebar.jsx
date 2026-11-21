@@ -18,6 +18,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import ProfileModal from './ProfileModal';
+import SettingsModal from './SettingsModal';
 import AppLogo from './AppLogo';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
@@ -36,6 +37,7 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
   const { t } = useLanguage();
   // 个人设置弹窗（昵称/数据管理）
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const navigate = useNavigate();
   const { chatId } = useParams();
   const { userProfile } = userStore;
@@ -480,7 +482,12 @@ const Sidebar = observer(({ isOpen, onClose, refreshKey }) => {
           </div>
         )}
       </div>
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <ProfileModal
+        onOpenModelSettings={() => {
+          setIsProfileOpen(false);
+          setIsSettingsOpen(true);
+        }}
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         onChatsCleared={() => {

@@ -37,6 +37,8 @@
   "settings": "Model & API Settings",
   "cancel": "Cancel",
   "save": "Save",
+  "secureChatRequired": "Chat storage requires HTTPS or localhost. Open the app at a secure address and try again.",
+  "sendChatFailed": "Could not send the message. Please try again.",
   "settingsSaved": "Settings saved!",
   "backendHosted": "Server-hosted",
   "demoHint": "No API key needed. Replies come from bundled samples.",
