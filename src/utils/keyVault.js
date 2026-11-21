@@ -14,6 +14,13 @@ const STORE = 'keys';
 const MASTER_ID = 'master';
 const PREFIX = 'enc:';
 
+export class WebCryptoUnavailableError extends Error {
+  constructor() {
+    super('Web Crypto is unavailable for local encrypted storage');
+    this.name = 'WebCryptoUnavailableError';
+  }
+}
+
 let masterKeyPromise = null;
 
 const openDb = () =>
@@ -73,9 +80,11 @@ export const isEncrypted = (stored) => typeof stored === 'string' && stored.star
  */
 export const encryptString = async (plain, key) => {
   if (!plain) return '';
+  const webCrypto = globalThis.crypto;
+  if (!webCrypto?.subtle) throw new WebCryptoUnavailableError();
   const master = key || (await getMasterKey());
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt(
+  const iv = webCrypto.getRandomValues(new Uint8Array(12));
+  const ct = await webCrypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     master,
     new TextEncoder().encode(plain)

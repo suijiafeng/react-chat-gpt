@@ -322,15 +322,16 @@ export const saveConfig = (partial) => {
 
 /**
  * 保存多服务商 profile 列表（apiKey 传入明文，这里 AES-GCM 加密后落盘）。
- * 明文同步写入内存缓存（订阅方立即可用），密文异步写 localStorage。
+ * 所有密钥加密完成并写入 localStorage 后，再更新供订阅方读取的内存缓存。
  * @param {Array} profiles - [{id,name,apiUrl,apiKey,models,model}]
  * @param {string} activeId - 当前激活的 profile id
  */
 export const saveProfiles = async (profiles, activeId) => {
+  const pendingKeys = new Map();
   const stored = await Promise.all(
     profiles.map(async (p) => {
       const plain = (p.apiKey || '').trim();
-      keyCache.set(p.id, plain);
+      pendingKeys.set(p.id, plain);
       const models = (p.models || []).map((m) => m.trim()).filter(Boolean);
       return {
         id: p.id,
@@ -345,6 +346,7 @@ export const saveProfiles = async (profiles, activeId) => {
   );
   accountScopedStorage.set(KEYS.profiles, JSON.stringify(stored));
   if (activeId !== undefined) accountScopedStorage.set(KEYS.activeProfile, activeId);
+  for (const [id, key] of pendingKeys) keyCache.set(id, key);
   notify();
 };
 
